@@ -152,6 +152,8 @@ window.CORE_RESEARCH_SEED = {
   "autoBotFindings": [],
   "importedFiles": [],
   "browserHistory": [],
+  "browserSearchResults": [],
+  "browserPreview": null,
   "agentMessages": [
     {
       "role": "assistant",

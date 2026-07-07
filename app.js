@@ -9,11 +9,13 @@ const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gs
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
 const AUTO_BOT_INTERVAL_MS = 60_000;
 const TEAM_CHAT_POLL_MS = 5_000;
+const GUEST_SESSION_VALUE = "Guest";
+const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
 
 const AUTH_USERS = [
-  { username: "UserSeth", password: "User1password", role: "ADMIN" },
-  { username: "UserSemaj", password: "User2password", role: "Member" },
-  { username: "UserKhiimori", password: "User3password", role: "Member" },
+  { username: "UserSeth", password: "User1password", role: "ADMIN", readOnly: false },
+  { username: "UserSemaj", password: "User2password", role: "Member", readOnly: false },
+  { username: "UserKhiimori", password: "User3password", role: "Member", readOnly: false },
 ];
 
 const SOURCE_TYPES = [
@@ -377,6 +379,8 @@ const SEED_DATA = {
   autoBotFindings: [],
   importedFiles: [],
   browserHistory: [],
+  browserSearchResults: [],
+  browserPreview: null,
   parallelExtractRuns: [],
   webScrapeRuns: [],
   teamMessages: [],
@@ -663,6 +667,9 @@ const state = {
   search: "",
   selectedId: null,
   currentBrowserUrl: BROWSER_DEFAULT_URL,
+  guestBrowserHistory: [],
+  guestBrowserSearchResults: [],
+  guestBrowserPreview: null,
   importBusy: false,
   teamChatPollTimer: null,
   pendingSearchChoice: null,
@@ -694,6 +701,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function cacheElements() {
   els.authOverlay = document.getElementById("authOverlay");
   els.authForm = document.getElementById("authForm");
+  els.guestLoginButton = document.getElementById("guestLoginButton");
   els.authError = document.getElementById("authError");
   els.currentUserBadge = document.getElementById("currentUserBadge");
   els.signOutButton = document.getElementById("signOutButton");
@@ -726,6 +734,8 @@ function cacheElements() {
   els.browserExternalButton = document.getElementById("browserExternalButton");
   els.browserAddSourceButton = document.getElementById("browserAddSourceButton");
   els.googleCsePublicLink = document.getElementById("googleCsePublicLink");
+  els.browserPreview = document.getElementById("browserPreview");
+  els.browserSearchResults = document.getElementById("browserSearchResults");
   els.browserHistory = document.getElementById("browserHistory");
   els.extractionForm = document.getElementById("extractionForm");
   els.extractionSourceTypes = document.getElementById("extractionSourceTypes");
@@ -780,6 +790,7 @@ function cacheElements() {
 
 function wireEvents() {
   els.authForm.addEventListener("submit", handleSignIn);
+  els.guestLoginButton.addEventListener("click", handleGuestLogin);
   els.signOutButton.addEventListener("click", signOut);
 
   els.searchInput.addEventListener("input", (event) => {
@@ -793,6 +804,7 @@ function wireEvents() {
   });
 
   els.toggleAddFormButton.addEventListener("click", () => {
+    if (!ensureCanWrite("add source records")) return;
     els.addSourceForm.hidden = !els.addSourceForm.hidden;
     if (!els.addSourceForm.hidden) {
       els.addSourceForm.elements.title.focus();
@@ -810,6 +822,12 @@ function wireEvents() {
   els.selectChatGptFilesButton.addEventListener("click", handleSelectChatGptFiles);
   els.saveFilesToChatGptButton.addEventListener("click", handleSaveFilesToChatGptLibrary);
   els.inAppBrowserForm.addEventListener("submit", handleBrowserNavigate);
+  document.querySelector(".google-cse-embed")?.addEventListener("click", handleCseResultClick, true);
+  window.addEventListener("core-cse-search-start", handleCseSearchStart);
+  window.addEventListener("core-cse-results-ready", handleCseResultsReady);
+  els.googleCsePublicLink?.addEventListener("click", () => {
+    openInAppBrowser(GOOGLE_CSE_PUBLIC_URL, "Google CSE public URL", { query: extractBrowserQuery("Google CSE public URL", GOOGLE_CSE_PUBLIC_URL) });
+  });
   els.browserExternalButton.addEventListener("click", openCurrentBrowserTargetExternal);
   els.browserAddSourceButton.addEventListener("click", addCurrentBrowserPageToSources);
   els.extractionForm.addEventListener("submit", handleQueueExtraction);
@@ -836,24 +854,31 @@ function wireEvents() {
   els.botFeedbackForm.addEventListener("submit", handleAutoBotFeedback);
   els.profileForm.addEventListener("submit", handleSaveProfile);
   els.exportProfilesButton.addEventListener("click", () => {
+    if (!ensureCanWrite("export profile data")) return;
     download("core-user-profiles.json", "application/json", JSON.stringify(state.archive.profiles, null, 2));
   });
 
   document.getElementById("exportJsonButton").addEventListener("click", () => {
+    if (!ensureCanWrite("export archive data")) return;
     download("core-research-atlas.json", "application/json", JSON.stringify(state.archive, null, 2));
   });
 
   document.getElementById("exportTextButton").addEventListener("click", () => {
+    if (!ensureCanWrite("export archive data")) return;
     download("core-research-atlas.txt", "text/plain", buildTextDigest(state.archive));
   });
 
   document.getElementById("exportHtmlButton").addEventListener("click", () => {
+    if (!ensureCanWrite("export archive data")) return;
     download("core-research-atlas-digest.html", "text/html", buildHtmlDigest(state.archive));
   });
 
   document.getElementById("copyBriefButton").addEventListener("click", copyCodexBrief);
 
+  replayBufferedCseEvents();
+
   document.getElementById("resetButton").addEventListener("click", () => {
+    if (!ensureCanWrite("reset the archive")) return;
     const confirmed = window.confirm("Reset local archive, profiles, extraction jobs, and chat to the starter state?");
     if (!confirmed) return;
     window.localStorage.removeItem(STORAGE_KEY);
@@ -875,12 +900,12 @@ function wireEvents() {
 
 function initAuth() {
   const username = window.localStorage.getItem(SESSION_KEY);
-  state.currentUser = AUTH_USERS.find((user) => user.username === username) || null;
+  state.currentUser = username === GUEST_SESSION_VALUE ? GUEST_USER : AUTH_USERS.find((user) => user.username === username) || null;
   if (!state.currentUser) {
     showAuth(true);
     return;
   }
-  state.activeProfileUsername = state.currentUser.username;
+  state.activeProfileUsername = isGuestUser() ? state.archive.profiles[0]?.username || "UserSeth" : state.currentUser.username;
   showAuth(false);
   renderAuthState();
 }
@@ -900,6 +925,19 @@ function handleSignIn(event) {
   state.currentUser = user;
   state.activeProfileUsername = user.username;
   window.localStorage.setItem(SESSION_KEY, user.username);
+  els.authForm.reset();
+  els.authError.textContent = "";
+  showAuth(false);
+  render();
+}
+
+function handleGuestLogin() {
+  state.currentUser = GUEST_USER;
+  state.activeProfileUsername = state.archive.profiles[0]?.username || "UserSeth";
+  state.guestBrowserHistory = [];
+  state.guestBrowserSearchResults = [];
+  state.guestBrowserPreview = null;
+  window.localStorage.setItem(SESSION_KEY, GUEST_SESSION_VALUE);
   els.authForm.reset();
   els.authError.textContent = "";
   showAuth(false);
@@ -927,8 +965,71 @@ function renderAuthState() {
   els.currentUserBadge.hidden = !user;
   els.signOutButton.hidden = !user;
   if (user) {
-    els.currentUserBadge.textContent = `${user.username} / ${user.role}`;
+    els.currentUserBadge.textContent = `${user.username} / ${user.role}${isGuestUser() ? " / View only" : ""}`;
   }
+}
+
+function isGuestUser() {
+  return Boolean(state.currentUser?.readOnly);
+}
+
+function ensureCanWrite(action = "change the atlas") {
+  if (!isGuestUser()) return true;
+  window.alert(`Guest mode is view-only. Sign in as a project user to ${action}.`);
+  return false;
+}
+
+function writeDisabledAttr() {
+  return isGuestUser() ? ' disabled aria-disabled="true" title="Guest mode is view-only."' : "";
+}
+
+function renderPermissionState() {
+  const guest = isGuestUser();
+  document.body.classList.toggle("is-guest-mode", guest);
+  const readOnlyFormIds = [
+    "addSourceForm",
+    "fileImportForm",
+    "extractionForm",
+    "extractKeywordSearchForm",
+    "parallelExtractForm",
+    "webScrapeForm",
+    "agentForm",
+    "agentScrapeForm",
+    "teamChatForm",
+    "profileForm",
+    "botFeedbackForm",
+  ];
+  readOnlyFormIds.forEach((id) => {
+    const form = document.getElementById(id);
+    form?.querySelectorAll("input, select, textarea, button").forEach((control) => {
+      control.disabled = guest;
+    });
+  });
+  [
+    "toggleAddFormButton",
+    "resetButton",
+    "exportJsonButton",
+    "exportTextButton",
+    "exportHtmlButton",
+    "copyBriefButton",
+    "browserAddSourceButton",
+    "selectChatGptFilesButton",
+    "saveFilesToChatGptButton",
+    "clearImportedFilesButton",
+    "copyExtractionQueueButton",
+    "clearExtractionQueueButton",
+    "startAutoBotButton",
+    "stopAutoBotButton",
+    "runAutoBotNowButton",
+    "botAcceptButton",
+    "botRejectButton",
+    "clearAgentButton",
+    "useBrowserForTeamPostButton",
+    "exportProfilesButton",
+  ].forEach((id) => {
+    const control = document.getElementById(id);
+    if (control) control.disabled = guest;
+  });
 }
 
 function populateFormOptions() {
@@ -967,6 +1068,7 @@ function render() {
   renderProfiles();
   renderModelCore();
   renderMetrics();
+  renderPermissionState();
 }
 
 function renderNavigation() {
@@ -1060,15 +1162,56 @@ function renderSelected(source) {
       <span class="detail-chip">${escapeHtml(source.sourceType || "URL")}</span>
     </div>
     <p>${escapeHtml(source.notes)}</p>
-    ${source.url ? `<p><strong>Locator:</strong> ${escapeHtml(source.url)}</p>` : ""}
+    ${source.url ? `<p><strong>Locator:</strong> <button class="link-button" type="button" data-source-open="${escapeHtml(source.id)}">${escapeHtml(source.url)}</button></p>` : ""}
     <div class="chip-row">
       ${source.terms.map((term) => `<span class="detail-chip">${escapeHtml(term)}</span>`).join("")}
     </div>
+    <div class="source-info-grid">
+      <span><strong>ID:</strong> ${escapeHtml(source.id)}</span>
+      <span><strong>Tradition:</strong> ${escapeHtml(source.tradition || "Unspecified")}</span>
+      <span><strong>CORE:</strong> ${escapeHtml((source.coreLinks || []).join(", ") || "None")}</span>
+    </div>
+    <div class="form-actions">
+      ${source.url ? `<button class="primary-button iconless" type="button" data-source-open="${escapeHtml(source.id)}">Open In Browser</button>` : ""}
+      <button class="ghost-button iconless" type="button" data-source-preview="${escapeHtml(source.id)}">Full Source Info</button>
+    </div>
   `;
+  els.selectedRecord.querySelectorAll("[data-source-open]").forEach((button) => {
+    button.addEventListener("click", () => openSourceInBrowser(button.dataset.sourceOpen));
+  });
+  els.selectedRecord.querySelectorAll("[data-source-preview]").forEach((button) => {
+    button.addEventListener("click", () => previewSourceInBrowser(button.dataset.sourcePreview));
+  });
+}
+
+function openSourceInBrowser(sourceId) {
+  const source = state.archive.sources.find((item) => item.id === sourceId);
+  if (!source) return;
+  previewSourceInBrowser(sourceId);
+  if (source.url) openInAppBrowser(source.url, source.title, { preview: sourceToBrowserPreview(source) });
+}
+
+function previewSourceInBrowser(sourceId) {
+  const source = state.archive.sources.find((item) => item.id === sourceId);
+  if (!source) return;
+  setBrowserPreview(sourceToBrowserPreview(source));
+  renderBrowserPreview();
+}
+
+function sourceToBrowserPreview(source) {
+  return {
+    title: source.title,
+    url: source.url || "",
+    type: `Source / ${source.sourceType || "URL"}`,
+    summary: source.notes || "",
+    sourceInfo: `${source.category} / ${source.domain} / ${source.evidenceTier} / ${source.citationStatus}`,
+    details: JSON.stringify(source, null, 2),
+  };
 }
 
 function handleAddSource(event) {
   event.preventDefault();
+  if (!ensureCanWrite("add source records")) return;
   const formData = new FormData(els.addSourceForm);
   const entry = {
     id: `src-${Date.now()}`,
@@ -1095,6 +1238,7 @@ function handleAddSource(event) {
 
 async function handleFileImport(event) {
   event.preventDefault();
+  if (!ensureCanWrite("import files")) return;
   if (state.importBusy) return;
 
   const files = [...(els.fileImportInput.files || [])];
@@ -1293,6 +1437,7 @@ function integrateImportedFile(fileData, options) {
     textExcerpt: clampText(fileData.text || "", 12000),
     childCount: fileData.children?.length || 0,
     recordsCreated: createdSources.length,
+    sourceIds: createdSources.map((source) => source.id),
     warnings: fileData.warnings || [],
   };
 
@@ -1528,14 +1673,67 @@ function renderImportPanel(message = "") {
                   ? `<ul>${item.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>`
                   : ""
               }
+              <div class="form-actions">
+                <button class="primary-button iconless" type="button" data-import-preview="${escapeHtml(item.id)}">Full File Info</button>
+                ${
+                  item.sourceIds?.[0]
+                    ? `<button class="ghost-button iconless" type="button" data-import-source="${escapeHtml(item.sourceIds[0])}">Open First Source</button>`
+                    : ""
+                }
+              </div>
             </article>
           `
         )
         .join("")
     : '<div class="empty-state">No files imported yet.</div>';
+
+  els.importedFileList.querySelectorAll("[data-import-preview]").forEach((button) => {
+    button.addEventListener("click", () => previewImportedFile(button.dataset.importPreview));
+  });
+  els.importedFileList.querySelectorAll("[data-import-source]").forEach((button) => {
+    button.addEventListener("click", () => previewSourceInBrowser(button.dataset.importSource));
+  });
+}
+
+function previewImportedFile(importId) {
+  const item = (state.archive.importedFiles || []).find((record) => record.id === importId);
+  if (!item) return;
+  setBrowserPreview(importedFileToBrowserPreview(item));
+  renderBrowserPreview();
+}
+
+function importedFileToBrowserPreview(item) {
+  return {
+    title: item.fileName || "Imported file",
+    url: "",
+    type: `Imported ${item.extension || "file"}`,
+    summary: item.summary || "Imported research file.",
+    sourceInfo: `${item.parser || "browser"} / ${item.recordsCreated || 0} source records`,
+    details: JSON.stringify(
+      {
+        id: item.id,
+        fileName: item.fileName,
+        extension: item.extension,
+        mimeType: item.mimeType,
+        size: item.size,
+        parser: item.parser,
+        strategy: item.strategy,
+        owner: item.owner,
+        createdAt: item.createdAt,
+        recordsCreated: item.recordsCreated,
+        sourceIds: item.sourceIds || [],
+        keywords: item.keywords || [],
+        warnings: item.warnings || [],
+        textExcerpt: item.textExcerpt,
+      },
+      null,
+      2
+    ),
+  };
 }
 
 async function handleSelectChatGptFiles() {
+  if (!ensureCanWrite("import ChatGPT files")) return;
   if (!window.openai?.selectFiles) {
     window.alert("ChatGPT file picker is not available in this browser context. Use the local file picker above.");
     return;
@@ -1566,6 +1764,7 @@ async function handleSelectChatGptFiles() {
 }
 
 async function handleSaveFilesToChatGptLibrary() {
+  if (!ensureCanWrite("save files to the ChatGPT library")) return;
   if (!window.openai?.uploadFile) {
     window.alert("ChatGPT library upload is not available in this browser context.");
     return;
@@ -1585,6 +1784,7 @@ async function handleSaveFilesToChatGptLibrary() {
 }
 
 function clearImportedFiles() {
+  if (!ensureCanWrite("clear imported file logs")) return;
   const confirmed = window.confirm("Clear imported file log? Sources already created from imports will remain.");
   if (!confirmed) return;
   state.archive.importedFiles = [];
@@ -1596,36 +1796,52 @@ function handleBrowserNavigate(event) {
   event.preventDefault();
   const target = String(new FormData(els.inAppBrowserForm).get("target") || "").trim();
   if (!target) return;
-  openInAppBrowser(normalizeBrowserTarget(target), target);
+  const url = normalizeBrowserTarget(target);
+  openInAppBrowser(url, target, { query: extractBrowserQuery(target, url) });
 }
 
-function openInAppBrowser(url, label = url) {
-  state.currentBrowserUrl = url;
-  els.inAppBrowserFrame.src = url;
-  state.archive.browserHistory = state.archive.browserHistory || [];
-  state.archive.browserHistory.unshift({
+function openInAppBrowser(url, label = url, options = {}) {
+  const normalizedUrl = normalizeBrowserTarget(url);
+  const query = options.query || extractBrowserQuery(label, normalizedUrl);
+  state.currentBrowserUrl = normalizedUrl;
+  if (els.inAppBrowserFrame) els.inAppBrowserFrame.src = normalizedUrl;
+  const history = getBrowserHistory();
+  history.unshift({
     id: `browser-${Date.now()}`,
-    url,
+    url: normalizedUrl,
     label,
     owner: state.currentUser?.username || "local",
     createdAt: new Date().toISOString(),
   });
-  state.archive.browserHistory = dedupeBrowserHistory(state.archive.browserHistory).slice(0, 30);
-  persistArchive();
+  setBrowserHistory(dedupeBrowserHistory(history).slice(0, 30));
+  if (query) {
+    setBrowserSearchResults(buildVirtualBrowserResults(query, normalizedUrl));
+  }
+  setBrowserPreview(
+    options.preview || {
+      title: label || domainFromUrl(normalizedUrl) || "Current browser target",
+      url: normalizedUrl,
+      type: query ? "Search target" : inferSourceType(normalizedUrl),
+      summary: query
+        ? `Search query routed through the internal research browser: ${query}.`
+        : "Loaded as the current in-app browser target. If the page blocks embedding, use the source preview and URL metadata here.",
+      sourceInfo: query ? `Google CSE ${GOOGLE_CSE_ID}` : domainFromUrl(normalizedUrl) || "Direct URL",
+    }
+  );
   renderBrowserPanel();
+  renderAgent();
 }
 
 function renderBrowserPanel() {
   if (!els.browserHistory) return;
-  const current = state.currentBrowserUrl || state.archive.browserHistory?.[0]?.url || BROWSER_DEFAULT_URL;
+  const history = getBrowserHistory();
+  const current = state.currentBrowserUrl || history[0]?.url || BROWSER_DEFAULT_URL;
   if (els.inAppBrowserFrame && els.inAppBrowserFrame.src !== current) {
     els.inAppBrowserFrame.src = current;
   }
-  if (els.googleCsePublicLink) {
-    els.googleCsePublicLink.href = GOOGLE_CSE_PUBLIC_URL;
-  }
   els.inAppBrowserStatus.textContent = browserStatusMessage(current);
-  const history = state.archive.browserHistory || [];
+  renderBrowserPreview();
+  renderBrowserSearchResults();
   els.browserHistory.innerHTML = history.length
     ? history
         .slice(0, 12)
@@ -1638,7 +1854,8 @@ function renderBrowserPanel() {
               </div>
               <div class="form-actions">
                 <button class="ghost-button iconless" type="button" data-browser-open="${escapeHtml(entry.url)}">Open</button>
-                <button class="ghost-button iconless" type="button" data-browser-source="${escapeHtml(entry.url)}">Add Source</button>
+                <button class="ghost-button iconless" type="button" data-browser-preview="${escapeHtml(entry.id)}">Preview</button>
+                <button class="ghost-button iconless" type="button" data-browser-source="${escapeHtml(entry.url)}"${writeDisabledAttr()}>Add Source</button>
               </div>
             </article>
           `
@@ -1649,9 +1866,431 @@ function renderBrowserPanel() {
   els.browserHistory.querySelectorAll("[data-browser-open]").forEach((button) => {
     button.addEventListener("click", () => openInAppBrowser(button.dataset.browserOpen, button.dataset.browserOpen));
   });
+  els.browserHistory.querySelectorAll("[data-browser-preview]").forEach((button) => {
+    button.addEventListener("click", () => previewBrowserHistoryItem(button.dataset.browserPreview));
+  });
   els.browserHistory.querySelectorAll("[data-browser-source]").forEach((button) => {
     button.addEventListener("click", () => addBrowserUrlToSources(button.dataset.browserSource));
   });
+}
+
+function renderBrowserPreview() {
+  if (!els.browserPreview) return;
+  const preview = getBrowserPreview();
+  if (!preview) {
+    els.browserPreview.innerHTML = '<div class="empty-state">Open a search result, source, file, or URL to see full preview metadata here.</div>';
+    return;
+  }
+  els.browserPreview.innerHTML = `
+    <article class="browser-preview-card">
+      <header>
+        <div>
+          <strong>${escapeHtml(preview.title || "Browser preview")}</strong>
+          <small>${escapeHtml(preview.type || "Source")} / ${escapeHtml(preview.sourceInfo || domainFromUrl(preview.url) || "No source info")}</small>
+        </div>
+        ${preview.url ? `<span class="detail-chip">${escapeHtml(domainFromUrl(preview.url) || inferSourceType(preview.url))}</span>` : ""}
+      </header>
+      ${preview.url ? `<p class="result-url">${escapeHtml(preview.url)}</p>` : ""}
+      ${preview.summary ? `<p>${escapeHtml(preview.summary)}</p>` : ""}
+      ${preview.details ? `<pre class="browser-preview-details">${escapeHtml(preview.details)}</pre>` : ""}
+      <div class="form-actions">
+        ${preview.url ? `<button class="primary-button iconless" type="button" data-preview-open="${escapeHtml(preview.url)}">Open In App</button>` : ""}
+        ${preview.url ? `<button class="ghost-button iconless" type="button" data-preview-source="${escapeHtml(preview.url)}"${writeDisabledAttr()}>Add to Sources</button>` : ""}
+      </div>
+    </article>
+  `;
+  els.browserPreview.querySelectorAll("[data-preview-open]").forEach((button) => {
+    button.addEventListener("click", () => openInAppBrowser(button.dataset.previewOpen, preview.title || button.dataset.previewOpen, { preview }));
+  });
+  els.browserPreview.querySelectorAll("[data-preview-source]").forEach((button) => {
+    button.addEventListener("click", () => addBrowserUrlToSources(button.dataset.previewSource));
+  });
+}
+
+function renderBrowserSearchResults() {
+  if (!els.browserSearchResults) return;
+  const results = getBrowserSearchResults();
+  if (!results.length) {
+    els.browserSearchResults.innerHTML =
+      '<div class="empty-state">Search from the address field or click CSE results to build internal previews from sources, files, browser history, and extraction cards.</div>';
+    return;
+  }
+  els.browserSearchResults.innerHTML = `
+    <div class="result-summary-bar">
+      <span>${results.length} internal result cards</span>
+      <span>Source, file, extraction, and browser leads</span>
+    </div>
+    ${results
+      .map(
+        (item) => `
+          <article class="browser-result-card">
+            <header>
+              <div>
+                <h3>${escapeHtml(item.title)}</h3>
+                <small>${escapeHtml(item.type)} / ${escapeHtml(item.sourceInfo || domainFromUrl(item.url) || "local archive")}</small>
+              </div>
+              ${item.url ? `<span class="detail-chip">${escapeHtml(domainFromUrl(item.url) || inferSourceType(item.url))}</span>` : ""}
+            </header>
+            ${item.url ? `<p class="result-url">${escapeHtml(item.url)}</p>` : ""}
+            <p>${escapeHtml(item.summary || "No preview summary available.")}</p>
+            <div class="form-actions">
+              ${item.url ? `<button class="primary-button iconless" type="button" data-browser-result-open="${escapeHtml(item.id)}">Open In App</button>` : ""}
+              <button class="ghost-button iconless" type="button" data-browser-result-preview="${escapeHtml(item.id)}">Full Info</button>
+              ${item.url ? `<button class="ghost-button iconless" type="button" data-browser-result-source="${escapeHtml(item.id)}"${writeDisabledAttr()}>Add Source</button>` : ""}
+            </div>
+          </article>
+        `
+      )
+      .join("")}
+  `;
+  els.browserSearchResults.querySelectorAll("[data-browser-result-open]").forEach((button) => {
+    button.addEventListener("click", () => openBrowserResult(button.dataset.browserResultOpen));
+  });
+  els.browserSearchResults.querySelectorAll("[data-browser-result-preview]").forEach((button) => {
+    button.addEventListener("click", () => previewBrowserResult(button.dataset.browserResultPreview));
+  });
+  els.browserSearchResults.querySelectorAll("[data-browser-result-source]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const result = findBrowserResult(button.dataset.browserResultSource);
+      if (result?.url) addBrowserUrlToSources(result.url);
+    });
+  });
+}
+
+function replayBufferedCseEvents() {
+  const buffered = Array.isArray(window.coreCseEvents) ? window.coreCseEvents.splice(0) : [];
+  buffered.forEach((event) => {
+    if (event.type === "core-cse-search-start") {
+      handleCseSearchStart({ detail: event.detail });
+    }
+    if (event.type === "core-cse-results-ready") {
+      handleCseResultsReady({ detail: event.detail });
+    }
+  });
+}
+
+function handleCseSearchStart(event) {
+  const query = String(event.detail?.query || "").trim();
+  if (!query) return;
+  const searchUrl = buildCseSearchUrl(query);
+  state.currentBrowserUrl = searchUrl;
+  const history = getBrowserHistory();
+  history.unshift({
+    id: `browser-cse-${Date.now()}`,
+    url: searchUrl,
+    label: `CSE search: ${query}`,
+    owner: state.currentUser?.username || "local",
+    createdAt: new Date().toISOString(),
+  });
+  setBrowserHistory(dedupeBrowserHistory(history).slice(0, 30));
+  setBrowserPreview({
+    title: `Google CSE search: ${query}`,
+    url: searchUrl,
+    type: "Google Programmable Search query",
+    summary: "This query came from the embedded Google search box. Result links are mirrored into internal cards when Google exposes them to the page callback.",
+    sourceInfo: `Google CSE ${GOOGLE_CSE_ID}`,
+  });
+  setBrowserSearchResults(buildVirtualBrowserResults(query, searchUrl));
+  renderBrowserPanel();
+  renderAgent();
+}
+
+function handleCseResultsReady(event) {
+  const query = String(event.detail?.query || "").trim();
+  if (!query) return;
+  const searchUrl = buildCseSearchUrl(query);
+  const googleCards = normalizeCseResultCards(query, event.detail?.results || []);
+  const localCards = buildVirtualBrowserResults(query, searchUrl);
+  const cards = dedupeBrowserResults([...googleCards, ...localCards])
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 24);
+  setBrowserSearchResults(cards);
+  setBrowserPreview({
+    title: `Google CSE results: ${query}`,
+    url: searchUrl,
+    type: "Google Programmable Search result set",
+    summary: `${googleCards.length} Google result card(s) and ${Math.max(cards.length - googleCards.length, 0)} local archive lead(s) are available below. Open In App keeps navigation inside the research browser when the target allows iframe embedding.`,
+    sourceInfo: `Google CSE ${GOOGLE_CSE_ID}`,
+    details: JSON.stringify(
+      {
+        query,
+        googleResultCount: googleCards.length,
+        totalCardCount: cards.length,
+        searchUrl,
+      },
+      null,
+      2
+    ),
+  });
+  state.currentBrowserUrl = searchUrl;
+  renderBrowserPanel();
+  renderAgent();
+}
+
+function normalizeCseResultCards(query, results = []) {
+  return results
+    .map((item, index) => {
+      const url = unwrapSearchResultUrl(item.url || item.unescapedUrl || item.clicktrackUrl || item.cacheUrl || "");
+      const title = stripHtml(item.titleNoFormatting || item.title || domainFromUrl(url) || `Google result ${index + 1}`);
+      const summary = stripHtml(item.contentNoFormatting || item.content || item.snippet || item.visibleUrl || "");
+      if (!url) return null;
+      return {
+        id: `google-cse-${Date.now()}-${index}`,
+        type: "Google CSE result",
+        title,
+        url,
+        summary: summary || `Google Programmable Search result for ${query}.`,
+        sourceInfo: item.visibleUrl || domainFromUrl(url) || `Google CSE ${GOOGLE_CSE_ID}`,
+        details: JSON.stringify(
+          {
+            title,
+            url,
+            visibleUrl: item.visibleUrl || "",
+            content: summary,
+            richSnippet: item.richSnippet || null,
+          },
+          null,
+          2
+        ),
+        score: 900 - index,
+      };
+    })
+    .filter(Boolean);
+}
+
+function handleCseResultClick(event) {
+  const link = event.target.closest?.("a");
+  if (!link?.href) return;
+  const url = unwrapSearchResultUrl(link.href);
+  if (!url || isCseUrl(url) || url.startsWith("javascript:")) return;
+  event.preventDefault();
+  openInAppBrowser(url, link.textContent.trim() || url, {
+    preview: {
+      title: link.textContent.trim() || domainFromUrl(url) || url,
+      url,
+      type: inferSourceType(url),
+      summary: "Opened from an embedded Google Programmable Search result. The browser will render it in-app if the target allows iframe embedding.",
+      sourceInfo: `Google CSE ${GOOGLE_CSE_ID}`,
+    },
+  });
+}
+
+function getBrowserHistory() {
+  return isGuestUser() ? state.guestBrowserHistory : state.archive.browserHistory || [];
+}
+
+function setBrowserHistory(history) {
+  if (isGuestUser()) {
+    state.guestBrowserHistory = history;
+    return;
+  }
+  state.archive.browserHistory = history;
+  persistArchive();
+}
+
+function getBrowserSearchResults() {
+  return isGuestUser() ? state.guestBrowserSearchResults : state.archive.browserSearchResults || [];
+}
+
+function setBrowserSearchResults(results) {
+  if (isGuestUser()) {
+    state.guestBrowserSearchResults = results;
+    return;
+  }
+  state.archive.browserSearchResults = results;
+  persistArchive();
+}
+
+function getBrowserPreview() {
+  return isGuestUser() ? state.guestBrowserPreview : state.archive.browserPreview || null;
+}
+
+function setBrowserPreview(preview) {
+  if (isGuestUser()) {
+    state.guestBrowserPreview = preview;
+    return;
+  }
+  state.archive.browserPreview = preview;
+  persistArchive();
+}
+
+function extractBrowserQuery(value, url = "") {
+  const raw = String(value || "").trim();
+  try {
+    const parsed = new URL(url || raw);
+    const cseQuery = parsed.searchParams.get("gsc.q") || parsed.searchParams.get("q");
+    if (cseQuery) return cseQuery;
+    if (parsed.hostname.includes("google.") && parsed.pathname.includes("/search")) {
+      return parsed.searchParams.get("q") || raw;
+    }
+    return "";
+  } catch {
+    if (/^https?:\/\//i.test(raw) || /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) return "";
+    return raw;
+  }
+}
+
+function buildVirtualBrowserResults(query, currentUrl = "") {
+  const keywords = extractKeywords(query);
+  const rows = [];
+  rows.push({
+    id: `browser-query-${Date.now()}`,
+    type: "Search query",
+    title: query,
+    url: currentUrl,
+    summary: `Google Programmable Search query routed through the in-app research browser: ${query}.`,
+    sourceInfo: `Google CSE ${GOOGLE_CSE_ID}`,
+    score: 999,
+  });
+
+  (state.archive.sources || []).forEach((source) => {
+    const haystack = [source.title, source.url, source.notes, source.category, source.domain, source.sourceType, ...(source.terms || [])].join(" ");
+    const score = browserResultScore(haystack, keywords);
+    if (score > 0) {
+      rows.push({
+        id: `source-${source.id}`,
+        type: `Source / ${source.sourceType || "URL"}`,
+        title: source.title,
+        url: source.url || "",
+        summary: source.notes,
+        sourceInfo: `${source.category} / ${source.domain} / ${source.citationStatus}`,
+        details: JSON.stringify(source, null, 2),
+        score,
+      });
+    }
+  });
+
+  (state.archive.extractionResults || []).forEach((record) => {
+    (record.items || []).forEach((item, index) => {
+      const haystack = [item.title, item.url, item.summary, record.sourcePrompt, record.engine].join(" ");
+      const score = browserResultScore(haystack, keywords);
+      if (score > 0) {
+        rows.push({
+          id: `extract-${record.id}-${index}`,
+          type: `Extraction / ${engineLabel(record.engine)}`,
+          title: item.title,
+          url: item.url || item.finalUrl || "",
+          summary: item.summary,
+          sourceInfo: `${record.owner || "local"} / ${new Date(record.createdAt).toLocaleString()}`,
+          details: JSON.stringify({ recordId: record.id, item }, null, 2),
+          score,
+        });
+      }
+    });
+  });
+
+  (state.archive.importedFiles || []).forEach((file) => {
+    const haystack = [file.fileName, file.summary, file.parser, ...(file.keywords || [])].join(" ");
+    const score = browserResultScore(haystack, keywords);
+    if (score > 0) {
+      rows.push({
+        id: `file-${file.id || file.fileName}`,
+        type: "Imported file",
+        title: file.fileName || "Imported file",
+        url: file.url || "",
+        summary: file.summary || `${file.recordsCreated || 0} source records created from this upload.`,
+        sourceInfo: `${file.parser || "browser"} / ${file.contentType || "file"}`,
+        details: JSON.stringify(file, null, 2),
+        score,
+      });
+    }
+  });
+
+  getReferenceLibrary().forEach((reference) => {
+    const haystack = [reference.title, reference.role, reference.backendUse, reference.evidenceTier, ...(reference.detectedTerms || [])].join(" ");
+    const score = browserResultScore(haystack, keywords);
+    if (score > 0) {
+      rows.push({
+        id: `reference-${reference.id}`,
+        type: "Uploaded reference",
+        title: reference.title,
+        url: `data/reference_ingest.json#${reference.id}`,
+        summary: reference.role,
+        sourceInfo: `${reference.pageCount || "?"} pages / ${reference.citationStatus}`,
+        details: JSON.stringify(reference, null, 2),
+        score,
+      });
+    }
+  });
+
+  getBrowserHistory().forEach((entry) => {
+    const haystack = [entry.label, entry.url].join(" ");
+    const score = browserResultScore(haystack, keywords);
+    if (score > 0) {
+      rows.push({
+        id: `history-${entry.id}`,
+        type: "Browser history",
+        title: entry.label || entry.url,
+        url: entry.url,
+        summary: `Previously opened in the in-app browser on ${new Date(entry.createdAt).toLocaleString()}.`,
+        sourceInfo: entry.owner || "local",
+        score,
+      });
+    }
+  });
+
+  return dedupeBrowserResults(rows)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 16);
+}
+
+function browserResultScore(text, keywords) {
+  const haystack = String(text || "").toLowerCase();
+  if (!keywords.length) return haystack ? 1 : 0;
+  return keywords.reduce((sum, keyword) => sum + (haystack.includes(keyword.toLowerCase()) ? 1 : 0), 0);
+}
+
+function dedupeBrowserResults(results) {
+  const seen = new Set();
+  return results.filter((result) => {
+    const key = result.url || result.id || result.title;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function findBrowserResult(id) {
+  return getBrowserSearchResults().find((item) => item.id === id);
+}
+
+function openBrowserResult(id) {
+  const result = findBrowserResult(id);
+  if (!result) return;
+  previewBrowserResult(id);
+  if (result.url) openInAppBrowser(result.url, result.title, { preview: result });
+}
+
+function previewBrowserResult(id) {
+  const result = findBrowserResult(id);
+  if (!result) return;
+  setBrowserPreview(result);
+  renderBrowserPreview();
+}
+
+function previewBrowserHistoryItem(id) {
+  const entry = getBrowserHistory().find((item) => item.id === id);
+  if (!entry) return;
+  setBrowserPreview({
+    title: entry.label || entry.url,
+    url: entry.url,
+    type: "Browser history",
+    summary: `Opened in the in-app browser on ${new Date(entry.createdAt).toLocaleString()}.`,
+    sourceInfo: entry.owner || "local",
+    details: JSON.stringify(entry, null, 2),
+  });
+  renderBrowserPreview();
+}
+
+function unwrapSearchResultUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    const wrapped = parsed.searchParams.get("q") || parsed.searchParams.get("url");
+    if (wrapped && /^https?:\/\//i.test(wrapped)) return wrapped;
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
 }
 
 function openCurrentBrowserTargetExternal() {
@@ -1665,6 +2304,7 @@ function openCurrentBrowserTargetExternal() {
 }
 
 function addCurrentBrowserPageToSources() {
+  if (!ensureCanWrite("add browser pages to Sources")) return;
   const target = String(els.inAppBrowserForm.elements.target.value || "").trim();
   const url = state.currentBrowserUrl || (target ? normalizeBrowserTarget(target) : "");
   if (!url) {
@@ -1675,6 +2315,7 @@ function addCurrentBrowserPageToSources() {
 }
 
 function addBrowserUrlToSources(url) {
+  if (!ensureCanWrite("add browser pages to Sources")) return;
   const source = {
     id: `src-browser-${Date.now()}`,
     title: `Browser lead: ${domainFromUrl(url) || url}`,
@@ -1699,6 +2340,8 @@ function addBrowserUrlToSources(url) {
 function normalizeBrowserTarget(value) {
   const target = value.trim();
   if (/^https?:\/\//i.test(target)) return target;
+  if (/^(data|assets|docs|dist)\//i.test(target) || target.startsWith("./") || target.startsWith("../") || target.startsWith("/")) return target;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return target;
   if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(target)) return `https://${target}`;
   return buildCseSearchUrl(target);
 }
@@ -1715,9 +2358,9 @@ function browserStatusMessage(url) {
     return `Loaded Google Programmable Search Engine ${GOOGLE_CSE_ID}. Use the embedded CSE search box above, or open the public CSE URL if the fallback frame is restricted.`;
   }
   if (isKnownFrameBlockedUrl(url)) {
-    return `Loaded ${url}. Google commonly blocks cross-site iframe display with X-Frame-Options: SAMEORIGIN, so use Open External if the frame appears blank.`;
+    return `Loaded ${url}. Google commonly blocks cross-site iframe display with X-Frame-Options: SAMEORIGIN, so use the internal result cards and Full Info preview if the frame appears blank.`;
   }
-  return `Loaded ${url}. If the frame is blank, that site likely blocks iframe embedding; use Open External.`;
+  return `Loaded ${url}. If the frame is blank, that site likely blocks iframe embedding; keep using the internal source cards, Full Info preview, or extraction console.`;
 }
 
 function isCseUrl(url) {
@@ -1748,8 +2391,10 @@ function dedupeBrowserHistory(history) {
 }
 
 function getBrowserContext() {
-  const history = state.archive.browserHistory || [];
+  const history = getBrowserHistory();
   const currentUrl = state.currentBrowserUrl || history[0]?.url || BROWSER_DEFAULT_URL;
+  const virtualResults = getBrowserSearchResults();
+  const preview = getBrowserPreview();
   const browserSources = (state.archive.sources || [])
     .filter((source) => source.id?.startsWith("src-browser-") || String(source.tradition || "").includes("In-app browser"))
     .slice(0, 5);
@@ -1761,11 +2406,17 @@ function getBrowserContext() {
     currentDomain: domainFromUrl(currentUrl) || "cse.google.com",
     csePublicUrl: GOOGLE_CSE_PUBLIC_URL,
     history: history.slice(0, 6),
+    virtualResults: virtualResults.slice(0, 8),
+    preview,
     browserSources,
     teamBrowserLeads,
     searchText: [
       currentUrl,
+      preview?.title,
+      preview?.url,
+      preview?.summary,
       ...history.slice(0, 6).flatMap((entry) => [entry.label, entry.url]),
+      ...virtualResults.slice(0, 8).flatMap((result) => [result.title, result.url, result.summary, result.sourceInfo]),
       ...browserSources.flatMap((source) => [source.title, source.url, source.notes, ...(source.terms || [])]),
       ...teamBrowserLeads.flatMap((item) => [item.title, item.url, item.text]),
     ]
@@ -1776,13 +2427,16 @@ function getBrowserContext() {
 
 function browserContextSummary(context = getBrowserContext()) {
   const historyLines = context.history.map((entry) => `- ${entry.label || entry.url}: ${entry.url}`).join("\n");
+  const resultLines = (context.virtualResults || []).map((item) => `- ${item.title}: ${item.url || item.type}`).join("\n");
   const sourceLines = context.browserSources.map((source) => `- ${source.title}: ${source.url || "no URL"}`).join("\n");
   const teamLines = context.teamBrowserLeads.map((item) => `- ${item.title || item.type}: ${item.url}`).join("\n");
   return [
     `Current browser URL: ${context.currentUrl}`,
     `Current browser domain: ${context.currentDomain}`,
+    context.preview ? `Current browser preview: ${context.preview.title} / ${context.preview.url || context.preview.type}` : "Current browser preview: none",
     `Google CSE URL: ${context.csePublicUrl}`,
     context.history.length ? `Recent browser history:\n${historyLines}` : "Recent browser history: none yet",
+    resultLines ? `Virtual browser result cards:\n${resultLines}` : "Virtual browser result cards: none yet",
     context.browserSources.length ? `Browser source leads:\n${sourceLines}` : "Browser source leads: none promoted yet",
     context.teamBrowserLeads.length ? `Team browser leads:\n${teamLines}` : "Team browser leads: none yet",
   ].join("\n");
@@ -1940,6 +2594,7 @@ function renderSourceTypeCheckboxes(container, prefix, selectedTypes) {
 
 function handleQueueExtraction(event) {
   event.preventDefault();
+  if (!ensureCanWrite("queue extraction jobs")) return;
   const formData = new FormData(els.extractionForm);
   const prompt = withBrowserContext(String(formData.get("prompt")).trim(), "In-app browser context");
   const job = createExtractionJob({
@@ -1960,6 +2615,7 @@ function handleQueueExtraction(event) {
 
 async function handleKeywordSearch(event, context) {
   event.preventDefault();
+  if (!ensureCanWrite("run search extraction")) return;
   const form = event.currentTarget;
   const formData = new FormData(form);
   const query = String(formData.get("query") || "").trim();
@@ -2112,23 +2768,35 @@ function renderEmbeddedSearchWindow(context, payload) {
     target.innerHTML = `
       <div class="embedded-search-header">
         <strong>${escapeHtml(payload.mode === "external" ? "External Search" : "Internal Search")}</strong>
-        <a href="${escapeHtml(payload.searchUrl)}" target="_blank" rel="noreferrer">Open search</a>
+        <button class="ghost-button iconless" type="button" data-open-browser-url="${escapeHtml(payload.searchUrl)}">Open search</button>
       </div>
       <p>${escapeHtml(payload.message || "Ready.")}</p>
       <small>${escapeHtml(payload.query || "")}</small>
     `;
+    target.querySelectorAll("[data-open-browser-url]").forEach((button) => {
+      button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, payload.query || button.dataset.openBrowserUrl));
+    });
     return;
   }
   target.innerHTML = `
     <div class="embedded-search-header">
       <strong>${escapeHtml(engineLabel(record.engine))}</strong>
-      <a href="${escapeHtml(record.searchUrl || payload.searchUrl)}" target="_blank" rel="noreferrer">Open search</a>
+      <button class="ghost-button iconless" type="button" data-open-browser-url="${escapeHtml(record.searchUrl || payload.searchUrl)}">Open search</button>
     </div>
     <p>${escapeHtml(record.sourcePrompt || payload.query)}</p>
     <div class="embedded-result-list">
       ${(record.items || []).map((item, index) => renderCompactSearchItem(record.id, item, index)).join("")}
     </div>
   `;
+  target.querySelectorAll("[data-open-browser-url]").forEach((button) => {
+    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, payload.query || button.dataset.openBrowserUrl));
+  });
+  target.querySelectorAll("[data-open-extraction-item]").forEach((button) => {
+    button.addEventListener("click", () => openExtractionItemInBrowser(button.dataset.openExtractionItem, Number(button.dataset.itemIndex || 0)));
+  });
+  target.querySelectorAll("[data-preview-extraction-item]").forEach((button) => {
+    button.addEventListener("click", () => previewExtractionItemInBrowser(button.dataset.previewExtractionItem, Number(button.dataset.itemIndex || 0)));
+  });
   target.querySelectorAll("[data-promote-result]").forEach((button) => {
     button.addEventListener("click", () => promoteExtractionItem(button.dataset.promoteResult, Number(button.dataset.itemIndex || 0)));
   });
@@ -2138,23 +2806,28 @@ function renderCompactSearchItem(resultId, item, index) {
   const url = item.url || item.finalUrl || "";
   const links = (item.links || [])
     .slice(0, 4)
-    .map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</a>`)
+    .map((link) => `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(link.url)}">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</button>`)
     .join("");
   return `
     <article class="embedded-result-item">
       <div>
-        <h3>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a>` : escapeHtml(item.title)}</h3>
+        <h3>${escapeHtml(item.title)}</h3>
         ${url ? `<small>${escapeHtml(url)}</small>` : ""}
       </div>
       ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ""}
       ${links ? `<div class="result-links">${links}</div>` : ""}
-      <button class="ghost-button iconless" type="button" data-promote-result="${escapeHtml(resultId)}" data-item-index="${index}">Promote</button>
+      <div class="form-actions">
+        ${url ? `<button class="primary-button iconless" type="button" data-open-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Open In App</button>` : ""}
+        <button class="ghost-button iconless" type="button" data-preview-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Full Info</button>
+        <button class="ghost-button iconless" type="button" data-promote-result="${escapeHtml(resultId)}" data-item-index="${index}"${writeDisabledAttr()}>Promote</button>
+      </div>
     </article>
   `;
 }
 
 async function handleParallelExtract(event) {
   event.preventDefault();
+  if (!ensureCanWrite("run Parallel Extract")) return;
   const formData = new FormData(els.parallelExtractForm);
   const urls = parseUrlList(String(formData.get("urls")));
   const fullContent = String(formData.get("fullContent")) === "true";
@@ -2233,6 +2906,7 @@ async function handleParallelExtract(event) {
 
 async function handleWebScrape(event) {
   event.preventDefault();
+  if (!ensureCanWrite("run web scraping")) return;
   const formData = new FormData(els.webScrapeForm);
   const query = String(formData.get("query") || "").trim();
   const urls = query ? [buildSearchUrl(query)] : parseUrlList(String(formData.get("urls") || ""));
@@ -2577,7 +3251,7 @@ function renderExtractionResults() {
                 .join("")}
             </div>
             <div class="form-actions">
-              <button class="ghost-button" type="button" data-copy-result="${escapeHtml(result.id)}">Copy Result JSON</button>
+              <button class="ghost-button" type="button" data-copy-result="${escapeHtml(result.id)}"${writeDisabledAttr()}>Copy Result JSON</button>
             </div>
             <small>${new Date(result.createdAt).toLocaleString()}</small>
           </article>
@@ -2593,6 +3267,22 @@ function renderExtractionResults() {
     });
   });
 
+  els.extractionResults.querySelectorAll("[data-open-browser-url]").forEach((button) => {
+    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, button.textContent.trim() || button.dataset.openBrowserUrl));
+  });
+
+  els.extractionResults.querySelectorAll("[data-open-extraction-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openExtractionItemInBrowser(button.dataset.openExtractionItem, Number(button.dataset.itemIndex || 0));
+    });
+  });
+
+  els.extractionResults.querySelectorAll("[data-preview-extraction-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      previewExtractionItemInBrowser(button.dataset.previewExtractionItem, Number(button.dataset.itemIndex || 0));
+    });
+  });
+
   els.extractionResults.querySelectorAll("[data-promote-result]").forEach((button) => {
     button.addEventListener("click", () => {
       promoteExtractionItem(button.dataset.promoteResult, Number(button.dataset.itemIndex || 0));
@@ -2605,23 +3295,23 @@ function renderExtractionItem(resultId, item, index) {
   const linkList = (item.links || [])
     .map(
       (link) =>
-        `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</a>`
+        `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(link.url)}">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</button>`
     )
     .join("");
   return `
     <section class="result-item">
       <div class="result-title-row">
         <div>
-          <h4>${
-            primaryUrl
-              ? `<a href="${escapeHtml(primaryUrl)}" target="_blank" rel="noreferrer">${escapeHtml(item.title)}</a>`
-              : escapeHtml(item.title)
-          }</h4>
+          <h4>${escapeHtml(item.title)}</h4>
           ${primaryUrl ? `<p class="result-url">${escapeHtml(primaryUrl)}</p>` : ""}
         </div>
-        <button class="ghost-button iconless" type="button" data-promote-result="${escapeHtml(resultId)}" data-item-index="${index}">
-          Promote
-        </button>
+        <div class="form-actions">
+          ${primaryUrl ? `<button class="primary-button iconless" type="button" data-open-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Open In App</button>` : ""}
+          <button class="ghost-button iconless" type="button" data-preview-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Full Info</button>
+          <button class="ghost-button iconless" type="button" data-promote-result="${escapeHtml(resultId)}" data-item-index="${index}"${writeDisabledAttr()}>
+            Promote
+          </button>
+        </div>
       </div>
       <div class="chip-row">
         ${item.status ? `<span class="detail-chip">${escapeHtml(item.status)}</span>` : ""}
@@ -2634,7 +3324,42 @@ function renderExtractionItem(resultId, item, index) {
   `;
 }
 
+function getExtractionItem(resultId, itemIndex) {
+  const result = (state.archive.extractionResults || []).find((record) => record.id === resultId);
+  const item = result?.items?.[itemIndex];
+  return { result, item };
+}
+
+function extractionItemToBrowserPreview(result, item) {
+  const url = item.url || item.finalUrl || item.links?.[0]?.url || "";
+  return {
+    title: item.title || "Extraction result",
+    url,
+    type: `Extraction / ${engineLabel(result.engine)}`,
+    summary: item.summary || result.sourcePrompt || "",
+    sourceInfo: `${result.owner || "local"} / ${new Date(result.createdAt).toLocaleString()}`,
+    details: JSON.stringify({ resultId: result.id, item, request: result.request }, null, 2),
+  };
+}
+
+function openExtractionItemInBrowser(resultId, itemIndex) {
+  const { result, item } = getExtractionItem(resultId, itemIndex);
+  if (!result || !item) return;
+  const preview = extractionItemToBrowserPreview(result, item);
+  setBrowserPreview(preview);
+  if (preview.url) openInAppBrowser(preview.url, preview.title, { preview });
+  renderBrowserPreview();
+}
+
+function previewExtractionItemInBrowser(resultId, itemIndex) {
+  const { result, item } = getExtractionItem(resultId, itemIndex);
+  if (!result || !item) return;
+  setBrowserPreview(extractionItemToBrowserPreview(result, item));
+  renderBrowserPreview();
+}
+
 function promoteExtractionItem(resultId, itemIndex) {
+  if (!ensureCanWrite("promote extraction results")) return;
   const result = (state.archive.extractionResults || []).find((record) => record.id === resultId);
   const item = result?.items?.[itemIndex];
   if (!result || !item) return;
@@ -2695,6 +3420,7 @@ function renderAutoBotStatus() {
 }
 
 function startAutoBot() {
+  if (!ensureCanWrite("start the automated research bot")) return;
   if (state.autoBot.active) return;
   const selectedIndex = Math.max(0, state.archive.categories.indexOf(els.autoBotSection.value));
   state.autoBot.active = true;
@@ -2706,6 +3432,7 @@ function startAutoBot() {
 }
 
 function stopAutoBot() {
+  if (!ensureCanWrite("stop the automated research bot")) return;
   if (state.autoBot.timer) {
     window.clearInterval(state.autoBot.timer);
   }
@@ -2716,6 +3443,7 @@ function stopAutoBot() {
 }
 
 async function runAutoBotAttempt({ manual = false, feedback = "" } = {}) {
+  if (!ensureCanWrite("run the automated research bot")) return null;
   if (!manual && (!state.autoBot.active || state.autoBot.pausedForReview)) return;
   const category = state.archive.categories[state.autoBot.sectionIndex % state.archive.categories.length] || "Documents";
   const query = buildAutoBotQuery(category, feedback || state.autoBot.feedback);
@@ -2788,16 +3516,20 @@ function showAutoBotFinding(record, item, category) {
     <article class="embedded-result-item">
       <strong>${escapeHtml(category)}</strong>
       <h3>${escapeHtml(item.title)}</h3>
-      ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>` : ""}
+      ${item.url ? `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(item.url)}">${escapeHtml(item.url)}</button>` : ""}
       ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ""}
       <small>${escapeHtml(record.query || "")}</small>
     </article>
   `;
+  els.botAlertContent.querySelectorAll("[data-open-browser-url]").forEach((button) => {
+    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, item.title || button.dataset.openBrowserUrl));
+  });
   els.botAlertOverlay.hidden = false;
   renderAutoBotStatus();
 }
 
 function acceptAutoBotFinding() {
+  if (!ensureCanWrite("accept automated research findings")) return;
   const finding = state.autoBot.currentFinding;
   const record = (state.archive.extractionResults || []).find((item) => item.id === finding?.recordId);
   const item = record?.items?.[finding?.itemIndex || 0];
@@ -2819,6 +3551,7 @@ function showAutoBotFeedback() {
 
 function handleAutoBotFeedback(event) {
   event.preventDefault();
+  if (!ensureCanWrite("send automated research feedback")) return;
   const feedback = String(new FormData(els.botFeedbackForm).get("feedback") || "").trim();
   if (feedback) state.autoBot.feedback = feedback;
   closeAutoBotAlert();
@@ -2894,8 +3627,8 @@ function renderExtractionJobs() {
             ${job.generatedQueries.map((query) => `<li>${escapeHtml(query)}</li>`).join("")}
           </ol>
           <div class="form-actions">
-            <button class="ghost-button" type="button" data-promote-job="${escapeHtml(job.id)}">Promote to Source Lead</button>
-            <button class="ghost-button" type="button" data-copy-job="${escapeHtml(job.id)}">Copy Job JSON</button>
+            <button class="ghost-button" type="button" data-promote-job="${escapeHtml(job.id)}"${writeDisabledAttr()}>Promote to Source Lead</button>
+            <button class="ghost-button" type="button" data-copy-job="${escapeHtml(job.id)}"${writeDisabledAttr()}>Copy Job JSON</button>
           </div>
         </article>
       `
@@ -2915,6 +3648,7 @@ function renderExtractionJobs() {
 }
 
 function promoteJobToSource(jobId) {
+  if (!ensureCanWrite("promote extraction jobs to Sources")) return;
   const job = state.archive.extractionJobs.find((item) => item.id === jobId);
   if (!job) return;
   const source = {
@@ -2939,10 +3673,12 @@ function promoteJobToSource(jobId) {
 }
 
 function copyExtractionQueue() {
+  if (!ensureCanWrite("copy extraction queue data")) return;
   copyOrDownload("core-extraction-queue.json", JSON.stringify(state.archive.extractionJobs, null, 2));
 }
 
 function clearExtractionQueue() {
+  if (!ensureCanWrite("clear queued extraction jobs")) return;
   const confirmed = window.confirm("Clear queued extraction jobs?");
   if (!confirmed) return;
   state.archive.extractionJobs = [];
@@ -2953,6 +3689,7 @@ function clearExtractionQueue() {
 
 function handleAgentPrompt(event) {
   event.preventDefault();
+  if (!ensureCanWrite("send agent prompts")) return;
   const formData = new FormData(els.agentForm);
   const prompt = String(formData.get("prompt")).trim();
   const sourceTypes = getCheckedSourceTypes(els.agentSourceTypes);
@@ -3056,7 +3793,7 @@ function generateAgentResponse(prompt, options) {
   const latestResults = (state.archive.extractionResults || []).slice(0, 3);
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
-  const browserHistory = state.archive.browserHistory || [];
+  const browserHistory = getBrowserHistory();
   const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected").slice(0, 3);
   const operation = getGatewayOperation(model);
   const targetParam = model?.targetParameter || "target_id";
@@ -3090,6 +3827,7 @@ function generateAgentResponse(prompt, options) {
     `Google Programmable Search: CSE ${cseApi.searchEngineId} is embedded in the Browser panel with public URL ${cseApi.publicUrl}.`,
     `File import layer: ${importedFiles.length} imported file logs are available; latest import ${importedFiles[0]?.fileName || "none"} created ${importedFiles[0]?.recordsCreated || 0} source records.`,
     `In-app browser layer: ${browserHistory.length} captured browser targets; active target ${browserContext.currentUrl}. The agent and Extract console use this browser context when building searches and source cards.`,
+    `Virtual browser memory: ${browserContext.virtualResults?.length || 0} result card(s) are attached; active preview ${browserContext.preview?.title || "none"}.`,
     `Team collaboration layer: ${teamMessages.length} posts stored; ${openRecommendations.length} open source recommendation(s) can be rejected or promoted into Sources.`,
     `Automated research bot: ${botFindings.length} persisted findings; it rotates through content sections once per minute only after the user starts it and asks before adding sources.`,
     `NVIDIA AIQ research path: ${aiqApi.backendUrl} is registered as an optional deep-research backend. Use it only after a trusted AI-Q server is reachable and health-checked.`,
@@ -3130,7 +3868,7 @@ function renderAgent() {
   const sourceCardCount = (state.archive.extractionResults || []).reduce((sum, result) => sum + (result.items?.length || 0), 0);
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
-  const browserHistory = state.archive.browserHistory || [];
+  const browserHistory = getBrowserHistory();
   const browserContext = getBrowserContext();
   const teamMessages = state.archive.teamMessages || [];
   const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected");
@@ -3146,7 +3884,7 @@ function renderAgent() {
     <article><strong>Google CSE</strong><span>${escapeHtml(cseApi.searchEngineId)} / ${escapeHtml(cseApi.publicUrl)}.</span></article>
     <article><strong>File Import</strong><span>${importedFiles.length} imported file logs; ${importedFiles.reduce((sum, item) => sum + (item.recordsCreated || 0), 0)} sources created from uploads.</span></article>
     <article><strong>In-App Browser</strong><span>${browserHistory.length} captured targets; active ${escapeHtml(browserContext.currentUrl)}.</span></article>
-    <article><strong>Browser Pull</strong><span>Agent, keyword scraper, Parallel Extract, and Extract jobs include current browser URL, CSE URL, history, and browser source leads.</span></article>
+    <article><strong>Browser Pull</strong><span>Agent, keyword scraper, Parallel Extract, and Extract jobs include current URL, CSE URL, history, ${browserContext.virtualResults?.length || 0} internal result cards, and active preview ${escapeHtml(browserContext.preview?.title || "none")}.</span></article>
     <article><strong>Team Feed</strong><span>${teamMessages.length} posts; ${openRecommendations.length} open recommendations available for source review.</span></article>
     <article><strong>Auto Bot</strong><span>${botFindings.length} findings logged; ${botFindings.filter((entry) => entry.accepted).length} accepted into source sections.</span></article>
     <article><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} / ${escapeHtml(aiqApi.status)}.</span></article>
@@ -3193,6 +3931,7 @@ function renderModelCore() {
 }
 
 function clearAgentChat() {
+  if (!ensureCanWrite("clear agent chat history")) return;
   const confirmed = window.confirm("Clear local agent chat history?");
   if (!confirmed) return;
   state.archive.agentMessages = clone(SEED_DATA.agentMessages);
@@ -3258,6 +3997,7 @@ async function postTeamChatPayload(payload) {
 
 function handleTeamChatSubmit(event) {
   event.preventDefault();
+  if (!ensureCanWrite("post team messages")) return;
   const formData = new FormData(els.teamChatForm);
   const type = String(formData.get("type") || "message");
   const rawUrl = String(formData.get("url") || "").trim();
@@ -3286,6 +4026,7 @@ function handleTeamChatSubmit(event) {
 }
 
 function useBrowserUrlForTeamPost() {
+  if (!ensureCanWrite("draft team posts")) return;
   const context = getBrowserContext();
   els.teamChatForm.elements.url.value = context.currentUrl;
   if (!els.teamChatForm.elements.title.value) {
@@ -3321,7 +4062,7 @@ function renderTeamChat() {
             <span class="detail-chip">${escapeHtml(item.status || "posted")}</span>
           </header>
           <p>${escapeHtml(item.text || "")}</p>
-          ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>` : ""}
+          ${item.url ? `<button class="link-button" type="button" data-team-browser="${escapeHtml(item.id)}">${escapeHtml(item.url)}</button>` : ""}
           ${
             isRecommendation
               ? `<div class="vote-row"><span>${addVotes} add</span><span>${rejectVotes} reject</span></div>`
@@ -3335,12 +4076,12 @@ function renderTeamChat() {
             }
             ${
               isLink || isRecommendation
-                ? `<button class="primary-button iconless" type="button" data-team-add="${escapeHtml(item.id)}">Add to Sources</button>`
+                ? `<button class="primary-button iconless" type="button" data-team-add="${escapeHtml(item.id)}"${writeDisabledAttr()}>Add to Sources</button>`
                 : ""
             }
             ${
               isRecommendation
-                ? `<button class="ghost-button iconless" type="button" data-team-reject="${escapeHtml(item.id)}">Reject</button>`
+                ? `<button class="ghost-button iconless" type="button" data-team-reject="${escapeHtml(item.id)}"${writeDisabledAttr()}>Reject</button>`
                 : ""
             }
           </div>
@@ -3376,6 +4117,7 @@ function updateTeamMessage(id, update) {
 }
 
 function addTeamItemToSources(id) {
+  if (!ensureCanWrite("add team recommendations to Sources")) return;
   const item = findTeamMessage(id);
   if (!item) return;
   const source = {
@@ -3402,6 +4144,7 @@ function addTeamItemToSources(id) {
 }
 
 function rejectTeamRecommendation(id) {
+  if (!ensureCanWrite("reject team recommendations")) return;
   const item = findTeamMessage(id);
   if (!item) return;
   const votes = { ...(item.votes || {}), [state.currentUser?.username || "local"]: "reject" };
@@ -3449,6 +4192,7 @@ function renderProfiles() {
 
 function handleSaveProfile(event) {
   event.preventDefault();
+  if (!ensureCanWrite("save profile changes")) return;
   const formData = new FormData(els.profileForm);
   const username = String(formData.get("username"));
   const index = state.archive.profiles.findIndex((profile) => profile.username === username);
@@ -3605,6 +4349,8 @@ function normalizeArchive(input) {
   archive.autoBotFindings = archive.autoBotFindings || [];
   archive.importedFiles = archive.importedFiles || [];
   archive.browserHistory = archive.browserHistory || [];
+  archive.browserSearchResults = archive.browserSearchResults || [];
+  archive.browserPreview = archive.browserPreview || null;
   archive.parallelExtractRuns = archive.parallelExtractRuns || [];
   archive.webScrapeRuns = archive.webScrapeRuns || [];
   archive.teamMessages = archive.teamMessages || [];
@@ -3613,6 +4359,7 @@ function normalizeArchive(input) {
 }
 
 function persistArchive() {
+  if (isGuestUser()) return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.archive));
 }
 
@@ -3649,6 +4396,7 @@ function extractKeywords(text) {
 }
 
 function download(filename, type, contents) {
+  if (!ensureCanWrite("download archive data")) return;
   const blob = new Blob([contents], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -3661,6 +4409,7 @@ function download(filename, type, contents) {
 }
 
 async function copyOrDownload(filename, contents) {
+  if (!ensureCanWrite("copy archive data")) return;
   try {
     await navigator.clipboard.writeText(contents);
     window.alert("Copied to clipboard.");
@@ -3880,6 +4629,7 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 }
 
 async function copyCodexBrief() {
+  if (!ensureCanWrite("copy the Codex build brief")) return;
   const brief = `Continue building the CORE Shapeshifting Research Atlas as a rigorous internal archive and research operating system.
 
 Preserve the evidence model: primary text, secondary scholarship, scientific analogy, experiential claim, and speculative framework.

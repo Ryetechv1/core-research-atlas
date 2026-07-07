@@ -10,6 +10,35 @@
     >
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles.css">
+    <script>
+      window.coreCseEvents = window.coreCseEvents || [];
+      window.coreDispatchCseEvent = function (type, detail) {
+        window.coreCseEvents.push({ type: type, detail: detail });
+        window.dispatchEvent(new CustomEvent(type, { detail: detail }));
+      };
+      window.__gcse = {
+        searchCallbacks: {
+          web: {
+            starting: function (gname, query) {
+              window.coreDispatchCseEvent("core-cse-search-start", { gname: gname, query: query });
+              return query;
+            },
+            ready: function (gname, query, promos, results) {
+              window.coreDispatchCseEvent("core-cse-results-ready", {
+                gname: gname,
+                query: query,
+                promos: promos || [],
+                results: results || []
+              });
+              return false;
+            },
+            rendered: function (gname, query) {
+              window.coreDispatchCseEvent("core-cse-results-rendered", { gname: gname, query: query });
+            }
+          }
+        }
+      };
+    </script>
     <script async src="https://cse.google.com/cse.js?cx=56f7592d1993141c3"></script>
   </head>
   <body>
@@ -329,7 +358,7 @@
                 <div class="panel-heading">
                   <div>
                     <h2>Google Programmable Search Browser</h2>
-                    <p>Search through the configured Google CSE inside the app, keep locator history, and send useful pages into the source archive.</p>
+                    <p>Search through the configured Google CSE inside the app, open result links in the research browser, preview source cards, and keep browser context attached to the agent and extraction consoles.</p>
                   </div>
                   <span class="detail-chip">CSE 56f7592d1993141c3</span>
                 </div>
@@ -347,13 +376,25 @@
                   <p id="inAppBrowserStatus" class="browser-status">No page loaded yet.</p>
                 </form>
 
+                <section class="api-panel virtual-browser-panel" aria-labelledby="virtualBrowserTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="virtualBrowserTitle">Virtual Research Browser</h2>
+                      <p>Internal result cards, source previews, and page targets are routed back into the in-app browser whenever the target page permits embedding.</p>
+                    </div>
+                    <span class="detail-chip">In-app route</span>
+                  </div>
+                  <div id="browserPreview" class="browser-preview" aria-live="polite"></div>
+                  <div id="browserSearchResults" class="browser-result-list" aria-live="polite"></div>
+                </section>
+
                 <section class="api-panel cse-panel" aria-labelledby="googleCseTitle">
                   <div class="panel-heading compact">
                     <div>
                       <h2 id="googleCseTitle">Embedded Google CSE</h2>
                       <p>Uses the provided search engine ID and renders the search box/results directly in the app.</p>
                     </div>
-                    <a id="googleCsePublicLink" class="detail-chip cse-public-link" href="https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0" target="_blank" rel="noopener noreferrer">Public URL</a>
+                    <button id="googleCsePublicLink" class="detail-chip cse-public-link" type="button">Public URL</button>
                   </div>
                   <div class="cse-meta-row">
                     <span class="detail-chip">cx: 56f7592d1993141c3</span>
@@ -881,7 +922,7 @@
           </svg>
         </span>
         <h2 id="authTitle">Restricted Research Access</h2>
-        <p>Sign in as one of the three project users to open the atlas.</p>
+        <p>Sign in as one of the three project users, or use guest mode for read-only browsing.</p>
         <label>
           Username
           <input name="username" autocomplete="username" required>
@@ -891,6 +932,7 @@
           <input name="password" type="password" autocomplete="current-password" required>
         </label>
         <button class="primary-button" type="submit">Sign in</button>
+        <button class="ghost-button" id="guestLoginButton" type="button">Login as Guest</button>
         <p class="auth-error" id="authError" role="alert"></p>
       </form>
     </div>
