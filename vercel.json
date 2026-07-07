@@ -15,6 +15,10 @@
       "dest": "/api/search.py"
     },
     {
+      "src": "/api/agent",
+      "dest": "/api/agent.py"
+    },
+    {
       "src": "/api/scrape",
       "dest": "/api/scrape.py"
     },

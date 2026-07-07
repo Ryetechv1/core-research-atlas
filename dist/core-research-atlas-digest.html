@@ -11,9 +11,9 @@ th{background:#edf1ed}
 </style>
 <h1>CORE Shapeshifting Research Atlas</h1>
 <p>Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.</p>
-<p>The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this build it performs local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state; true OpenAI model execution requires a secure backend/API connector.</p>
+<p>The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state.</p>
 <h2>Internal Model Core</h2>
-<p>ChatGPT 5.5 Pro Internal Core / Local internal model profile / connector-ready. Gateway: fetchInternalData(target_id) at /resource/fetch.</p>
+<p>ChatGPT 5.5 Pro Internal Core / OpenAI-backed when /api/agent is configured; local profile fallback otherwise. Gateway: fetchInternalData(target_id) at /resource/fetch.</p>
 <p>ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.</p>
 <h2>Parallel Extract API</h2>
 <p>Local endpoint: /api/extract. Upstream endpoint: https://api.parallel.ai/v1/extract. Authentication: Server-side PARALLEL_API_KEY.</p>

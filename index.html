@@ -380,7 +380,7 @@
                   <div class="panel-heading compact">
                     <div>
                       <h2 id="virtualBrowserTitle">Virtual Research Browser</h2>
-                      <p>Internal result cards, source previews, and page targets are routed back into the in-app browser whenever the target page permits embedding.</p>
+                    <p>Internal result cards, source previews, and page targets stay inside the app; iframe display is used only for targets that allow embedding.</p>
                     </div>
                     <span class="detail-chip">In-app route</span>
                   </div>
@@ -654,7 +654,7 @@
                   <div class="panel-heading">
                     <div>
                       <h2>ChatGPT Pro Research Agent</h2>
-                      <p>Prompt-driven research interface using app context, Google/CSE web results, site extraction cards, and team/source history.</p>
+                    <p>Prompt-driven research interface using the OpenAI-backed agent route when available, plus app context, Google/CSE web results, site extraction cards, and team/source history.</p>
                     </div>
                     <button class="ghost-button" id="clearAgentButton" type="button">Clear Chat</button>
                   </div>
@@ -665,7 +665,7 @@
                     <div class="panel-heading compact">
                       <div>
                         <h2>Agent Keyword Scraper</h2>
-                        <p>Searches Google through the backend JSON route when available, then falls back to embedded CSE/browser result cards.</p>
+                        <p>Searches Google through the backend JSON route when available, then falls back to embedded CSE and virtual browser result cards.</p>
                       </div>
                       <span class="detail-chip">Shared tool</span>
                     </div>

@@ -4,7 +4,7 @@ window.CORE_RESEARCH_SEED = {
     "version": "0.5.0",
     "epistemicPolicy": "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     "corePrompt": "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
-    "aiConnectorNote": "The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this build it performs local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state; true OpenAI model execution requires a secure backend/API connector."
+    "aiConnectorNote": "The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state."
   },
   "categories": [
     "Documents",
@@ -575,7 +575,7 @@ window.CORE_RESEARCH_SEED = {
   ],
   "internalModel": {
     "displayName": "ChatGPT 5.5 Pro Internal Core",
-    "status": "Local internal model profile / connector-ready",
+    "status": "OpenAI-backed when /api/agent is configured; local profile fallback otherwise",
     "gateway": {
       "openapi": "3.0.0",
       "info": {
@@ -631,7 +631,7 @@ window.CORE_RESEARCH_SEED = {
     },
     "gatewayOperation": "fetchInternalData",
     "targetParameter": "target_id",
-    "providerNote": "OpenAI Developers can be used later for secure API-key setup and backend integration. This static file does not create or host an actual OpenAI model.",
+    "providerNote": "Uses the OpenAI Responses API through the backend /api/agent route when OPENAI_API_KEY is present. Static GitHub Pages uses the local connector-ready profile fallback.",
     "synthesisScope": [
       "Archive sources",
       "Queued extraction jobs",
@@ -664,8 +664,8 @@ window.CORE_RESEARCH_SEED = {
       "Generate local synthesis output"
     ],
     "hardLimits": [
-      "No live global-web scraping in the static build",
-      "No real OpenAI model execution without a backend and secure API key",
+      "Static hosts cannot run live global-web scraping or model routes",
+      "OpenAI model execution requires /api/agent on a backend with OPENAI_API_KEY",
       "No long copyrighted PDF text embedded in exported app data",
       "No biomedical claim may be upgraded beyond its evidence tier without verification"
     ]

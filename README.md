@@ -116,6 +116,19 @@ The Agent Keyword Scraper, Global Web Extraction Console keyword mode, Keyword S
 python scripts/web_scrape_extract.py https://www.google.com
 ```
 
+## OpenAI Research Agent
+
+The ChatGPT Pro Research Agent now calls `/api/agent` when the app is running on a backend host with `OPENAI_API_KEY` configured. That route uses the OpenAI Responses API with `OPENAI_AGENT_MODEL`, defaulting to `gpt-5.5`, and sends the model the active prompt, browser context, web result cards, scraped site previews, source matches, uploaded-reference metadata, team posts, and active profile data.
+
+Local setup:
+
+```powershell
+$env:OPENAI_AGENT_MODEL = "gpt-5.5"
+python server.py
+```
+
+The API key belongs in `.env.local` or the host's secret manager, never in browser JavaScript. On GitHub Pages, `/api/agent` cannot run because Pages is static, so the agent automatically falls back to the local app synthesizer while keeping source URLs and CSE/browser cards visible.
+
 Deployment notes for Render, Vercel, Cloudflare Workers/Agents, and Catalyst are in `docs/extraction-deployment.md`.
 
 ## File Import
@@ -148,13 +161,13 @@ The public fallback URL is:
 https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0
 ```
 
-The Browser panel also provides a sandboxed iframe fallback for quick research navigation. It defaults to:
+The Browser panel also provides a virtual in-app browser pane. It defaults to:
 
 ```html
 <iframe src="https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0" width="100%" height="500px"></iframe>
 ```
 
-It accepts a full URL, a domain, or keywords. Browser-panel keyword input opens the Google CSE public URL with `gsc.q=<encoded keywords>`. Some sites block iframe embedding with browser security headers such as `X-Frame-Options: SAMEORIGIN`; when that happens, use the external-open button and still capture the URL as a source lead.
+It accepts a full URL, a domain, or keywords. Browser-panel keyword input opens the Google CSE public URL with `gsc.q=<encoded keywords>`. External result links now open as in-app source previews first, because many public sites block iframe embedding with browser security headers such as `X-Frame-Options` or CSP `frame-ancestors`. When `/api/scrape` is available, the preview is enriched with title, summary, headings, and discovered links.
 
 The Extract Console and ChatGPT Pro Research Agent attach the active in-app browser URL, recent browser history, captured browser source leads, Google/CSE result cards, and browser search text to generated extraction jobs and local synthesis responses.
 

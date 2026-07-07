@@ -7,7 +7,9 @@ const GOOGLE_CSE_ID = "56f7592d1993141c3";
 const GOOGLE_CSE_SCRIPT_URL = `https://cse.google.com/cse.js?cx=${GOOGLE_CSE_ID}`;
 const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gsc.tab=0`;
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
+const HEALTH_API_PATH = "/api/health";
 const SEARCH_API_PATH = "/api/search";
+const AGENT_API_PATH = "/api/agent";
 const TEAM_CHAT_STORAGE_KEY = `${STORAGE_KEY}:team-chat`;
 const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
 const AUTO_BOT_INTERVAL_MS = 60_000;
@@ -173,8 +175,8 @@ const BACKEND_CORE = {
     "Generate local synthesis output",
   ],
   hardLimits: [
-    "No live global-web scraping in the static build",
-    "No real OpenAI model execution without a backend and secure API key",
+    "Static hosts cannot run live global-web scraping or model routes",
+    "OpenAI model execution requires /api/agent on a backend with OPENAI_API_KEY",
     "No long copyrighted PDF text embedded in exported app data",
     "No biomedical claim may be upgraded beyond its evidence tier without verification",
   ],
@@ -237,16 +239,16 @@ const SEED_DATA = {
     corePrompt:
       "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
     aiConnectorNote:
-      "The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this build it performs local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state; true OpenAI model execution requires a secure backend/API connector.",
+      "The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state.",
   },
   internalModel: {
     displayName: "ChatGPT 5.5 Pro Internal Core",
-    status: "Local internal model profile / connector-ready",
+    status: "OpenAI-backed when /api/agent is configured; local profile fallback otherwise",
     gateway: INTERNAL_MODEL_GATEWAY,
     gatewayOperation: "fetchInternalData",
     targetParameter: "target_id",
     providerNote:
-      "OpenAI Developers can be used later for secure API-key setup and backend integration. This static file does not create or host an actual OpenAI model.",
+      "Uses the OpenAI Responses API through the backend /api/agent route when OPENAI_API_KEY is present. Static GitHub Pages uses the local connector-ready profile fallback.",
     synthesisScope: [
       "Archive sources",
       "Queued extraction jobs",
@@ -682,6 +684,16 @@ const state = {
   guestBrowserPreview: null,
   teamChatChannel: null,
   teamChatBackendAvailable: null,
+  backendCapabilities: {
+    checked: false,
+    checking: null,
+    available: false,
+    routes: [],
+    googleSearchConfigured: false,
+    openaiAgentConfigured: false,
+    agentModel: "gpt-5.5",
+    platform: "static",
+  },
   importBusy: false,
   teamChatPollTimer: null,
   pendingSearchChoice: null,
@@ -709,6 +721,7 @@ document.addEventListener("DOMContentLoaded", () => {
   startTeamChatBroadcast();
   initAuth();
   render();
+  detectBackendCapabilities();
   startTeamChatPolling();
 });
 
@@ -1818,7 +1831,6 @@ function openInAppBrowser(url, label = url, options = {}) {
   const normalizedUrl = normalizeBrowserTarget(url);
   const query = options.query || extractBrowserQuery(label, normalizedUrl);
   state.currentBrowserUrl = normalizedUrl;
-  if (els.inAppBrowserFrame) els.inAppBrowserFrame.src = normalizedUrl;
   const history = getBrowserHistory();
   history.unshift({
     id: `browser-${Date.now()}`,
@@ -1831,27 +1843,141 @@ function openInAppBrowser(url, label = url, options = {}) {
   if (query) {
     setBrowserSearchResults(buildVirtualBrowserResults(query, normalizedUrl));
   }
-  setBrowserPreview(
+  const preview =
     options.preview || {
       title: label || domainFromUrl(normalizedUrl) || "Current browser target",
       url: normalizedUrl,
       type: query ? "Search target" : inferSourceType(normalizedUrl),
       summary: query
         ? `Search query routed through the internal research browser: ${query}.`
-        : "Loaded as the current in-app browser target. If the page blocks embedding, use the source preview and URL metadata here.",
+        : "Loaded into the virtual research browser. External pages are shown as in-app source previews first because many sites block iframe embedding.",
       sourceInfo: query ? `Google CSE ${GOOGLE_CSE_ID}` : domainFromUrl(normalizedUrl) || "Direct URL",
-    }
-  );
+    };
+  setBrowserPreview(preview);
+  loadInAppBrowserFrame(normalizedUrl, preview);
   renderBrowserPanel();
   renderAgent();
+  hydrateBrowserPreviewFromScrape(normalizedUrl, label, query);
+}
+
+function loadInAppBrowserFrame(url, preview = null) {
+  if (!els.inAppBrowserFrame) return;
+  els.inAppBrowserFrame.dataset.currentUrl = url;
+  if (shouldAttemptIframeEmbed(url)) {
+    els.inAppBrowserFrame.removeAttribute("srcdoc");
+    els.inAppBrowserFrame.src = url;
+    return;
+  }
+  els.inAppBrowserFrame.removeAttribute("src");
+  els.inAppBrowserFrame.srcdoc = renderBrowserFrameDocument(url, preview);
+}
+
+function shouldAttemptIframeEmbed(url) {
+  if (!url) return false;
+  if (isCseUrl(url)) return true;
+  if (/^(data|assets|docs|dist)\//i.test(url) || url.startsWith("./") || url.startsWith("../") || url.startsWith("/")) return true;
+  return !/^https?:\/\//i.test(url);
+}
+
+function renderBrowserFrameDocument(url, preview = {}) {
+  const title = escapeHtml(preview?.title || domainFromUrl(url) || url);
+  const summary = escapeHtml(
+    preview?.summary ||
+      "This page is represented as a source preview inside the app. Many public sites block iframe display with X-Frame-Options or Content-Security-Policy, so the virtual browser keeps the URL, snippets, and extraction links visible here."
+  );
+  const source = escapeHtml(preview?.sourceInfo || domainFromUrl(url) || inferSourceType(url));
+  const safeUrl = escapeHtml(url);
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; font-family: Inter, Arial, sans-serif; background: #050505; color: #f8f8f8; }
+      main { min-height: 100vh; display: grid; align-content: center; gap: 16px; padding: 32px; box-sizing: border-box; }
+      article { border: 1px solid #3b3b3b; border-radius: 8px; padding: 20px; background: linear-gradient(145deg, #151515, #0a0a0a); }
+      h1 { margin: 0 0 8px; font-size: 22px; }
+      p { color: #d8d8d8; line-height: 1.55; }
+      code { display: block; overflow-wrap: anywhere; color: #fff; background: #000; border: 1px solid #333; padding: 10px; border-radius: 6px; }
+      small { color: #aaa; text-transform: uppercase; letter-spacing: .08em; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <small>${source}</small>
+        <h1>${title}</h1>
+        <p>${summary}</p>
+        <code>${safeUrl}</code>
+      </article>
+    </main>
+  </body>
+</html>`;
+}
+
+async function hydrateBrowserPreviewFromScrape(url, label, query = "") {
+  if (query || !/^https?:\/\//i.test(url) || isCseUrl(url)) return;
+  const capabilities = await ensureBackendCapabilities();
+  if (!hasBackendRoute("/api/scrape", capabilities)) return;
+  try {
+    const response = await fetch("/api/scrape", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        urls: [url],
+        advanced_settings: { full_content: false, include_links: true },
+        browser_context: getBrowserContext(),
+      }),
+    });
+    const data = await readJsonResponse(response);
+    const result = data?.response?.results?.[0] || data?.results?.[0];
+    if (!response.ok || !result?.ok || state.currentBrowserUrl !== url) return;
+    const preview = {
+      title: result.title || label || domainFromUrl(url) || url,
+      url: result.finalUrl || result.url || url,
+      type: inferSourceType(result.contentType || url),
+      summary: result.description || result.summary || "Page preview extracted through the local scrape route.",
+      sourceInfo: `${domainFromUrl(result.finalUrl || result.url || url) || "source"} / HTTP ${result.status || "ok"}`,
+      details: JSON.stringify(
+        {
+          title: result.title,
+          finalUrl: result.finalUrl,
+          status: result.status,
+          contentType: result.contentType,
+          headings: result.headings || [],
+          textLength: result.textLength,
+          links: (result.links || []).slice(0, 12),
+        },
+        null,
+        2
+      ),
+    };
+    const linkCards = (result.links || []).slice(0, 8).map((link, index) => ({
+      id: `scrape-link-${Date.now()}-${index}`,
+      type: "Page link",
+      title: link.text || domainFromUrl(link.href) || link.href,
+      url: link.href,
+      summary: `Discovered on ${result.title || url}.`,
+      sourceInfo: domainFromUrl(link.href) || "linked page",
+      score: 700 - index,
+    }));
+    setBrowserPreview(preview);
+    setBrowserSearchResults(dedupeBrowserResults([...linkCards, ...getBrowserSearchResults()]).slice(0, 24));
+    loadInAppBrowserFrame(url, preview);
+    renderBrowserPanel();
+    renderAgent();
+  } catch {
+    // Static hosts and blocked pages simply keep the metadata preview.
+  }
 }
 
 function renderBrowserPanel() {
   if (!els.browserHistory) return;
   const history = getBrowserHistory();
   const current = state.currentBrowserUrl || history[0]?.url || BROWSER_DEFAULT_URL;
-  if (els.inAppBrowserFrame && els.inAppBrowserFrame.src !== current) {
-    els.inAppBrowserFrame.src = current;
+  if (els.inAppBrowserFrame && els.inAppBrowserFrame.dataset.currentUrl !== current) {
+    loadInAppBrowserFrame(current, getBrowserPreview());
   }
   els.inAppBrowserStatus.textContent = browserStatusMessage(current);
   renderBrowserPreview();
@@ -2372,9 +2498,11 @@ function browserStatusMessage(url) {
     return `Loaded Google Programmable Search Engine ${GOOGLE_CSE_ID}. Use the embedded CSE search box above, or open the public CSE URL if the fallback frame is restricted.`;
   }
   if (isKnownFrameBlockedUrl(url)) {
-    return `Loaded ${url}. Google commonly blocks cross-site iframe display with X-Frame-Options: SAMEORIGIN, so use the internal result cards and Full Info preview if the frame appears blank.`;
+    return `Loaded ${url} into the virtual browser preview. Google and many public sites block iframe display, so the app keeps the page URL, source preview, and extractable links in-app.`;
   }
-  return `Loaded ${url}. If the frame is blank, that site likely blocks iframe embedding; keep using the internal source cards, Full Info preview, or extraction console.`;
+  return /^https?:\/\//i.test(url)
+    ? `Loaded ${url} into the virtual browser preview. Server-backed hosts can enrich this with /api/scrape; static hosts keep URL and card metadata in-app.`
+    : `Loaded ${url} in the in-app browser.`;
 }
 
 function isCseUrl(url) {
@@ -2686,6 +2814,20 @@ async function requestGoogleSearch({ query, context = "extract", sourcePrompt = 
     objective: sourcePrompt,
     browser_context: getBrowserContext(),
   };
+  const capabilities = await ensureBackendCapabilities();
+  if (!hasBackendRoute(SEARCH_API_PATH, capabilities) || capabilities.googleSearchConfigured === false) {
+    return createGoogleFallbackRecord({
+      query,
+      context,
+      sourcePrompt,
+      searchUrl,
+      status: capabilities.available ? 503 : 0,
+      error: capabilities.available
+        ? "GOOGLE_CUSTOM_SEARCH_API_KEY is not configured on this backend host."
+        : "This host is serving the static app without backend API routes.",
+      reason: capabilities.available ? "missing-google-key" : "static-host",
+    });
+  }
   try {
     const response = await fetch(SEARCH_API_PATH, {
       method: "POST",
@@ -2721,7 +2863,62 @@ async function readJsonResponse(response) {
   }
 }
 
-function createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl, status, error }) {
+async function ensureBackendCapabilities() {
+  if (state.backendCapabilities.checked) return state.backendCapabilities;
+  if (state.backendCapabilities.checking) return state.backendCapabilities.checking;
+  return detectBackendCapabilities({ renderAfter: false });
+}
+
+async function detectBackendCapabilities({ renderAfter = true } = {}) {
+  if (state.backendCapabilities.checking) return state.backendCapabilities.checking;
+  state.backendCapabilities.checking = fetch(HEALTH_API_PATH, { cache: "no-store" })
+    .then(async (response) => {
+      const data = await readJsonResponse(response);
+      state.backendCapabilities = {
+        checked: true,
+        checking: null,
+        available: response.ok && data.ok !== false,
+        routes: Array.isArray(data.routes) ? data.routes : [],
+        googleSearchConfigured: Boolean(data.googleSearchConfigured),
+        openaiAgentConfigured: Boolean(data.openaiAgentConfigured),
+        agentModel: data.agentModel || "gpt-5.5",
+        platform: data.platform || (response.ok ? "local-python" : "static"),
+      };
+      if (renderAfter) {
+        renderAgent();
+        renderModelCore();
+      }
+      return state.backendCapabilities;
+    })
+    .catch(() => {
+      state.backendCapabilities = {
+        checked: true,
+        checking: null,
+        available: false,
+        routes: [],
+        googleSearchConfigured: false,
+        openaiAgentConfigured: false,
+        agentModel: "gpt-5.5",
+        platform: "static",
+      };
+      if (renderAfter) {
+        renderAgent();
+        renderModelCore();
+      }
+      return state.backendCapabilities;
+    });
+  return state.backendCapabilities.checking;
+}
+
+function hasBackendRoute(route, capabilities = state.backendCapabilities) {
+  return Boolean(capabilities?.available && Array.isArray(capabilities.routes) && capabilities.routes.includes(route));
+}
+
+function createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl, status, error, reason = "fallback" }) {
+  const staticSummary =
+    reason === "static-host"
+      ? "This public host is serving the static GitHub Pages app, so Python/API routes cannot run here. The app is showing embedded Google CSE results and virtual browser cards inside the Browser panel instead."
+      : "The backend Google JSON route is reachable but missing GOOGLE_CUSTOM_SEARCH_API_KEY. The app is showing embedded Google CSE results and virtual browser cards until that server-side key is configured.";
   const response = {
     ok: false,
     provider: "google-programmable-search-element-fallback",
@@ -2732,11 +2929,11 @@ function createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl, s
         title: `Open Google CSE search for: ${query}`,
         url: searchUrl,
         finalUrl: searchUrl,
-        summary:
-          "The backend Google JSON search route is unavailable on this host or missing GOOGLE_CUSTOM_SEARCH_API_KEY. Use the embedded CSE/browser cards for live Google results.",
+        summary: staticSummary,
         links: [],
       },
     ],
+    reason,
   };
   return createExtractionResultRecord({
     engine: context === "agent" ? "agent-web-search" : "google-search",
@@ -3888,6 +4085,7 @@ async function handleAgentPrompt(event) {
   });
   options.webRecord = siteRecord || webRecord;
   options.browserContext = getBrowserContext();
+  const agentAnswer = await requestOpenAIAgentAnswer(prompt, options);
 
   if (options.queueExtraction) {
     state.archive.extractionJobs.unshift(
@@ -3906,7 +4104,8 @@ async function handleAgentPrompt(event) {
     role: "assistant",
     owner: "ChatGPT Pro Research Agent",
     createdAt: new Date().toISOString(),
-    content: generateAgentResponse(prompt, options),
+    content: agentAnswer.content,
+    backend: agentAnswer.backend,
   });
 
   persistArchive();
@@ -3926,6 +4125,95 @@ function buildAgentSearchQuery(prompt, sourceTypes = []) {
     .join(" ");
   const base = keywords.length ? keywords.join(" ") : String(prompt || "").slice(0, 90);
   return `${base} shapeshifting research sources ${typeHints}`.replace(/\s+/g, " ").trim();
+}
+
+async function requestOpenAIAgentAnswer(prompt, options) {
+  const capabilities = await ensureBackendCapabilities();
+  if (!hasBackendRoute(AGENT_API_PATH, capabilities) || capabilities.openaiAgentConfigured === false) {
+    return {
+      backend: capabilities.available ? "local-fallback-missing-openai-key" : "local-fallback-static-host",
+      content: generateAgentResponse(prompt, {
+        ...options,
+        agentBackendReason: capabilities.available
+          ? "OPENAI_API_KEY is not configured on this backend host."
+          : "This host cannot run backend API routes, so the local synthesizer answered from app/browser context.",
+      }),
+    };
+  }
+
+  const payload = buildAgentApiPayload(prompt, options, capabilities);
+  try {
+    const response = await fetch(AGENT_API_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || data.ok === false) {
+      return {
+        backend: "local-fallback-agent-error",
+        content: `${generateAgentResponse(prompt, {
+          ...options,
+          agentBackendReason: data.error || "The OpenAI agent route returned an error.",
+        })}\n\nOpenAI backend note: ${data.error || "The OpenAI agent route returned an error."}`,
+      };
+    }
+    const answer = data.response?.output_text || "";
+    return {
+      backend: data.response?.model || capabilities.agentModel || "gpt-5.5",
+      content:
+        answer ||
+        generateAgentResponse(prompt, {
+          ...options,
+          agentBackendReason: "The OpenAI agent route returned no text output.",
+        }),
+    };
+  } catch (error) {
+    return {
+      backend: "local-fallback-agent-network",
+      content: `${generateAgentResponse(prompt, {
+        ...options,
+        agentBackendReason: error.message,
+      })}\n\nOpenAI backend note: ${error.message}`,
+    };
+  }
+}
+
+function buildAgentApiPayload(prompt, options, capabilities) {
+  const browserContext = options.browserContext || getBrowserContext();
+  return {
+    prompt,
+    model: capabilities.agentModel || "gpt-5.5",
+    mode: options.mode,
+    depth: options.depth,
+    sourceTypes: options.sourceTypes || [],
+    browserContext,
+    webRecord: summarizeExtractionRecord(options.webRecord),
+    sourceMatches: rankSources(`${prompt} ${browserContext.searchText}`).slice(0, 8),
+    references: rankReferences(prompt).slice(0, 5),
+    teamMessages: (state.archive.teamMessages || []).slice(0, 10),
+    recentExtractions: (state.archive.extractionResults || []).slice(0, 6).map(summarizeExtractionRecord),
+    activeProfile: getProfile(state.currentUser?.username || state.activeProfileUsername),
+  };
+}
+
+function summarizeExtractionRecord(record) {
+  if (!record) return null;
+  return {
+    id: record.id,
+    engine: record.engine,
+    ok: record.ok,
+    status: record.status,
+    query: record.query,
+    searchUrl: record.searchUrl,
+    sourcePrompt: record.sourcePrompt,
+    items: (record.items || []).slice(0, 8).map((item) => ({
+      title: item.title,
+      url: item.url || item.finalUrl || "",
+      summary: item.summary,
+      links: (item.links || []).slice(0, 4),
+    })),
+  };
 }
 
 function getInternalModel() {
@@ -4019,13 +4307,19 @@ function generateAgentResponse(prompt, options) {
     ? webItems.map((item, index) => `${index + 1}. ${item.title}${item.url ? ` <${item.url}>` : ""} - ${item.summary || "No snippet available."}`).join("\n")
     : "No web result cards are available yet. Use the embedded CSE/browser fallback or configure GOOGLE_CUSTOM_SEARCH_API_KEY on the backend.";
   const sourceTypes = options.sourceTypes.join(", ") || "all source types";
+  const capabilities = state.backendCapabilities;
+  const backendLine = capabilities.available
+    ? `Backend runtime: ${capabilities.platform}; OpenAI agent ${capabilities.openaiAgentConfigured ? `configured for ${capabilities.agentModel}` : "not configured"}; Google JSON search ${capabilities.googleSearchConfigured ? "configured" : "not configured"}.`
+    : "Backend runtime: static host. Python/API routes are unavailable here, so the agent uses embedded CSE cards plus local app synthesis.";
 
   return [
     `Research answer from current prompt: The strongest available leads are listed below. Treat them as research leads until their source text is opened, extracted, and evidence-tiered.`,
+    backendLine,
+    options.agentBackendReason ? `Backend note: ${options.agentBackendReason}` : "",
     `Web and site evidence:\n${webLine}`,
     `App archive answer layer: ${sourceLine}`,
     `Mode: ${options.mode}. Access depth: ${options.depth}. Source access: ${sourceTypes}.`,
-    `Internal model profile: ${model.displayName || "ChatGPT 5.5 Pro Internal Core"} is mapped to ${operation}(${targetParam}) through ${getGatewayPath(model)}. This is local connector-ready orchestration, not a live OpenAI-hosted model call.`,
+    `Model surface: ${capabilities.openaiAgentConfigured ? `${capabilities.agentModel} through ${AGENT_API_PATH}` : `${model.displayName || "ChatGPT 5.5 Pro Internal Core"} local connector-ready profile`}. The internal gateway is mapped to ${operation}(${targetParam}) through ${getGatewayPath(model)}.`,
     `Google web search path: ${googleJsonApi.localEndpoint} uses ${googleJsonApi.auth}; when unavailable, the Browser panel uses embedded CSE ${cseApi.searchEngineId} result callbacks and internal result cards.`,
     `Parallel extraction path: ${parallelApi.localEndpoint} can call ${parallelApi.upstreamEndpoint} from the Python server when PARALLEL_API_KEY is configured.`,
     `Local scraping path: ${scraperApi.localEndpoint} performs dependency-free HTML/text extraction with private-network target safeguards. Keyword search mode invisibly builds ${GOOGLE_SEARCH_BASE_URL}{keywords}.`,
@@ -4043,8 +4337,10 @@ function generateAgentResponse(prompt, options) {
     `Latest extraction source cards: ${extractionLine}`,
     `Current browser context summary: ${browserContext.currentDomain}; recent lead ${browserContext.history[0]?.url || "none"}.`,
     `Recommended next pass: search documentation, PDFs, URLs, archives, and image/OCR leads for primary-source anchors; extract citation metadata; separate folklore, occult testimony, metaphysical theory, and biological analogy into distinct evidence tiers.`,
-    `Epistemic constraint: physical shapeshifting claims remain speculative unless independently verified. The agent can synthesize large research plans here, but live global-web fetching needs an external scraper/search/API connector.`,
-  ].join("\n\n");
+    `Epistemic constraint: physical shapeshifting claims remain speculative unless independently verified. The agent can synthesize large research plans here, while live global-web fetching requires the configured search/scrape/API backend.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function renderAgent() {
@@ -4052,7 +4348,7 @@ function renderAgent() {
     .map(
       (message) => `
         <article class="message ${message.role}">
-          <strong>${escapeHtml(message.role === "user" ? message.owner : "CORE Agent")}</strong>
+          <strong>${escapeHtml(message.role === "user" ? message.owner : message.owner || "ChatGPT Pro Research Agent")}</strong>
           <p>${escapeHtml(message.content)}</p>
           <small>${new Date(message.createdAt).toLocaleString()}</small>
         </article>
@@ -4078,15 +4374,17 @@ function renderAgent() {
   const browserContext = getBrowserContext();
   const teamMessages = state.archive.teamMessages || [];
   const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected");
+  const capabilities = state.backendCapabilities;
   els.agentContextSummary.innerHTML = `
     <article><strong>Model Surface</strong><span>${escapeHtml(model.displayName)}; ${escapeHtml(model.status)}.</span></article>
-    <article><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))} via ${escapeHtml(getGatewayPath(model))}; static local profile only.</span></article>
+    <article><strong>Runtime</strong><span>${escapeHtml(capabilities.available ? capabilities.platform : "static host")} / ${capabilities.openaiAgentConfigured ? `OpenAI ${escapeHtml(capabilities.agentModel)}` : "local synthesis fallback"}.</span></article>
+    <article><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))} via ${escapeHtml(getGatewayPath(model))}; ${capabilities.openaiAgentConfigured ? "OpenAI-backed answers enabled on this backend." : "connector-ready local profile fallback."}</span></article>
     <article><strong>Backend Core</strong><span>${escapeHtml(core.title)} with ${core.stages.length} staged mechanics.</span></article>
     <article><strong>Archive</strong><span>${state.archive.sources.length} records, ${state.archive.extractionJobs.length} queued extraction jobs.</span></article>
     <article><strong>Extraction Results</strong><span>${resultCount} result records, ${sourceCardCount} normalized source cards available to the agent.</span></article>
     <article><strong>Parallel Extract</strong><span>${escapeHtml(parallelApi.localEndpoint)} / ${state.archive.parallelExtractRuns.length} local request logs.</span></article>
     <article><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} / ${state.archive.webScrapeRuns.length} local request logs.</span></article>
-    <article><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} / server key required; falls back to embedded CSE cards on static hosts.</span></article>
+    <article><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} / ${capabilities.googleSearchConfigured ? "server key detected" : "embedded CSE fallback"}.</span></article>
     <article><strong>Keyword Search</strong><span>${escapeHtml(GOOGLE_SEARCH_BASE_URL)} + user keywords; modal chooses internal window or external link.</span></article>
     <article><strong>Google CSE</strong><span>${escapeHtml(cseApi.searchEngineId)} / ${escapeHtml(cseApi.publicUrl)}.</span></article>
     <article><strong>File Import</strong><span>${importedFiles.length} imported file logs; ${importedFiles.reduce((sum, item) => sum + (item.recordsCreated || 0), 0)} sources created from uploads.</span></article>
@@ -4097,7 +4395,7 @@ function renderAgent() {
     <article><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} / ${escapeHtml(aiqApi.status)}.</span></article>
     <article><strong>References</strong><span>${references.length} uploaded PDF references loaded for background and routing.</span></article>
     <article><strong>Active Profile</strong><span>${escapeHtml(activeProfile?.displayName || "None")} / ${escapeHtml(activeProfile?.animalForm || "Not set")}</span></article>
-    <article><strong>Policy</strong><span>Web/model calls require configured backend keys; source URLs remain visible and clickable.</span></article>
+    <article><strong>Policy</strong><span>Web/model calls require configured backend keys; source URLs remain visible and clickable inside the virtual browser.</span></article>
   `;
 }
 
@@ -4110,13 +4408,15 @@ function renderModelCore() {
   const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
   const aiqApi = state.archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
+  const capabilities = state.backendCapabilities;
   if (els.modelCoreSummary) {
     els.modelCoreSummary.innerHTML = `
       <div class="status-row"><strong>${escapeHtml(model.displayName)}</strong><span>${escapeHtml(model.providerNote)}</span></div>
+      <div class="status-row"><strong>OpenAI Agent Route</strong><span>${escapeHtml(AGENT_API_PATH)} / ${capabilities.openaiAgentConfigured ? `configured for ${capabilities.agentModel}` : "not available on this host or missing OPENAI_API_KEY"}.</span></div>
       <div class="status-row"><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))}(${escapeHtml(model.targetParameter || "target_id")}) at ${escapeHtml(getGatewayPath(model))}</span></div>
       <div class="status-row"><strong>Parallel Extract</strong><span>${escapeHtml(parallelApi.localEndpoint)} proxies ${escapeHtml(parallelApi.upstreamEndpoint)} with ${escapeHtml(parallelApi.auth)}.</span></div>
       <div class="status-row"><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} extracts HTML/text directly with safeguards: ${escapeHtml(scraperApi.safeguards.slice(0, 2).join("; "))}.</span></div>
-      <div class="status-row"><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} uses ${escapeHtml(googleJsonApi.auth)} and returns normalized web result cards.</span></div>
+      <div class="status-row"><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} uses ${escapeHtml(googleJsonApi.auth)} and returns normalized web result cards when ${capabilities.googleSearchConfigured ? "configured" : "hosted with GOOGLE_CUSTOM_SEARCH_API_KEY"}.</span></div>
       <div class="status-row"><strong>Google CSE</strong><span>${escapeHtml(cseApi.scriptUrl)} renders ${escapeHtml(cseApi.elements.join(" + "))}; public URL ${escapeHtml(cseApi.publicUrl)}.</span></div>
       <div class="status-row"><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} is registered for optional routed shallow/deep research once a trusted backend is running.</span></div>
       <div class="status-row"><strong>${escapeHtml(core.title)}</strong><span>${escapeHtml(core.summary)}</span></div>
@@ -4208,6 +4508,13 @@ function setTeamChatStatus(text) {
 
 async function syncTeamChat({ renderAfter = false } = {}) {
   if (!els.teamChatFeed) return;
+  const capabilities = await ensureBackendCapabilities();
+  if (!hasBackendRoute("/api/team-chat", capabilities)) {
+    state.teamChatBackendAvailable = false;
+    setTeamChatStatus("Local/cross-tab team feed on this static host. Cross-device posts need a backend with /api/team-chat.");
+    if (renderAfter) renderTeamChat();
+    return;
+  }
   try {
     const response = await fetch("/api/team-chat", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -4236,6 +4543,13 @@ function mergeTeamMessages(localMessages = [], remoteMessages = []) {
 }
 
 async function postTeamChatPayload(payload) {
+  const capabilities = await ensureBackendCapabilities();
+  if (!hasBackendRoute("/api/team-chat", capabilities)) {
+    state.teamChatBackendAvailable = false;
+    broadcastTeamMessages();
+    setTeamChatStatus("Saved locally and synced across open tabs. Cross-device backend is not available on this host.");
+    return;
+  }
   try {
     const response = await fetch("/api/team-chat", {
       method: "POST",

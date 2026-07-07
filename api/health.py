@@ -20,6 +20,16 @@ class handler(BaseHTTPRequestHandler):
                     or os.environ.get("GOOGLE_CSE_API_KEY")
                     or os.environ.get("CUSTOM_SEARCH_API_KEY")
                 ),
-                "routes": ["/api/health", "/api/extract", "/api/search", "/api/scrape", "/api/import-file", "/api/team-chat"],
+                "openaiAgentConfigured": bool(os.environ.get("OPENAI_API_KEY")),
+                "agentModel": os.environ.get("OPENAI_AGENT_MODEL", "gpt-5.5"),
+                "routes": [
+                    "/api/health",
+                    "/api/extract",
+                    "/api/search",
+                    "/api/agent",
+                    "/api/scrape",
+                    "/api/import-file",
+                    "/api/team-chat",
+                ],
             },
         )

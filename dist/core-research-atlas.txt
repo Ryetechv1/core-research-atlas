@@ -5,12 +5,12 @@ Epistemic policy:
 Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.
 
 AI/search connector note:
-The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this build it performs local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state; true OpenAI model execution requires a secure backend/API connector.
+The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state.
 
 Internal model core:
-ChatGPT 5.5 Pro Internal Core - Local internal model profile / connector-ready
+ChatGPT 5.5 Pro Internal Core - OpenAI-backed when /api/agent is configured; local profile fallback otherwise
 Gateway operation: fetchInternalData(target_id) at /resource/fetch
-OpenAI Developers can be used later for secure API-key setup and backend integration. This static file does not create or host an actual OpenAI model.
+Uses the OpenAI Responses API through the backend /api/agent route when OPENAI_API_KEY is present. Static GitHub Pages uses the local connector-ready profile fallback.
 
 Backend mechanics core:
 ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.
