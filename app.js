@@ -7,6 +7,9 @@ const GOOGLE_CSE_ID = "56f7592d1993141c3";
 const GOOGLE_CSE_SCRIPT_URL = `https://cse.google.com/cse.js?cx=${GOOGLE_CSE_ID}`;
 const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gsc.tab=0`;
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
+const SEARCH_API_PATH = "/api/search";
+const TEAM_CHAT_STORAGE_KEY = `${STORAGE_KEY}:team-chat`;
+const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
 const AUTO_BOT_INTERVAL_MS = 60_000;
 const TEAM_CHAT_POLL_MS = 5_000;
 const GUEST_SESSION_VALUE = "Guest";
@@ -282,6 +285,13 @@ const SEED_DATA = {
       publicUrl: GOOGLE_CSE_PUBLIC_URL,
       elements: ["gcse-searchbox", "gcse-searchresults"],
       status: "Embedded in Browser panel with external public URL fallback.",
+    },
+    googleCustomSearchJson: {
+      provider: "Google Custom Search JSON API",
+      localEndpoint: SEARCH_API_PATH,
+      auth: "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY",
+      searchEngineId: GOOGLE_CSE_ID,
+      status: "Preferred backend search path when hosted on a server with an API key; otherwise the app falls back to embedded CSE result cards.",
     },
     nvidiaAIQResearch: {
       provider: "NVIDIA AI-Q Research",
@@ -670,6 +680,8 @@ const state = {
   guestBrowserHistory: [],
   guestBrowserSearchResults: [],
   guestBrowserPreview: null,
+  teamChatChannel: null,
+  teamChatBackendAvailable: null,
   importBusy: false,
   teamChatPollTimer: null,
   pendingSearchChoice: null,
@@ -693,6 +705,8 @@ document.addEventListener("DOMContentLoaded", () => {
   populateFormOptions();
   renderSourceTypeCheckboxes(els.extractionSourceTypes, "extract", ["Documentation", "PDF", "URL", "Archive"]);
   renderSourceTypeCheckboxes(els.agentSourceTypes, "agent", ["Documentation", "PDF", "URL", "Archive", "Forum / Community"]);
+  loadTeamMessagesFromLocalStorage();
+  startTeamChatBroadcast();
   initAuth();
   render();
   startTeamChatPolling();
@@ -1299,7 +1313,7 @@ async function analyzeUploadedFile(file) {
       method: "POST",
       body: payload,
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (response.ok && data.ok !== false && data.file) {
       return { ...data.file, source: "server" };
     }
@@ -2644,7 +2658,7 @@ function askSearchDisplayChoice({ query, searchUrl, context }) {
   return new Promise((resolve) => {
     state.pendingSearchChoice = { resolve, query, searchUrl, context };
     els.searchChoiceSummary.innerHTML = `
-      <strong>${escapeHtml(context === "agent" ? "ChatGPT 5.5 Agent" : "Global Extract Console")}</strong>
+      <strong>${escapeHtml(context === "agent" ? "ChatGPT Pro Research Agent" : "Global Extract Console")}</strong>
       <span>${escapeHtml(query)}</span>
     `;
     els.searchChoiceOverlay.hidden = false;
@@ -2662,6 +2676,120 @@ function buildSearchUrl(query) {
   return `${GOOGLE_SEARCH_BASE_URL}${encodeURIComponent(query.trim())}`;
 }
 
+async function requestGoogleSearch({ query, context = "extract", sourcePrompt = "", num = 8 }) {
+  const searchUrl = buildCseSearchUrl(query);
+  const payload = {
+    query,
+    cx: GOOGLE_CSE_ID,
+    num,
+    context,
+    objective: sourcePrompt,
+    browser_context: getBrowserContext(),
+  };
+  try {
+    const response = await fetch(SEARCH_API_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || data.ok === false) {
+      return createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl: data.fallback?.searchUrl || searchUrl, status: response.status, error: data.error });
+    }
+    return createExtractionResultRecord({
+      engine: context === "agent" ? "agent-web-search" : "google-search",
+      request: payload,
+      response: data.response || data,
+      status: response.status,
+      ok: true,
+      sourcePrompt,
+    });
+  } catch (error) {
+    return createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl, status: 0, error: error.message });
+  }
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text || "{}");
+  } catch {
+    return {
+      ok: false,
+      error: `Expected JSON from ${response.url || "API route"} but received ${text.slice(0, 120) || "an empty response"}.`,
+    };
+  }
+}
+
+function createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl, status, error }) {
+  const response = {
+    ok: false,
+    provider: "google-programmable-search-element-fallback",
+    query,
+    error: error || "Google JSON search backend unavailable.",
+    items: [
+      {
+        title: `Open Google CSE search for: ${query}`,
+        url: searchUrl,
+        finalUrl: searchUrl,
+        summary:
+          "The backend Google JSON search route is unavailable on this host or missing GOOGLE_CUSTOM_SEARCH_API_KEY. Use the embedded CSE/browser cards for live Google results.",
+        links: [],
+      },
+    ],
+  };
+  return createExtractionResultRecord({
+    engine: context === "agent" ? "agent-web-search" : "google-search",
+    request: { query, cx: GOOGLE_CSE_ID, fallback: true },
+    response,
+    status,
+    ok: false,
+    sourcePrompt,
+  });
+}
+
+function updateBrowserFromSearchRecord(record, query) {
+  const searchUrl = buildCseSearchUrl(query);
+  const cards = [
+    ...(record.items || []).map((item, index) => ({
+      id: `search-${record.id}-${index}`,
+      type: `${engineLabel(record.engine)} result`,
+      title: item.title,
+      url: item.url || item.finalUrl || "",
+      summary: item.summary || "",
+      sourceInfo: item.displayLink || domainFromUrl(item.url || item.finalUrl || "") || engineLabel(record.engine),
+      details: JSON.stringify({ recordId: record.id, item }, null, 2),
+      score: 950 - index,
+    })),
+    ...buildVirtualBrowserResults(query, searchUrl),
+  ];
+  const preview = {
+    title: `${engineLabel(record.engine)}: ${query}`,
+    url: searchUrl,
+    type: record.ok ? "Google web search" : "Google CSE fallback",
+    summary: record.ok
+      ? `${record.items?.length || 0} Google result card(s) returned from the server-side search route.`
+      : `${record.response?.error || "Search backend unavailable."} The embedded CSE remains available in the Browser panel.`,
+    sourceInfo: record.ok ? "Server-side Google Custom Search JSON API" : "Embedded Google Programmable Search fallback",
+    details: JSON.stringify(
+      {
+        query,
+        status: record.status,
+        ok: record.ok,
+        itemCount: record.items?.length || 0,
+        request: record.request,
+      },
+      null,
+      2
+    ),
+  };
+  openInAppBrowser(searchUrl, `Google CSE: ${query}`);
+  setBrowserSearchResults(dedupeBrowserResults(cards).slice(0, 24));
+  setBrowserPreview(preview);
+  renderBrowserPanel();
+  renderAgent();
+}
+
 function getContextPrompt(context, query) {
   if (context === "agent") {
     const agentPrompt = els.agentForm?.elements?.prompt?.value?.trim();
@@ -2675,9 +2803,58 @@ function getContextPrompt(context, query) {
 async function runKeywordScrape({ query, fullContent = false, includeLinks = true, context = "extract", sourcePrompt, categoryTarget = "" }) {
   const searchUrl = buildSearchUrl(query);
   const objective = withBrowserContext(sourcePrompt || `Keyword search: ${query}`, "In-app browser context");
+  renderEmbeddedSearchWindow(context, {
+    query,
+    searchUrl,
+    mode: "internal",
+    message: "Searching Google through /api/search...",
+  });
+
+  const record = await requestGoogleSearch({ query, context, sourcePrompt: objective, num: 8 });
+  record.context = context;
+  record.query = query;
+  record.searchUrl = buildCseSearchUrl(query);
+  record.categoryTarget = categoryTarget;
+  appendExtractionResult(record);
+  state.archive.webScrapeRuns.unshift({
+    id: `search-${Date.now()}`,
+    owner: state.currentUser?.username || "local",
+    createdAt: new Date().toISOString(),
+    request: record.request,
+    ok: record.ok,
+    status: record.status,
+    response: record.response,
+    context,
+    categoryTarget,
+  });
+  state.archive.webScrapeRuns = state.archive.webScrapeRuns.slice(0, 30);
+  updateBrowserFromSearchRecord(record, query);
+  const siteRecord = await scrapeSearchResultPages(record, {
+    query,
+    sourcePrompt: objective,
+    fullContent,
+    includeLinks,
+    context,
+    categoryTarget,
+  });
+  const displayRecord = siteRecord || record;
+  persistArchive();
+  renderEmbeddedSearchWindow(context, { query, searchUrl: record.searchUrl, mode: "internal", record: displayRecord });
+  renderExtractionResults();
+  renderAgent();
+  renderModelCore();
+  return displayRecord;
+}
+
+async function scrapeSearchResultPages(record, { query, sourcePrompt, fullContent, includeLinks, context, categoryTarget }) {
+  const urls = (record.items || [])
+    .map((item) => item.url || item.finalUrl || "")
+    .filter((url) => /^https?:\/\//i.test(url) && !isCseUrl(url))
+    .slice(0, 3);
+  if (!urls.length) return null;
   const payload = {
-    urls: [searchUrl],
-    objective,
+    urls,
+    objective: `${sourcePrompt}\n\nSearch result pages selected from Google query: ${query}`,
     browser_context: getBrowserContext(),
     search_query: query,
     search_base_url: GOOGLE_SEARCH_BASE_URL,
@@ -2686,76 +2863,29 @@ async function runKeywordScrape({ query, fullContent = false, includeLinks = tru
       include_links: includeLinks,
     },
   };
-  renderEmbeddedSearchWindow(context, {
-    query,
-    searchUrl,
-    mode: "internal",
-    message: "Searching through /api/scrape...",
-  });
-
   try {
     const response = await fetch("/api/scrape", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await response.json();
-    const run = {
-      id: `keyword-scrape-${Date.now()}`,
-      owner: state.currentUser?.username || "local",
-      createdAt: new Date().toISOString(),
+    const data = await readJsonResponse(response);
+    const scrapeRecord = createExtractionResultRecord({
+      engine: context === "agent" ? "agent-site-scrape" : "site-scrape",
       request: payload,
+      response: data,
+      status: response.status,
       ok: response.ok && data.ok !== false,
-      status: response.status,
-      response: data,
-      context,
-      categoryTarget,
-    };
-    state.archive.webScrapeRuns.unshift(run);
-    state.archive.webScrapeRuns = state.archive.webScrapeRuns.slice(0, 30);
-    const record = createExtractionResultRecord({
-      engine: context === "agent" ? "agent-scrape" : "keyword-scrape",
-      request: payload,
-      response: data,
-      status: response.status,
-      ok: run.ok,
-      sourcePrompt: payload.objective,
+      sourcePrompt,
     });
-    record.context = context;
-    record.query = query;
-    record.searchUrl = searchUrl;
-    record.categoryTarget = categoryTarget;
-    appendExtractionResult(record);
-    persistArchive();
-    renderEmbeddedSearchWindow(context, { query, searchUrl, mode: "internal", record });
-    renderExtractionResults();
-    renderAgent();
-    renderModelCore();
-    return record;
-  } catch (error) {
-    const data = {
-      ok: false,
-      error: "Could not reach /api/scrape. Start the Python server and try again.",
-      detail: error.message,
-    };
-    const record = createExtractionResultRecord({
-      engine: context === "agent" ? "agent-scrape" : "keyword-scrape",
-      request: payload,
-      response: data,
-      status: 0,
-      ok: false,
-      sourcePrompt: payload.objective,
-    });
-    record.context = context;
-    record.query = query;
-    record.searchUrl = searchUrl;
-    record.categoryTarget = categoryTarget;
-    appendExtractionResult(record);
-    persistArchive();
-    renderEmbeddedSearchWindow(context, { query, searchUrl, mode: "internal", record });
-    renderExtractionResults();
-    renderAgent();
-    return record;
+    scrapeRecord.context = context;
+    scrapeRecord.query = query;
+    scrapeRecord.searchUrl = buildCseSearchUrl(query);
+    scrapeRecord.categoryTarget = categoryTarget;
+    appendExtractionResult(scrapeRecord);
+    return scrapeRecord;
+  } catch {
+    return null;
   }
 }
 
@@ -2915,6 +3045,23 @@ async function handleWebScrape(event) {
   const sourcePrompt = query ? getActiveExtractionPrompt(`Keyword search: ${query}`) : getActiveExtractionPrompt();
   if (!urls.length) {
     els.webScrapeOutput.textContent = "Add search keywords.";
+    return;
+  }
+
+  if (query) {
+    els.webScrapeOutput.textContent = "Searching Google through /api/search, then scraping top result pages when available...";
+    const record = await runKeywordScrape({ query, fullContent, includeLinks, context: "extract", sourcePrompt });
+    els.webScrapeOutput.textContent = JSON.stringify(
+      {
+        ok: record.ok,
+        engine: record.engine,
+        query,
+        itemCount: record.items?.length || 0,
+        response: record.response,
+      },
+      null,
+      2
+    );
     return;
   }
 
@@ -3165,6 +3312,10 @@ function engineLabel(engine) {
   const labels = {
     parallel: "Parallel Extract",
     scrape: "Local Scraper",
+    "google-search": "Google Web Search",
+    "agent-web-search": "Agent Google Web Search",
+    "site-scrape": "Search Result Site Scrape",
+    "agent-site-scrape": "Agent Site Scrape",
     "keyword-scrape": "Keyword Search",
     "agent-scrape": "Agent Keyword Search",
     "auto-bot": "Auto Research Bot",
@@ -3687,7 +3838,7 @@ function clearExtractionQueue() {
   renderAgent();
 }
 
-function handleAgentPrompt(event) {
+async function handleAgentPrompt(event) {
   event.preventDefault();
   if (!ensureCanWrite("send agent prompts")) return;
   const formData = new FormData(els.agentForm);
@@ -3707,6 +3858,36 @@ function handleAgentPrompt(event) {
     createdAt: new Date().toISOString(),
     content: prompt,
   });
+  renderAgent();
+
+  const agentQuery = buildAgentSearchQuery(prompt, sourceTypes);
+  renderEmbeddedSearchWindow("agent", {
+    query: agentQuery,
+    searchUrl: buildCseSearchUrl(agentQuery),
+    mode: "internal",
+    message: "Researching web results for this prompt...",
+  });
+  const webRecord = await requestGoogleSearch({
+    query: agentQuery,
+    context: "agent",
+    sourcePrompt: withBrowserContext(prompt, "Agent prompt web research context"),
+    num: options.depth === "Exhaustive" ? 10 : 8,
+  });
+  webRecord.context = "agent";
+  webRecord.query = agentQuery;
+  webRecord.searchUrl = buildCseSearchUrl(agentQuery);
+  appendExtractionResult(webRecord);
+  updateBrowserFromSearchRecord(webRecord, agentQuery);
+  const siteRecord = await scrapeSearchResultPages(webRecord, {
+    query: agentQuery,
+    sourcePrompt: withBrowserContext(prompt, "Agent prompt web research context"),
+    fullContent: options.depth === "Exhaustive",
+    includeLinks: true,
+    context: "agent",
+    categoryTarget: "",
+  });
+  options.webRecord = siteRecord || webRecord;
+  options.browserContext = getBrowserContext();
 
   if (options.queueExtraction) {
     state.archive.extractionJobs.unshift(
@@ -3723,7 +3904,7 @@ function handleAgentPrompt(event) {
 
   state.archive.agentMessages.push({
     role: "assistant",
-    owner: "ChatGPT 5.5 Pro connector-ready agent",
+    owner: "ChatGPT Pro Research Agent",
     createdAt: new Date().toISOString(),
     content: generateAgentResponse(prompt, options),
   });
@@ -3731,8 +3912,20 @@ function handleAgentPrompt(event) {
   persistArchive();
   els.agentForm.reset();
   renderSourceTypeCheckboxes(els.agentSourceTypes, "agent", sourceTypes);
+  renderEmbeddedSearchWindow("agent", { query: agentQuery, searchUrl: webRecord.searchUrl, mode: "internal", record: options.webRecord });
   renderAgent();
+  renderExtractionResults();
   renderExtractionJobs();
+}
+
+function buildAgentSearchQuery(prompt, sourceTypes = []) {
+  const keywords = extractKeywords(`${prompt} ${getBrowserContext().searchText}`).slice(0, 8);
+  const typeHints = sourceTypes
+    .filter((type) => ["PDF", "Archive", "Documentation", "Book / Manuscript"].includes(type))
+    .slice(0, 3)
+    .join(" ");
+  const base = keywords.length ? keywords.join(" ") : String(prompt || "").slice(0, 90);
+  return `${base} shapeshifting research sources ${typeHints}`.replace(/\s+/g, " ").trim();
 }
 
 function getInternalModel() {
@@ -3789,8 +3982,12 @@ function generateAgentResponse(prompt, options) {
   const parallelApi = state.archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
   const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
+  const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
   const aiqApi = state.archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
   const latestResults = (state.archive.extractionResults || []).slice(0, 3);
+  const webRecord =
+    options.webRecord ||
+    latestResults.find((result) => ["agent-web-search", "agent-site-scrape", "google-search", "site-scrape"].includes(result.engine));
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
   const browserHistory = getBrowserHistory();
@@ -3817,11 +4014,19 @@ function generateAgentResponse(prompt, options) {
         })
         .join("; ")
     : "No normalized extraction results yet.";
+  const webItems = (webRecord?.items || []).slice(0, 5);
+  const webLine = webItems.length
+    ? webItems.map((item, index) => `${index + 1}. ${item.title}${item.url ? ` <${item.url}>` : ""} - ${item.summary || "No snippet available."}`).join("\n")
+    : "No web result cards are available yet. Use the embedded CSE/browser fallback or configure GOOGLE_CUSTOM_SEARCH_API_KEY on the backend.";
   const sourceTypes = options.sourceTypes.join(", ") || "all source types";
 
   return [
+    `Research answer from current prompt: The strongest available leads are listed below. Treat them as research leads until their source text is opened, extracted, and evidence-tiered.`,
+    `Web and site evidence:\n${webLine}`,
+    `App archive answer layer: ${sourceLine}`,
     `Mode: ${options.mode}. Access depth: ${options.depth}. Source access: ${sourceTypes}.`,
     `Internal model profile: ${model.displayName || "ChatGPT 5.5 Pro Internal Core"} is mapped to ${operation}(${targetParam}) through ${getGatewayPath(model)}. This is local connector-ready orchestration, not a live OpenAI-hosted model call.`,
+    `Google web search path: ${googleJsonApi.localEndpoint} uses ${googleJsonApi.auth}; when unavailable, the Browser panel uses embedded CSE ${cseApi.searchEngineId} result callbacks and internal result cards.`,
     `Parallel extraction path: ${parallelApi.localEndpoint} can call ${parallelApi.upstreamEndpoint} from the Python server when PARALLEL_API_KEY is configured.`,
     `Local scraping path: ${scraperApi.localEndpoint} performs dependency-free HTML/text extraction with private-network target safeguards. Keyword search mode invisibly builds ${GOOGLE_SEARCH_BASE_URL}{keywords}.`,
     `Google Programmable Search: CSE ${cseApi.searchEngineId} is embedded in the Browser panel with public URL ${cseApi.publicUrl}.`,
@@ -3863,6 +4068,7 @@ function renderAgent() {
   const parallelApi = state.archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
   const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
+  const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
   const aiqApi = state.archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
   const resultCount = (state.archive.extractionResults || []).length;
   const sourceCardCount = (state.archive.extractionResults || []).reduce((sum, result) => sum + (result.items?.length || 0), 0);
@@ -3880,6 +4086,7 @@ function renderAgent() {
     <article><strong>Extraction Results</strong><span>${resultCount} result records, ${sourceCardCount} normalized source cards available to the agent.</span></article>
     <article><strong>Parallel Extract</strong><span>${escapeHtml(parallelApi.localEndpoint)} / ${state.archive.parallelExtractRuns.length} local request logs.</span></article>
     <article><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} / ${state.archive.webScrapeRuns.length} local request logs.</span></article>
+    <article><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} / server key required; falls back to embedded CSE cards on static hosts.</span></article>
     <article><strong>Keyword Search</strong><span>${escapeHtml(GOOGLE_SEARCH_BASE_URL)} + user keywords; modal chooses internal window or external link.</span></article>
     <article><strong>Google CSE</strong><span>${escapeHtml(cseApi.searchEngineId)} / ${escapeHtml(cseApi.publicUrl)}.</span></article>
     <article><strong>File Import</strong><span>${importedFiles.length} imported file logs; ${importedFiles.reduce((sum, item) => sum + (item.recordsCreated || 0), 0)} sources created from uploads.</span></article>
@@ -3901,6 +4108,7 @@ function renderModelCore() {
   const parallelApi = state.archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
   const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
+  const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
   const aiqApi = state.archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
   if (els.modelCoreSummary) {
     els.modelCoreSummary.innerHTML = `
@@ -3908,6 +4116,7 @@ function renderModelCore() {
       <div class="status-row"><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))}(${escapeHtml(model.targetParameter || "target_id")}) at ${escapeHtml(getGatewayPath(model))}</span></div>
       <div class="status-row"><strong>Parallel Extract</strong><span>${escapeHtml(parallelApi.localEndpoint)} proxies ${escapeHtml(parallelApi.upstreamEndpoint)} with ${escapeHtml(parallelApi.auth)}.</span></div>
       <div class="status-row"><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} extracts HTML/text directly with safeguards: ${escapeHtml(scraperApi.safeguards.slice(0, 2).join("; "))}.</span></div>
+      <div class="status-row"><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} uses ${escapeHtml(googleJsonApi.auth)} and returns normalized web result cards.</span></div>
       <div class="status-row"><strong>Google CSE</strong><span>${escapeHtml(cseApi.scriptUrl)} renders ${escapeHtml(cseApi.elements.join(" + "))}; public URL ${escapeHtml(cseApi.publicUrl)}.</span></div>
       <div class="status-row"><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} is registered for optional routed shallow/deep research once a trusted backend is running.</span></div>
       <div class="status-row"><strong>${escapeHtml(core.title)}</strong><span>${escapeHtml(core.summary)}</span></div>
@@ -3939,6 +4148,54 @@ function clearAgentChat() {
   renderAgent();
 }
 
+function loadTeamMessagesFromLocalStorage() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(TEAM_CHAT_STORAGE_KEY) || "[]");
+    if (Array.isArray(saved) && saved.length) {
+      state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], saved).slice(0, 200);
+    }
+  } catch {
+    window.localStorage.removeItem(TEAM_CHAT_STORAGE_KEY);
+  }
+}
+
+function persistTeamMessagesLocal() {
+  try {
+    window.localStorage.setItem(TEAM_CHAT_STORAGE_KEY, JSON.stringify((state.archive.teamMessages || []).slice(0, 200)));
+  } catch {
+    // Local storage can be unavailable in privacy-restricted contexts.
+  }
+}
+
+function startTeamChatBroadcast() {
+  if ("BroadcastChannel" in window) {
+    state.teamChatChannel = new BroadcastChannel(TEAM_CHAT_CHANNEL_NAME);
+    state.teamChatChannel.addEventListener("message", (event) => {
+      if (event.data?.type !== "team-messages" || !Array.isArray(event.data.messages)) return;
+      state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], event.data.messages).slice(0, 200);
+      persistTeamMessagesLocal();
+      renderTeamChat();
+    });
+  }
+  window.addEventListener("storage", (event) => {
+    if (event.key !== TEAM_CHAT_STORAGE_KEY || !event.newValue) return;
+    try {
+      const messages = JSON.parse(event.newValue);
+      if (!Array.isArray(messages)) return;
+      state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], messages).slice(0, 200);
+      renderTeamChat();
+    } catch {
+      // Ignore malformed cross-tab storage events.
+    }
+  });
+}
+
+function broadcastTeamMessages() {
+  const messages = (state.archive.teamMessages || []).slice(0, 200);
+  persistTeamMessagesLocal();
+  state.teamChatChannel?.postMessage({ type: "team-messages", messages });
+}
+
 function startTeamChatPolling() {
   syncTeamChat({ renderAfter: true });
   if (state.teamChatPollTimer) window.clearInterval(state.teamChatPollTimer);
@@ -3954,14 +4211,17 @@ async function syncTeamChat({ renderAfter = false } = {}) {
   try {
     const response = await fetch("/api/team-chat", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (Array.isArray(data.messages)) {
       state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], data.messages).slice(0, 200);
+      broadcastTeamMessages();
       persistArchive();
     }
+    state.teamChatBackendAvailable = true;
     setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}`);
   } catch (error) {
-    setTeamChatStatus("Local-only chat");
+    state.teamChatBackendAvailable = false;
+    setTeamChatStatus("Local-only team feed on this host. Shared messages across devices require a backend /api/team-chat deployment.");
   }
   if (renderAfter) renderTeamChat();
 }
@@ -3983,15 +4243,19 @@ async function postTeamChatPayload(payload) {
       body: JSON.stringify(payload),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (Array.isArray(data.messages)) {
-      state.archive.teamMessages = data.messages;
+      state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], data.messages).slice(0, 200);
+      broadcastTeamMessages();
       persistArchive();
       renderTeamChat();
     }
+    state.teamChatBackendAvailable = true;
     setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}`);
   } catch (error) {
-    setTeamChatStatus("Local-only chat");
+    state.teamChatBackendAvailable = false;
+    broadcastTeamMessages();
+    setTeamChatStatus("Saved locally. Shared backend unavailable on this host.");
   }
 }
 
@@ -4019,6 +4283,7 @@ function handleTeamChatSubmit(event) {
   };
 
   state.archive.teamMessages = mergeTeamMessages([item], state.archive.teamMessages || []).slice(0, 200);
+  broadcastTeamMessages();
   persistArchive();
   els.teamChatForm.reset();
   renderTeamChat();
@@ -4041,7 +4306,11 @@ function renderTeamChat() {
   if (!els.teamChatFeed) return;
   const messages = [...(state.archive.teamMessages || [])].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
   if (!messages.length) {
-    els.teamChatFeed.innerHTML = '<div class="empty-state">No team posts yet. Share a message, update, link, or source recommendation.</div>';
+    const note =
+      state.teamChatBackendAvailable === false
+        ? " Shared cross-device team chat needs a backend host with /api/team-chat; this GitHub Pages/static session can still save and display local posts."
+        : "";
+    els.teamChatFeed.innerHTML = `<div class="empty-state">No team posts yet. Share a message, update, link, or source recommendation.${escapeHtml(note)}</div>`;
     return;
   }
 
@@ -4112,6 +4381,7 @@ function updateTeamMessage(id, update) {
   state.archive.teamMessages = (state.archive.teamMessages || []).map((item) =>
     item.id === id ? { ...item, ...update, updatedAt: new Date().toISOString() } : item
   );
+  broadcastTeamMessages();
   persistArchive();
   renderTeamChat();
 }
@@ -4315,6 +4585,10 @@ function normalizeArchive(input) {
     ...base.externalApis.googleProgrammableSearch,
     ...(archive.externalApis.googleProgrammableSearch || {}),
   };
+  archive.externalApis.googleCustomSearchJson = {
+    ...base.externalApis.googleCustomSearchJson,
+    ...(archive.externalApis.googleCustomSearchJson || {}),
+  };
   archive.externalApis.nvidiaAIQResearch = {
     ...base.externalApis.nvidiaAIQResearch,
     ...(archive.externalApis.nvidiaAIQResearch || {}),
@@ -4422,6 +4696,7 @@ function buildTextDigest(archive) {
   const parallelApi = archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
   const scraperApi = archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
+  const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
   const aiqApi = archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
   const lines = [
     archive.project.name,
@@ -4461,6 +4736,11 @@ function buildTextDigest(archive) {
     `Script URL: ${cseApi.scriptUrl || GOOGLE_CSE_SCRIPT_URL}`,
     `Public URL: ${cseApi.publicUrl || GOOGLE_CSE_PUBLIC_URL}`,
     `Elements: ${(cseApi.elements || []).join(", ")}`,
+    "",
+    "Google Custom Search JSON API:",
+    `Local endpoint: ${googleJsonApi.localEndpoint || SEARCH_API_PATH}`,
+    `Authentication: ${googleJsonApi.auth || "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY"}`,
+    `Status: ${googleJsonApi.status || "Preferred backend search path with CSE fallback."}`,
     "",
     "Automated AI Research Bot:",
     `${archive.autoBotFindings?.length || 0} findings logged`,
@@ -4534,6 +4814,7 @@ function buildHtmlDigest(archive) {
   const parallelApi = archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
   const scraperApi = archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
+  const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
   const aiqApi = archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
   const rows = archive.sources
     .map(
@@ -4600,6 +4881,8 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 <p>Local endpoint: ${escapeHtml(scraperApi.localEndpoint)}. Authentication: ${escapeHtml(scraperApi.auth)}. Keyword mode: ${escapeHtml(String(Boolean(scraperApi.keywordMode)))}. Hidden search base: ${escapeHtml(scraperApi.searchBaseUrl || GOOGLE_SEARCH_BASE_URL)}. Safeguards: ${escapeHtml((scraperApi.safeguards || []).join(", "))}.</p>
 <h2>Google Programmable Search</h2>
 <p>Search engine ID: ${escapeHtml(cseApi.searchEngineId || GOOGLE_CSE_ID)}. Script URL: ${escapeHtml(cseApi.scriptUrl || GOOGLE_CSE_SCRIPT_URL)}. Public URL: ${escapeHtml(cseApi.publicUrl || GOOGLE_CSE_PUBLIC_URL)}.</p>
+<h2>Google Custom Search JSON API</h2>
+<p>Local endpoint: ${escapeHtml(googleJsonApi.localEndpoint || SEARCH_API_PATH)}. Authentication: ${escapeHtml(googleJsonApi.auth || "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY")}. Status: ${escapeHtml(googleJsonApi.status || "Preferred backend search path with CSE fallback.")}</p>
 <h2>Automated AI Research Bot</h2>
 <p>${escapeHtml(String(archive.autoBotFindings?.length || 0))} findings logged; ${escapeHtml(String((archive.autoBotFindings || []).filter((entry) => entry.accepted).length))} accepted into source sections. Cadence: opt-in, one attempt per minute, pauses for user review.</p>
 <h2>File Import Layer</h2>

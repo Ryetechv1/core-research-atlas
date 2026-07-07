@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
+from pathlib import Path
 from typing import Any
 
 from api._common import read_json, write_json
@@ -10,11 +12,12 @@ from api._common import read_json, write_json
 
 MESSAGES: list[dict[str, Any]] = []
 TEAM_CHAT_LIMIT = 200
+TEAM_CHAT_PATH = Path(tempfile.gettempdir()) / "core_team_chat_runtime.json"
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        write_json(self, {"ok": True, "messages": MESSAGES[:TEAM_CHAT_LIMIT]})
+        write_json(self, {"ok": True, "messages": read_messages()[:TEAM_CHAT_LIMIT]})
 
     def do_POST(self) -> None:
         try:
@@ -29,6 +32,7 @@ class handler(BaseHTTPRequestHandler):
 def apply_action(body: dict[str, Any]) -> list[dict[str, Any]]:
     global MESSAGES
     action = str(body.get("action", "")).strip()
+    MESSAGES = read_messages()
     if action == "post":
         MESSAGES.insert(0, sanitize_message(body.get("item") or body.get("message") or {}))
     elif action == "vote":
@@ -61,7 +65,32 @@ def apply_action(body: dict[str, Any]) -> list[dict[str, Any]]:
     else:
         raise ValueError("Unknown team chat action.")
     MESSAGES = dedupe(MESSAGES)[:TEAM_CHAT_LIMIT]
+    write_messages(MESSAGES)
     return MESSAGES
+
+
+def read_messages() -> list[dict[str, Any]]:
+    global MESSAGES
+    if MESSAGES:
+        return MESSAGES
+    try:
+        data = json.loads(TEAM_CHAT_PATH.read_text(encoding="utf-8"))
+        messages = data.get("messages", data if isinstance(data, list) else [])
+        if isinstance(messages, list):
+            MESSAGES = [message for message in messages if isinstance(message, dict)][:TEAM_CHAT_LIMIT]
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        MESSAGES = []
+    return MESSAGES
+
+
+def write_messages(messages: list[dict[str, Any]]) -> None:
+    try:
+        TEAM_CHAT_PATH.write_text(
+            json.dumps({"messages": messages[:TEAM_CHAT_LIMIT]}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
 
 
 def sanitize_message(raw: Any) -> dict[str, Any]:

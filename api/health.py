@@ -15,6 +15,11 @@ class handler(BaseHTTPRequestHandler):
                 "service": "CORE Research Atlas",
                 "platform": "vercel",
                 "parallelConfigured": bool(os.environ.get("PARALLEL_API_KEY")),
-                "routes": ["/api/health", "/api/extract", "/api/scrape", "/api/import-file", "/api/team-chat"],
+                "googleSearchConfigured": bool(
+                    os.environ.get("GOOGLE_CUSTOM_SEARCH_API_KEY")
+                    or os.environ.get("GOOGLE_CSE_API_KEY")
+                    or os.environ.get("CUSTOM_SEARCH_API_KEY")
+                ),
+                "routes": ["/api/health", "/api/extract", "/api/search", "/api/scrape", "/api/import-file", "/api/team-chat"],
             },
         )

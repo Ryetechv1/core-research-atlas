@@ -800,6 +800,13 @@ window.CORE_RESEARCH_SEED = {
       ],
       "status": "Embedded in Browser panel with external public URL fallback."
     },
+    "googleCustomSearchJson": {
+      "provider": "Google Custom Search JSON API",
+      "localEndpoint": "/api/search",
+      "auth": "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY",
+      "searchEngineId": "56f7592d1993141c3",
+      "status": "Preferred backend search path when hosted on a server with an API key; otherwise the app falls back to embedded CSE result cards."
+    },
     "nvidiaAIQResearch": {
       "provider": "NVIDIA AI-Q Research",
       "backendUrl": "http://localhost:8000",

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.file_import_extract import FileImportError, extract_uploaded_file
+from scripts.google_search import GoogleSearchApiError, GoogleSearchConfigError, fallback_search_url, search_google
 from scripts.multipart_upload import MultipartUploadError, read_uploaded_file
 from scripts.parallel_extract import ParallelApiError, ParallelConfigError, extract_urls
 from scripts.web_scrape_extract import scrape_urls
@@ -62,7 +63,12 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
                     "ok": True,
                     "service": "CORE Research Atlas",
                     "parallelConfigured": bool(os.environ.get("PARALLEL_API_KEY")),
-                    "routes": ["/api/health", "/api/extract", "/api/scrape", "/api/import-file", "/api/team-chat"],
+                    "googleSearchConfigured": bool(
+                        os.environ.get("GOOGLE_CUSTOM_SEARCH_API_KEY")
+                        or os.environ.get("GOOGLE_CSE_API_KEY")
+                        or os.environ.get("CUSTOM_SEARCH_API_KEY")
+                    ),
+                    "routes": ["/api/health", "/api/extract", "/api/search", "/api/scrape", "/api/import-file", "/api/team-chat"],
                 }
             )
             return
@@ -74,6 +80,9 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         if self.path == "/api/extract":
             self.handle_parallel_extract()
+            return
+        if self.path == "/api/search":
+            self.handle_google_search()
             return
         if self.path == "/api/scrape":
             self.handle_web_scrape()
@@ -102,6 +111,40 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
             self.write_json({"ok": False, "error": str(error)}, HTTPStatus.SERVICE_UNAVAILABLE)
             return
         except (ParallelApiError, ValueError, json.JSONDecodeError) as error:
+            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
+            return
+        self.write_json({"ok": True, "response": response})
+
+    def handle_google_search(self) -> None:
+        load_local_env()
+        try:
+            body = self.read_json_body()
+            query = str(body.get("query", "")).strip()
+            response = search_google(
+                query,
+                cx=str(body.get("cx", "")).strip() or None,
+                num=int(body.get("num", 8) or 8),
+                search_type=str(body.get("searchType", "")).strip(),
+                file_type=str(body.get("fileType", "")).strip(),
+                site_search=str(body.get("siteSearch", "")).strip(),
+                date_restrict=str(body.get("dateRestrict", "")).strip(),
+                language_restrict=str(body.get("languageRestrict", "")).strip(),
+            )
+        except GoogleSearchConfigError as error:
+            query = str(locals().get("body", {}).get("query", "")).strip()
+            self.write_json(
+                {
+                    "ok": False,
+                    "error": str(error),
+                    "fallback": {
+                        "provider": "google-programmable-search-element",
+                        "searchUrl": fallback_search_url(query) if query else "",
+                    },
+                },
+                HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+            return
+        except (GoogleSearchApiError, ValueError, json.JSONDecodeError) as error:
             self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
             return
         self.write_json({"ok": True, "response": response})

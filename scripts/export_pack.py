@@ -60,6 +60,7 @@ def write_txt(seed: dict) -> None:
     parallel_api = seed.get("externalApis", {}).get("parallelExtract", {})
     scraper_api = seed.get("externalApis", {}).get("localWebScraper", {})
     cse_api = seed.get("externalApis", {}).get("googleProgrammableSearch", {})
+    google_json_api = seed.get("externalApis", {}).get("googleCustomSearchJson", {})
     aiq_api = seed.get("externalApis", {}).get("nvidiaAIQResearch", {})
     lines = [
         project["name"],
@@ -99,6 +100,11 @@ def write_txt(seed: dict) -> None:
         f"Script URL: {cse_api.get('scriptUrl', 'https://cse.google.com/cse.js?cx=56f7592d1993141c3')}",
         f"Public URL: {cse_api.get('publicUrl', 'https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0')}",
         f"Elements: {', '.join(cse_api.get('elements', ['gcse-searchbox', 'gcse-searchresults']))}",
+        "",
+        "Google Custom Search JSON API:",
+        f"Local endpoint: {google_json_api.get('localEndpoint', '/api/search')}",
+        f"Authentication: {google_json_api.get('auth', 'Server-side GOOGLE_CUSTOM_SEARCH_API_KEY')}",
+        f"Status: {google_json_api.get('status', 'Preferred backend search path with CSE fallback.')}",
         "",
         "Automated AI Research Bot:",
         f"Findings logged: {len(seed.get('autoBotFindings', []))}",
@@ -206,6 +212,7 @@ def write_html(seed: dict) -> None:
     parallel_api = seed.get("externalApis", {}).get("parallelExtract", {})
     scraper_api = seed.get("externalApis", {}).get("localWebScraper", {})
     cse_api = seed.get("externalApis", {}).get("googleProgrammableSearch", {})
+    google_json_api = seed.get("externalApis", {}).get("googleCustomSearchJson", {})
     aiq_api = seed.get("externalApis", {}).get("nvidiaAIQResearch", {})
     reference_rows = []
     for reference in seed.get("referenceLibrary", []):
@@ -268,6 +275,8 @@ th{{background:#edf1ed}}
 <p>Local endpoint: {html.escape(scraper_api.get("localEndpoint", "/api/scrape"))}. Authentication: {html.escape(scraper_api.get("auth", "No API key; public http/https targets only"))}. Keyword mode: {html.escape(str(bool(scraper_api.get("keywordMode", False))))}. Hidden search base: {html.escape(scraper_api.get("searchBaseUrl", "https://www.google.com/search?q="))}. Safeguards: {html.escape(", ".join(scraper_api.get("safeguards", [])))}.</p>
 <h2>Google Programmable Search</h2>
 <p>Search engine ID: {html.escape(cse_api.get("searchEngineId", "56f7592d1993141c3"))}. Script URL: {html.escape(cse_api.get("scriptUrl", "https://cse.google.com/cse.js?cx=56f7592d1993141c3"))}. Public URL: {html.escape(cse_api.get("publicUrl", "https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0"))}.</p>
+<h2>Google Custom Search JSON API</h2>
+<p>Local endpoint: {html.escape(google_json_api.get("localEndpoint", "/api/search"))}. Authentication: {html.escape(google_json_api.get("auth", "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY"))}. Status: {html.escape(google_json_api.get("status", "Preferred backend search path with CSE fallback."))}</p>
 <h2>Automated AI Research Bot</h2>
 <p>{html.escape(str(len(seed.get("autoBotFindings", []))))} findings logged; {html.escape(str(len([entry for entry in seed.get("autoBotFindings", []) if entry.get("accepted")])))} accepted into source sections. Cadence: opt-in, one attempt per minute, pauses for user review.</p>
 <h2>File Import Layer</h2>

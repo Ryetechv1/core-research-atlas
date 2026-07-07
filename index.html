@@ -494,7 +494,7 @@
                   <div class="panel-heading compact">
                     <div>
                       <h2>Keyword Search Scraper</h2>
-                      <p>Type keywords only. The Google search URL is generated invisibly before scraping or opening results.</p>
+                      <p>Type keywords only. The app searches Google through /api/search when available, then falls back to embedded CSE/browser cards.</p>
                     </div>
                     <span class="detail-chip">Google q mode</span>
                   </div>
@@ -597,7 +597,7 @@
                   <div class="panel-heading compact">
                     <div>
                       <h2>Local Web Scraper</h2>
-                      <p>Keyword mode builds the Google search URL invisibly and sends it to /api/scrape.</p>
+                      <p>Keyword mode searches Google first, then extracts top result pages when a backend scraper is available.</p>
                     </div>
                     <span class="detail-chip">Keyword Search</span>
                   </div>
@@ -653,8 +653,8 @@
                 <div class="agent-main">
                   <div class="panel-heading">
                     <div>
-                      <h2>ChatGPT 5.5 Pro Research Agent</h2>
-                      <p>Connector-ready local synthesis console. It uses archive, profile, extraction, and in-app browser context.</p>
+                      <h2>ChatGPT Pro Research Agent</h2>
+                      <p>Prompt-driven research interface using app context, Google/CSE web results, site extraction cards, and team/source history.</p>
                     </div>
                     <button class="ghost-button" id="clearAgentButton" type="button">Clear Chat</button>
                   </div>
@@ -665,7 +665,7 @@
                     <div class="panel-heading compact">
                       <div>
                         <h2>Agent Keyword Scraper</h2>
-                        <p>Runs the same local Google keyword scraper with the active agent prompt as extraction context.</p>
+                        <p>Searches Google through the backend JSON route when available, then falls back to embedded CSE/browser result cards.</p>
                       </div>
                       <span class="detail-chip">Shared tool</span>
                     </div>

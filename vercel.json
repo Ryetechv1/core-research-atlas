@@ -11,6 +11,10 @@
       "dest": "/api/extract.py"
     },
     {
+      "src": "/api/search",
+      "dest": "/api/search.py"
+    },
+    {
       "src": "/api/scrape",
       "dest": "/api/scrape.py"
     },

@@ -96,17 +96,21 @@ Successful and failed runs are normalized into clickable Extraction Results card
 
 The TypeScript example in `integrations/parallel_extract.ts` mirrors the `parallel-web` client call with `process.env.PARALLEL_API_KEY` and optional `objective`.
 
-## Local Web Scraper
+## Google Search and Local Web Scraper
 
 The app also posts to `/api/scrape` for dependency-free HTML/text extraction. It blocks localhost, private, reserved, and link-local targets by default, caps page fetches at 2 MB, and does not execute JavaScript.
 
-The visible UI now uses keyword mode by default. Users type search keywords; the app invisibly builds:
+Keyword search now uses `/api/search` first. That route calls the Google Custom Search JSON API with the configured Programmable Search Engine ID and a server-side `GOOGLE_CUSTOM_SEARCH_API_KEY`. If no key or backend is available, the UI falls back to the embedded Google Programmable Search Element and internal browser cards.
 
-```text
-https://www.google.com/search?q=<encoded keywords>
+Set this on a backend host when you want server-side Google result cards:
+
+```powershell
+$env:GOOGLE_CUSTOM_SEARCH_API_KEY = "your-google-api-key"
+$env:GOOGLE_CSE_ID = "56f7592d1993141c3"
+python server.py
 ```
 
-Before each keyword search, a popup asks whether to open the external search link or show the scrape result inside the current Extract/Agent subwindow. The same keyword scraper is available in the Global Web Extraction Console and the ChatGPT 5.5 agent panel.
+The Agent Keyword Scraper, Global Web Extraction Console keyword mode, Keyword Search Scraper, Auto Bot, and ChatGPT Pro Research Agent all use this search-first path. When `/api/search` returns URLs, the app also tries `/api/scrape` against the top result pages to create site extraction cards.
 
 ```powershell
 python scripts/web_scrape_extract.py https://www.google.com
@@ -152,11 +156,13 @@ The Browser panel also provides a sandboxed iframe fallback for quick research n
 
 It accepts a full URL, a domain, or keywords. Browser-panel keyword input opens the Google CSE public URL with `gsc.q=<encoded keywords>`. Some sites block iframe embedding with browser security headers such as `X-Frame-Options: SAMEORIGIN`; when that happens, use the external-open button and still capture the URL as a source lead.
 
-The Extract Console and ChatGPT 5.5 agent console now attach the active in-app browser URL, recent browser history, captured browser source leads, and browser search text to generated extraction jobs and local synthesis responses.
+The Extract Console and ChatGPT Pro Research Agent attach the active in-app browser URL, recent browser history, captured browser source leads, Google/CSE result cards, and browser search text to generated extraction jobs and local synthesis responses.
 
 ## Team Chat
 
-The Team panel lets the three project users post messages, updates, links, and recommendations. Recommendations can be rejected or promoted directly into Sources. When `server.py` is running, messages sync through `/api/team-chat`; the app also keeps a local fallback in browser storage.
+The Team panel lets the three project users post messages, updates, links, and recommendations. Recommendations can be rejected or promoted directly into Sources. When `server.py` or another backend host is running, messages sync through `/api/team-chat`; the app also keeps a dedicated local fallback in browser storage and uses `BroadcastChannel`/storage events so same-browser tabs stay in sync.
+
+GitHub Pages is static, so it cannot share new team posts across different devices by itself. Cross-device team chat requires a backend deployment for `/api/team-chat` or a real database-backed service.
 
 ## Automated AI Research Bot
 

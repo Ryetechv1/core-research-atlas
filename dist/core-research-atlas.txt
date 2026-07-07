@@ -36,6 +36,11 @@ Script URL: https://cse.google.com/cse.js?cx=56f7592d1993141c3
 Public URL: https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0
 Elements: gcse-searchbox, gcse-searchresults
 
+Google Custom Search JSON API:
+Local endpoint: /api/search
+Authentication: Server-side GOOGLE_CUSTOM_SEARCH_API_KEY
+Status: Preferred backend search path when hosted on a server with an API key; otherwise the app falls back to embedded CSE result cards.
+
 Automated AI Research Bot:
 Findings logged: 0
 Accepted findings: 0
