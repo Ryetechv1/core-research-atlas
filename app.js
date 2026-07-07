@@ -3067,7 +3067,34 @@ async function ensureBackendCapabilities() {
   return detectBackendCapabilities({ renderAfter: false });
 }
 
+function staticHostCapabilities() {
+  return {
+    checked: true,
+    checking: null,
+    available: false,
+    routes: [],
+    freeLocalAgentConfigured: false,
+    localAgentModel: "llama3.2:3b",
+    googleSearchConfigured: false,
+    openaiAgentConfigured: false,
+    agentModel: "gpt-5.5",
+    platform: "static",
+  };
+}
+
+function isKnownStaticHost() {
+  return window.location.protocol === "file:" || window.location.hostname.endsWith(".github.io");
+}
+
 async function detectBackendCapabilities({ renderAfter = true } = {}) {
+  if (isKnownStaticHost()) {
+    state.backendCapabilities = staticHostCapabilities();
+    if (renderAfter) {
+      renderAgent();
+      renderModelCore();
+    }
+    return state.backendCapabilities;
+  }
   if (state.backendCapabilities.checking) return state.backendCapabilities.checking;
   state.backendCapabilities.checking = fetch(HEALTH_API_PATH, { cache: "no-store" })
     .then(async (response) => {
@@ -3091,18 +3118,7 @@ async function detectBackendCapabilities({ renderAfter = true } = {}) {
       return state.backendCapabilities;
     })
     .catch(() => {
-      state.backendCapabilities = {
-        checked: true,
-        checking: null,
-        available: false,
-        routes: [],
-        freeLocalAgentConfigured: false,
-        localAgentModel: "llama3.2:3b",
-        googleSearchConfigured: false,
-        openaiAgentConfigured: false,
-        agentModel: "gpt-5.5",
-        platform: "static",
-      };
+      state.backendCapabilities = staticHostCapabilities();
       if (renderAfter) {
         renderAgent();
         renderModelCore();
