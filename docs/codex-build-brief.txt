@@ -14,10 +14,10 @@ Current internal-app additions
 - Web extraction/search console that creates structured jobs for future
   outsourcing, scraping, PDF extraction, archive search, image/OCR, and citation
   gathering.
-- Connector-ready ChatGPT 5.5 Pro agent UI that locally synthesizes archive,
-  profile, extraction state, team recommendations, and active in-app browser
-  context. It does not perform live model calls or global web fetching until a
-  backend/API connector is added.
+- Connector-ready ChatGPT Pro Research Agent UI that synthesizes archive,
+  profile, extraction state, team recommendations, memory-bank snapshots, and
+  active in-app browser context. It tries the free local model route first when
+  Ollama or another compatible local runtime is available.
 - Uploaded Internal Core System Gateway JSON installed as the local model
   profile for the agent. This is a connector-ready configuration layer, not a
   created or hosted OpenAI model.
@@ -27,19 +27,23 @@ Current internal-app additions
   visual design.
 - Uploaded PDFs installed as a metadata-only reference layer. Do not embed long
   copyrighted or unverified source text in app data or exports.
-- Parallel Extract API installed through the local Python server. The browser
-  posts to /api/extract; server.py proxies https://api.parallel.ai/v1/extract
-  using PARALLEL_API_KEY from environment or ignored .env.local. Do not put the
-  key in index.html, app.js, TypeScript bundles, JSON seed files, or docs.
+- Free local model route installed through /api/local-agent. The route calls an
+  Ollama-compatible /api/chat endpoint at LOCAL_AGENT_BASE_URL and defaults to
+  LOCAL_AGENT_MODEL=llama3.2:3b. This gives the app a no-billing AI path for
+  research synthesis; optional OpenAI support remains available through /api/agent
+  when a secure key is configured separately.
 - Local web scraping extraction installed through /api/scrape. It uses
   dependency-free Python HTML/text extraction, blocks private/local targets by
   default, caps fetch size, and does not execute JavaScript.
 - Team chat and recommendation review installed through /api/team-chat. The
   Team panel supports messages, updates, links, rejectable recommendations, and
   promotion of approved recommendations into Sources.
+- Internal memory bank installed in browser storage. Every archive mutation
+  creates a timestamped snapshot with owner, reason, counts, and full archive
+  backup, plus an export button for manual backup.
 - Deployment artifacts now include Render web service config, Vercel Python API
-  handlers, and a Cloudflare Workers / Agents scaffold. Catalyst by Zoho is
-  blocked until catalyst init creates .catalystrc and catalyst.json.
+  handlers, and static GitHub Pages support. Catalyst by Zoho is blocked until
+  catalyst init creates .catalystrc and catalyst.json.
 
 Research stance
 The app should catalog supernatural, metaphysical, occult, esoteric, and
@@ -79,8 +83,8 @@ Expansion priorities
    primary/secondary status, quote extracts, and review owner.
 4. Add live extraction workers for documentation, PDFs, URLs, archives,
    WebP/images, OCR, datasets, and transcripts.
-5. Wire the AI Agent console to an approved OpenAI model/API flow or another
-   chosen provider through a secure backend.
+5. Add a browser-side WebLLM worker if fully in-browser model inference becomes
+   preferred over the current local Ollama-compatible route.
 6. Add a graph view linking terms such as lycanthropy, alopecanthropy,
    dracanthrope, therianthropy, kitsune-tsuki, phantom shift, mental shift,
    animal aura, morphogenetic field, and holographic blueprint.
@@ -112,11 +116,10 @@ Deliverable files in this starter
 - render.yaml
 - vercel.json
 - api/
-- cloudflare-extraction-agent/
-- scripts/parallel_extract.py
+- scripts/local_free_agent.py
 - scripts/web_scrape_extract.py
+- scripts/file_import_extract.py
 - scripts/export_pack.py
-- integrations/parallel_extract.ts
 - docs/extraction-deployment.md
 - docs/codex-build-brief.txt
 - assets/concept-dashboard.png

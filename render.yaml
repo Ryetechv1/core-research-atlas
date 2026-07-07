@@ -3,14 +3,16 @@ services:
     name: core-research-atlas
     runtime: python
     plan: starter
-    buildCommand: python -m py_compile server.py scripts/parallel_extract.py scripts/web_scrape_extract.py
+    buildCommand: python -m py_compile server.py scripts/local_free_agent.py scripts/web_scrape_extract.py scripts/file_import_extract.py
     startCommand: python server.py --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     autoDeployTrigger: commit
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.0
-      - key: PARALLEL_API_KEY
-        sync: false
+      - key: LOCAL_AGENT_MODEL
+        value: llama3.2:3b
+      - key: LOCAL_AGENT_BASE_URL
+        value: http://127.0.0.1:11434
       - key: ALLOW_PRIVATE_SCRAPE_TARGETS
         value: "0"

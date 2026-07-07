@@ -125,6 +125,7 @@ def build_agent_input(payload: dict[str, Any]) -> str:
         "webRecord": payload.get("webRecord"),
         "sourceMatches": payload.get("sourceMatches"),
         "references": payload.get("references"),
+        "memoryBank": payload.get("memoryBank"),
         "collabDocs": payload.get("collabDocs"),
         "teamMessages": payload.get("teamMessages"),
         "recentExtractions": payload.get("recentExtractions"),

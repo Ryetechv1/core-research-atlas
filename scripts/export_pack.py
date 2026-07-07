@@ -65,7 +65,7 @@ def write_txt(seed: dict) -> None:
         .get("operationId", model.get("gatewayOperation", "fetchInternalData"))
     )
     core = seed.get("backendCore", {})
-    parallel_api = seed.get("externalApis", {}).get("parallelExtract", {})
+    free_local_api = seed.get("externalApis", {}).get("freeLocalAgent", {})
     scraper_api = seed.get("externalApis", {}).get("localWebScraper", {})
     cse_api = seed.get("externalApis", {}).get("googleProgrammableSearch", {})
     google_json_api = seed.get("externalApis", {}).get("googleCustomSearchJson", {})
@@ -89,11 +89,12 @@ def write_txt(seed: dict) -> None:
         f"{core.get('title', '')}: {core.get('summary', '')}",
         f"Stages: {', '.join(core.get('stages', []))}",
         "",
-        "Parallel Extract API:",
-        f"Local endpoint: {parallel_api.get('localEndpoint', '/api/extract')}",
-        f"Upstream endpoint: {parallel_api.get('upstreamEndpoint', 'https://api.parallel.ai/v1/extract')}",
-        f"Authentication: {parallel_api.get('auth', 'Server-side PARALLEL_API_KEY')}",
-        f"Saved request logs: {len(seed.get('parallelExtractRuns', []))}",
+        "Free Local Model Agent:",
+        f"Local endpoint: {free_local_api.get('localEndpoint', '/api/local-agent')}",
+        f"Ollama endpoint: {free_local_api.get('upstreamEndpoint', 'http://127.0.0.1:11434/api/chat')}",
+        f"Authentication: {free_local_api.get('auth', 'No API key; runs on the user machine')}",
+        f"Default model: {free_local_api.get('defaultModel', 'llama3.2:3b')}",
+        f"Install: {free_local_api.get('installHint', 'Install Ollama and pull a local model.')}",
         "",
         "Local Web Scraper:",
         f"Local endpoint: {scraper_api.get('localEndpoint', '/api/scrape')}",
@@ -140,6 +141,9 @@ def write_txt(seed: dict) -> None:
         )
     lines.extend(
         [
+            "",
+            "Internal Memory Bank:",
+            "Browser runtime snapshots are stored locally by the app and exported separately from the live browser.",
             "",
         "NVIDIA AIQ Research:",
         f"Backend URL: {aiq_api.get('backendUrl', 'http://localhost:8000')}",
@@ -229,7 +233,7 @@ def write_html(seed: dict) -> None:
         .get("operationId", model.get("gatewayOperation", "fetchInternalData"))
     )
     core = seed.get("backendCore", {})
-    parallel_api = seed.get("externalApis", {}).get("parallelExtract", {})
+    free_local_api = seed.get("externalApis", {}).get("freeLocalAgent", {})
     scraper_api = seed.get("externalApis", {}).get("localWebScraper", {})
     cse_api = seed.get("externalApis", {}).get("googleProgrammableSearch", {})
     google_json_api = seed.get("externalApis", {}).get("googleCustomSearchJson", {})
@@ -300,8 +304,8 @@ th{{background:#edf1ed}}
 <h2>Internal Model Core</h2>
 <p>{html.escape(model.get("displayName", ""))} / {html.escape(model.get("status", ""))}. Gateway: {html.escape(gateway_operation)}({html.escape(model.get("targetParameter", "target_id"))}) at {html.escape(gateway_path)}.</p>
 <p>{html.escape(core.get("title", ""))}: {html.escape(core.get("summary", ""))}</p>
-<h2>Parallel Extract API</h2>
-<p>Local endpoint: {html.escape(parallel_api.get("localEndpoint", "/api/extract"))}. Upstream endpoint: {html.escape(parallel_api.get("upstreamEndpoint", "https://api.parallel.ai/v1/extract"))}. Authentication: {html.escape(parallel_api.get("auth", "Server-side PARALLEL_API_KEY"))}.</p>
+<h2>Free Local Model Agent</h2>
+<p>Local endpoint: {html.escape(free_local_api.get("localEndpoint", "/api/local-agent"))}. Ollama endpoint: {html.escape(free_local_api.get("upstreamEndpoint", "http://127.0.0.1:11434/api/chat"))}. Authentication: {html.escape(free_local_api.get("auth", "No API key; runs on the user machine"))}. Default model: {html.escape(free_local_api.get("defaultModel", "llama3.2:3b"))}.</p>
 <h2>Local Web Scraper</h2>
 <p>Local endpoint: {html.escape(scraper_api.get("localEndpoint", "/api/scrape"))}. Authentication: {html.escape(scraper_api.get("auth", "No API key; public http/https targets only"))}. Keyword mode: {html.escape(str(bool(scraper_api.get("keywordMode", False))))}. Hidden search base: {html.escape(scraper_api.get("searchBaseUrl", "https://www.google.com/search?q="))}. Safeguards: {html.escape(", ".join(scraper_api.get("safeguards", [])))}.</p>
 <h2>Google Programmable Search</h2>
@@ -321,6 +325,8 @@ th{{background:#edf1ed}}
 <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Owner</th><th>Preview</th></tr></thead>
 <tbody>{''.join(doc_rows) or '<tr><td colspan="5">No collaboration documents yet.</td></tr>'}</tbody>
 </table>
+<h2>Internal Memory Bank</h2>
+<p>Browser runtime snapshots are stored locally by the app and can be exported from the Memory tab.</p>
 <h2>NVIDIA AIQ Research</h2>
 <p>Backend URL: {html.escape(aiq_api.get("backendUrl", "http://localhost:8000"))}. Status: {html.escape(aiq_api.get("status", "Optional local/self-hosted research backend"))}.</p>
 <h2>Extraction Results</h2>

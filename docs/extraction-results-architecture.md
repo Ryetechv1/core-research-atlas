@@ -13,10 +13,10 @@ This mirrors current AI-source UI guidance from OpenAI web search docs, Vercel A
 
 ## Providers
 
-- `parallel`: `/api/extract`, backed by Parallel Extract when `PARALLEL_API_KEY` is configured.
 - `scrape`: `/api/scrape`, backed by the local HTML/text scraper.
 - `keyword-scrape`: user keyword input converted to `https://www.google.com/search?q=<encoded keywords>`.
 - `agent-scrape`: the same keyword scraper, launched inside the ChatGPT 5.5 agent panel.
+- `local-agent`: `/api/local-agent`, backed by a free local Ollama-compatible `/api/chat` endpoint.
 - `auto-bot`: opt-in recursive keyword search that pauses for user approval before adding sources.
 - `file-import`: uploaded local/ChatGPT files parsed through `/api/import-file`, then normalized into source cards.
 - `aiq`: reserved for a trusted NVIDIA AI-Q backend at `AIQ_SERVER_URL` or `http://localhost:8000`.
@@ -24,7 +24,7 @@ This mirrors current AI-source UI guidance from OpenAI web search docs, Vercel A
 
 ## File Import and Browser Intake
 
-The Import panel treats uploaded files as another source-card provider. It supports text, JSON, Markdown, code, HTML, DOCX, PDF, legacy DOC best-effort, and ZIP exports. ChatGPT conversation exports are detected from `conversations.json`-style structures and converted into one source record per conversation. Previous atlas JSON exports can be merged back into Sources.
+The Import panel treats uploaded files as another source-card provider. It supports text, JSON, Markdown, code, HTML, DOCX, PDF, legacy DOC best-effort, ZIP exports, and image metadata records for PNG, JPG, JPEG, WebP, GIF, SVG, BMP, TIFF, HEIC, and AVIF. ChatGPT conversation exports are detected from `conversations.json`-style structures and converted into one source record per conversation. Previous atlas JSON exports can be merged back into Sources.
 
 The Browser panel embeds Google Programmable Search Engine `56f7592d1993141c3` with:
 
@@ -43,10 +43,12 @@ The automated bot does not silently mutate the archive. It stores findings as ex
 ## Production Upgrade Path
 
 - Replace localStorage with a database table keyed by result ID.
+- Keep the internal memory bank as a user-visible backup/export layer even after adding the database.
 - Add a result-detail URL such as `/extractions/:id` for collaboration and mobile sharing.
 - Store AI/model token usage and provider cost metadata when live model calls are added.
 - Keep original provider responses for audit, but show users normalized cards first.
 - Health-check AIQ before sending prompts, and do not send secrets or private profile data to untrusted endpoints.
+- Add a WebLLM worker for fully in-browser model inference if device/browser support is good enough for the expected users.
 
 ## References
 
@@ -55,7 +57,9 @@ The automated bot does not silently mutate the archive. It stores findings as ex
 - Vercel AI Elements Sources: https://elements.ai-sdk.dev/components/sources
 - Vercel chatbot GitHub template: https://github.com/vercel/chatbot
 - NVIDIA AI-Q Blueprint: https://github.com/NVIDIA-AI-Blueprints/aiq
-- Parallel Extract setup/docs: https://docs.parallel.ai/getting-started/overview
+- Ollama API docs: https://github.com/ollama/ollama/blob/main/docs/api.md
+- WebLLM GitHub project: https://github.com/mlc-ai/web-llm
+- Transformers.js docs: https://huggingface.co/docs/transformers.js
 - ChatGPT Apps file APIs: https://developers.openai.com/apps-sdk/build/chatgpt-ui
 - MDN FileReader: https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsText
 - MDN iframe sandbox: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe

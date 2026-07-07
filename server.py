@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Serve the static app and proxy Parallel Extract requests.
+"""Serve the static app and local research endpoints.
 
 Run with:
   python server.py
 
-The server reads PARALLEL_API_KEY from the process environment, .env.local, or
-.env. It never sends the key to the browser.
+The server reads local configuration from the process environment, .env.local,
+or .env. It never sends secrets to the browser.
 """
 
 from __future__ import annotations
@@ -20,9 +20,15 @@ from typing import Any
 
 from scripts.file_import_extract import FileImportError, extract_uploaded_file
 from scripts.google_search import GoogleSearchApiError, GoogleSearchConfigError, fallback_search_url, search_google
+from scripts.local_free_agent import (
+    LocalAgentApiError,
+    LocalAgentConfigError,
+    configured_local_model,
+    create_local_research_answer,
+    is_local_agent_available,
+)
 from scripts.multipart_upload import MultipartUploadError, read_uploaded_file
 from scripts.openai_agent import OpenAIAgentApiError, OpenAIAgentConfigError, create_research_answer
-from scripts.parallel_extract import ParallelApiError, ParallelConfigError, extract_urls
 from scripts.web_scrape_extract import scrape_urls
 
 
@@ -63,7 +69,8 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
                 {
                     "ok": True,
                     "service": "CORE Research Atlas",
-                    "parallelConfigured": bool(os.environ.get("PARALLEL_API_KEY")),
+                    "freeLocalAgentConfigured": is_local_agent_available(),
+                    "localAgentModel": configured_local_model(),
                     "googleSearchConfigured": bool(
                         os.environ.get("GOOGLE_CUSTOM_SEARCH_API_KEY")
                         or os.environ.get("GOOGLE_CSE_API_KEY")
@@ -73,7 +80,7 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
                     "agentModel": os.environ.get("OPENAI_AGENT_MODEL", "gpt-5.5"),
                     "routes": [
                         "/api/health",
-                        "/api/extract",
+                        "/api/local-agent",
                         "/api/search",
                         "/api/agent",
                         "/api/scrape",
@@ -89,8 +96,8 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:
-        if self.path == "/api/extract":
-            self.handle_parallel_extract()
+        if self.path == "/api/local-agent":
+            self.handle_local_agent()
             return
         if self.path == "/api/search":
             self.handle_google_search()
@@ -109,22 +116,22 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
             return
         self.write_json({"ok": False, "error": "Unknown API route."}, HTTPStatus.NOT_FOUND)
 
-    def handle_parallel_extract(self) -> None:
+    def handle_local_agent(self) -> None:
         load_local_env()
         try:
             body = self.read_json_body()
-            urls = body.get("urls", [])
-            if isinstance(urls, str):
-                urls = [urls]
-            urls = [str(url).strip() for url in urls if str(url).strip()]
-            settings = body.get("advanced_settings", {})
-            full_content = bool(settings.get("full_content", False))
-            objective = str(body.get("objective", "")).strip() or None
-            response = extract_urls(urls, full_content=full_content, objective=objective)
-        except ParallelConfigError as error:
-            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.SERVICE_UNAVAILABLE)
+            response = create_local_research_answer(body)
+        except LocalAgentConfigError as error:
+            self.write_json(
+                {
+                    "ok": False,
+                    "error": str(error),
+                    "fallback": "Use the local app synthesizer, or install Ollama and pull a local model.",
+                },
+                HTTPStatus.SERVICE_UNAVAILABLE,
+            )
             return
-        except (ParallelApiError, ValueError, json.JSONDecodeError) as error:
+        except (LocalAgentApiError, ValueError, json.JSONDecodeError) as error:
             self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
             return
         self.write_json({"ok": True, "response": response})

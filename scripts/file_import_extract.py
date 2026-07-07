@@ -35,6 +35,20 @@ TEXT_EXTENSIONS = {
     ".xml",
 }
 
+IMAGE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".svg",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".avif",
+}
+
 MAX_TEXT_CHARS = 240_000
 MAX_ZIP_MEMBERS = 80
 MAX_ZIP_MEMBER_BYTES = 4_000_000
@@ -76,6 +90,10 @@ def extract_uploaded_file(filename: str, content_type: str, data: bytes) -> dict
     elif suffix == ".zip":
         text, children = extract_zip_export(data, warnings)
         parser = "zip-export"
+    elif suffix in IMAGE_EXTENSIONS or content_type.lower().startswith("image/"):
+        text = extract_image_metadata_text(filename, suffix, content_type, data)
+        parser = "image-metadata"
+        warnings.append("Image import records metadata only. Add OCR or vision parsing later for embedded research text.")
     else:
         text = extract_printable_binary(data)
         parser = "binary-best-effort"
@@ -111,6 +129,18 @@ def decode_text(data: bytes) -> str:
         except UnicodeDecodeError:
             continue
     return data.decode("utf-8", errors="replace")
+
+
+def extract_image_metadata_text(filename: str, suffix: str, content_type: str, data: bytes) -> str:
+    return "\n".join(
+        [
+            f"Imported image source: {filename}",
+            f"Extension: {suffix or 'unknown'}",
+            f"MIME type: {content_type or 'image/unknown'}",
+            f"Size: {len(data)} bytes",
+            "Use this record as a visual-source placeholder. Run OCR, image description, or manual review before treating image content as extracted evidence.",
+        ]
+    )
 
 
 def clean_text(value: str) -> str:
@@ -192,7 +222,7 @@ def extract_zip_export(data: bytes, warnings: list[str]) -> tuple[str, list[dict
     children: list[dict[str, Any]] = []
     with archive:
         members = [info for info in archive.infolist() if not info.is_dir()]
-        supported = [info for info in members if Path(info.filename).suffix.lower() in TEXT_EXTENSIONS | {".docx", ".pdf", ".doc"}]
+        supported = [info for info in members if Path(info.filename).suffix.lower() in TEXT_EXTENSIONS | IMAGE_EXTENSIONS | {".docx", ".pdf", ".doc"}]
         for info in supported[:MAX_ZIP_MEMBERS]:
             if info.file_size > MAX_ZIP_MEMBER_BYTES:
                 warnings.append(f"Skipped {info.filename}: larger than {MAX_ZIP_MEMBER_BYTES:,} bytes.")

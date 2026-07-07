@@ -4,11 +4,11 @@ A self-contained static research web app for building a collaborative archive ar
 
 The app treats supernatural and metaphysical material as research artifacts with evidence labels. It does not present physical shapeshifting as established biomedical fact.
 
-This build includes a local gated sign-in modal for the three project users, editable profile pages, source-type listings, file import, an in-app research browser, an extraction queue builder, a connector-ready AI synthesis console, team chat with recommendation review, an uploaded Internal Core System Gateway model profile, an ErydirCeisiwr backend mechanics scaffold, a metadata-only uploaded PDF reference layer, and Python-backed endpoints for Parallel, local HTML/text scraping, uploaded-file parsing, and team messages.
+This build includes a local gated sign-in modal for the three project users, editable profile pages, source-type listings, file import, an in-app research browser, an extraction queue builder, a free local-model AI synthesis console, team chat with recommendation review, an internal memory bank, an uploaded Internal Core System Gateway model profile, an ErydirCeisiwr backend mechanics scaffold, a metadata-only uploaded PDF reference layer, and Python-backed endpoints for local AI, local HTML/text scraping, uploaded-file parsing, and team messages.
 
 ## Open The App
 
-For the full app with the Parallel Extract proxy, run:
+For the full local app server, run:
 
 ```powershell
 python server.py
@@ -20,28 +20,26 @@ Then open:
 http://127.0.0.1:5177/
 ```
 
-The static UI can still be opened directly with `index.html`, but `/api/extract` only works through the Python server.
+The static UI can still be opened directly with `index.html`, but backend routes such as `/api/local-agent`, `/api/scrape`, `/api/import-file`, and `/api/team-chat` only work through the Python server.
 
 ## Files
 
 - `index.html` - app shell and semantic UI.
 - `styles.css` - responsive dashboard styling.
 - `app.js` - local state, filters, add-source flow, browser-context synthesis, team chat, and browser exports.
-- `server.py` - local Python static server, `/api/extract` proxy for Parallel, `/api/scrape` local scraper, `/api/import-file` parser, and `/api/team-chat` runtime message endpoint.
+- `server.py` - local Python static server, `/api/local-agent` free Ollama agent route, `/api/scrape` local scraper, `/api/import-file` parser, and `/api/team-chat` runtime message endpoint.
 - `render.yaml` - Render Web Service blueprint with health check and server-side secret wiring.
 - `vercel.json` - static routing plus Vercel Python API function routing.
 - `manifest.webmanifest` - installable web-app metadata for future hosted/mobile use.
 - `.env.example` - local environment variable template. Keep real keys in `.env.local` or the process environment.
 - `api/` - Vercel-compatible Python serverless handlers.
-- `cloudflare-extraction-agent/` - Cloudflare Workers / Agents SDK extraction scaffold.
 - `data/internal_model_gateway.json` - uploaded OpenAPI-style gateway profile for future backend wiring.
 - `data/reference_ingest.json` - metadata-only ingest of uploaded PDFs; no long source text is embedded.
 - `data/research_seed.json` - importable starter schema and source log.
-- `scripts/parallel_extract.py` - Python REST client for `https://api.parallel.ai/v1/extract`.
+- `scripts/local_free_agent.py` - free local-model helper that talks to Ollama on `127.0.0.1:11434`.
 - `scripts/web_scrape_extract.py` - dependency-free local HTML/text scraper with private-target safeguards.
 - `scripts/file_import_extract.py` - dependency-light importer for text, JSON, HTML, DOCX, PDF, legacy DOC best-effort, and ZIP exports.
 - `scripts/export_pack.py` - creates JSON, JS, TXT, and HTML exports in `dist/`.
-- `integrations/parallel_extract.ts` - server-side TypeScript example using `parallel-web`.
 - `docs/codex-build-brief.txt` - direct prompt/integration guide for future Codex work.
 - `docs/extraction-deployment.md` - deployment guide for Python, Render, Vercel, Cloudflare, and Catalyst notes.
 - `docs/extraction-results-architecture.md` - normalized source-card result display and persistence contract.
@@ -65,36 +63,23 @@ The script writes:
 - `dist/internal_model_gateway.json`
 - `dist/reference_ingest.json`
 
-## Parallel Extract API
+## Free Local Model Agent
 
-Configure the key outside tracked source files:
+The ChatGPT Pro Research Agent now tries a completely free local model route first. Install Ollama, pull a small open model, then run the Python server:
 
 ```powershell
-$env:PARALLEL_API_KEY = "your_parallel_key"
+ollama pull llama3.2:3b
+$env:LOCAL_AGENT_MODEL = "llama3.2:3b"
 python server.py
 ```
 
-Or put `PARALLEL_API_KEY=...` in ignored `.env.local`.
+The app posts to `/api/local-agent`, which talks to Ollama at `http://127.0.0.1:11434/api/chat`. No API key or billing account is required. GitHub Pages cannot run this local backend route, so the public static site falls back to browser/app synthesis unless you run the Python server locally.
 
-The app posts to `/api/extract`, which proxies:
+Research notes from current open-source options:
 
-```text
-POST https://api.parallel.ai/v1/extract
-```
-
-with the JSON body:
-
-```json
-{
-  "urls": ["https://www.google.com"],
-  "objective": "Optional focused research prompt from the Extract Console or agent console.",
-  "advanced_settings": { "full_content": false }
-}
-```
-
-Successful and failed runs are normalized into clickable Extraction Results cards. Each card keeps the source prompt, request ID, returned URLs, links/citations, summary text, and a "Promote" action that turns a result into a normal archive source record.
-
-The TypeScript example in `integrations/parallel_extract.ts` mirrors the `parallel-web` client call with `process.env.PARALLEL_API_KEY` and optional `objective`.
+- WebLLM is the best future fully browser-side path because it runs LLM inference in the browser with WebGPU and an OpenAI-style API.
+- Ollama is the best immediate path for this project because it exposes a local REST API and works from the existing Python backend without cloud billing.
+- Transformers.js is useful for smaller browser ML tasks and future text/image pipelines, but a full ChatGPT-like assistant is better served by WebLLM or Ollama.
 
 ## Google Search and Local Web Scraper
 
@@ -116,9 +101,15 @@ The Agent Keyword Scraper, Global Web Extraction Console keyword mode, Keyword S
 python scripts/web_scrape_extract.py https://www.google.com
 ```
 
-## OpenAI Research Agent
+## Optional OpenAI Research Agent
 
-The ChatGPT Pro Research Agent now calls `/api/agent` when the app is running on a backend host with `OPENAI_API_KEY` configured. That route uses the OpenAI Responses API with `OPENAI_AGENT_MODEL`, defaulting to `gpt-5.5`, optional hosted `web_search`, and reasoning effort from `OPENAI_AGENT_REASONING_EFFORT`. It sends the model the active prompt, browser context, web result cards, scraped site previews, source matches, collaboration documents, uploaded-reference metadata, team posts, and active profile data.
+The ChatGPT Pro Research Agent preference order is now:
+
+1. Free local Ollama model through `/api/local-agent`.
+2. Optional OpenAI Responses API through `/api/agent` when `OPENAI_API_KEY` is configured.
+3. Browser/app synthesis fallback from local archive, memory bank, browser cards, docs, team chat, and sources.
+
+The optional OpenAI route uses `OPENAI_AGENT_MODEL`, defaulting to `gpt-5.5`, optional hosted `web_search`, and reasoning effort from `OPENAI_AGENT_REASONING_EFFORT`. It sends the model the active prompt, browser context, web result cards, scraped site previews, source matches, memory-bank summary, collaboration documents, uploaded-reference metadata, team posts, and active profile data.
 
 Local setup:
 
@@ -129,13 +120,13 @@ $env:OPENAI_AGENT_REASONING_EFFORT = "low"
 python server.py
 ```
 
-The API key belongs in `.env.local` or the host's secret manager, never in browser JavaScript. On GitHub Pages, `/api/agent` cannot run because Pages is static, so the agent automatically falls back to the local app synthesizer while keeping source URLs and CSE/browser cards visible. If `/api/agent` is reachable but OpenAI returns `billing_not_active`, the code path and key are wired, but the OpenAI project must have billing/model access enabled before live model responses will work.
+The API key belongs in `.env.local` or the host's secret manager, never in browser JavaScript. On GitHub Pages, `/api/agent` cannot run because Pages is static, so the agent automatically falls back to the local app synthesizer while keeping source URLs and CSE/browser cards visible. If `/api/agent` is reachable but OpenAI returns `billing_not_active`, the code path and key are wired, but the OpenAI project must have billing/model access enabled before live OpenAI responses will work. The free local Ollama path avoids that billing requirement.
 
-Deployment notes for Render, Vercel, Cloudflare Workers/Agents, and Catalyst are in `docs/extraction-deployment.md`.
+Deployment notes for Render, Vercel, Cloudflare future work, and Catalyst are in `docs/extraction-deployment.md`.
 
 ## File Import
 
-The Import panel accepts `.txt`, `.json`, `.py`, `.md`, `.html`, `.doc`, `.docx`, `.pdf`, `.csv`, `.xml`, `.yaml`, `.yml`, and `.zip`. It posts files to `/api/import-file`, extracts readable text, detects ChatGPT conversation exports and previous app archive JSON, then creates normalized Source records and File Import extraction-result cards.
+The Import panel accepts `.txt`, `.json`, `.py`, `.js`, `.css`, `.md`, `.html`, `.doc`, `.docx`, `.pdf`, `.csv`, `.xml`, `.yaml`, `.yml`, `.zip`, and common image files such as `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.svg`, `.bmp`, `.tif`, `.tiff`, `.heic`, and `.avif`. It posts files to `/api/import-file`, extracts readable text or image metadata, detects ChatGPT conversation exports and previous app archive JSON, then creates normalized Source records and File Import extraction-result cards.
 
 When the app is hosted inside ChatGPT as an Apps SDK widget, it feature-detects `window.openai.selectFiles`, `window.openai.uploadFile`, and `window.openai.getFileDownloadUrl`. Outside ChatGPT, the same panel falls back to the normal browser file picker.
 
@@ -181,9 +172,13 @@ GitHub Pages is static, so it cannot share new team posts across different devic
 
 ## Collaboration Docs
 
-The Docs panel is a local-first drafting workspace for research briefs, PDF drafts, source reviews, meeting notes, and grimoire chapters. It supports rich text drafting, inserting the active in-app browser lead, importing `.txt`, `.md`, `.html`, `.json`, `.py`, `.js`, `.css`, `.doc`, `.docx`, and `.pdf` files, exporting individual documents to TXT/HTML/JSON, exporting the full document library, print-to-PDF handoff, and promoting a document into Sources.
+The Docs panel is a local-first drafting workspace for research briefs, PDF drafts, source reviews, meeting notes, and grimoire chapters. It supports rich text drafting, inserting the active in-app browser lead, importing `.txt`, `.md`, `.html`, `.json`, `.py`, `.js`, `.css`, `.doc`, `.docx`, `.pdf`, and common image files such as `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.svg`, `.bmp`, `.tif`, `.tiff`, `.heic`, and `.avif`, exporting individual documents to TXT/HTML/JSON, exporting the full document library, print-to-PDF handoff, and promoting a document into Sources.
 
 Browser-only imports parse text, Markdown, HTML, JSON, and code directly. DOC, DOCX, and PDF imports are stored as metadata-only document drafts unless a backend parser is added. Guest mode can browse documents and profiles but cannot edit, import, export, post, promote, or save changes.
+
+## Internal Memory Bank
+
+The Memory panel stores local recovery snapshots in browser storage under `core-shapeshifting-research-atlas:memory-bank`, plus a last-good backup of the main archive. Signed-in users can create manual snapshots and export the memory bank as JSON. The memory bank is intended to protect source edits, uploads, extraction cards, team chat history, profiles, browser leads, and collaboration documents from accidental app-level deletion. Browser storage can still be cleared by the browser/user, so periodic JSON export remains the strongest long-term backup.
 
 ## Automated AI Research Bot
 
@@ -208,7 +203,7 @@ Then open `http://YOUR-LAN-IP:5177/` from the phone. `127.0.0.1` and `localhost`
 - Replace static demo sign-in with real backend auth and secure password hashing.
 - URL/PDF/source ingestion with citation metadata.
 - Live extraction workers for URLs, documentation sites, PDFs, WebP/image OCR, archives, and datasets.
-- Activate billing/model access on the OpenAI project used by `/api/agent` if live model calls return `billing_not_active`.
+- Add a fully browser-side WebLLM worker for devices with WebGPU, so public static hosting can run an open model without the Python server.
 - Team ownership fields for the two additional contributors.
 - Graph view for terms, traditions, entities, species forms, and CORE framework links.
 - Database-backed collaboration when a backend is chosen.

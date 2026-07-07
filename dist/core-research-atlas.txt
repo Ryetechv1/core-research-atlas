@@ -5,22 +5,23 @@ Epistemic policy:
 Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.
 
 AI/search connector note:
-The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state.
+The ChatGPT Pro console now prefers /api/local-agent with a free local Ollama model when available. OpenAI /api/agent remains optional. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, memory snapshots, collaboration documents, and extraction-job state.
 
 Internal model core:
-ChatGPT 5.5 Pro Internal Core - OpenAI-backed when /api/agent is configured; local profile fallback otherwise
+ChatGPT 5.5 Pro Internal Core - Free local-model first; optional OpenAI-backed route; local profile fallback otherwise
 Gateway operation: fetchInternalData(target_id) at /resource/fetch
-Uses the OpenAI Responses API through the backend /api/agent route when OPENAI_API_KEY is present. Static GitHub Pages uses the local connector-ready profile fallback.
+Uses a free local Ollama model through /api/local-agent when available, then optional OpenAI Responses API through /api/agent, then the local connector-ready profile fallback.
 
 Backend mechanics core:
 ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.
 Stages: Intent intake, Profile context merge, Reference lookup, Evidence-tier separation, Mechanics synthesis, Extraction queue expansion, Export and review logging
 
-Parallel Extract API:
-Local endpoint: /api/extract
-Upstream endpoint: https://api.parallel.ai/v1/extract
-Authentication: Server-side PARALLEL_API_KEY
-Saved request logs: 0
+Free Local Model Agent:
+Local endpoint: /api/local-agent
+Ollama endpoint: http://127.0.0.1:11434/api/chat
+Authentication: No API key; runs on the user's machine
+Default model: llama3.2:3b
+Install: Install Ollama, run `ollama pull llama3.2:3b`, then start this app with python server.py.
 
 Local Web Scraper:
 Local endpoint: /api/scrape
@@ -60,6 +61,9 @@ Open recommendations: 0
 Collaboration Documents:
 Draft documents stored: 1
 - CORE Research Brief (Research Brief; Draft; UserSeth)
+
+Internal Memory Bank:
+Browser runtime snapshots are stored locally by the app and exported separately from the live browser.
 
 NVIDIA AIQ Research:
 Backend URL: http://localhost:8000

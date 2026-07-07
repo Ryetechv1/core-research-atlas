@@ -4,7 +4,7 @@
     "version": "0.6.0",
     "epistemicPolicy": "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     "corePrompt": "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
-    "aiConnectorNote": "The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state."
+    "aiConnectorNote": "The ChatGPT Pro console now prefers /api/local-agent with a free local Ollama model when available. OpenAI /api/agent remains optional. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, memory snapshots, collaboration documents, and extraction-job state."
   },
   "categories": [
     "Documents",
@@ -575,7 +575,7 @@
   ],
   "internalModel": {
     "displayName": "ChatGPT 5.5 Pro Internal Core",
-    "status": "OpenAI-backed when /api/agent is configured; local profile fallback otherwise",
+    "status": "Free local-model first; optional OpenAI-backed route; local profile fallback otherwise",
     "gateway": {
       "openapi": "3.0.0",
       "info": {
@@ -631,7 +631,7 @@
     },
     "gatewayOperation": "fetchInternalData",
     "targetParameter": "target_id",
-    "providerNote": "Uses the OpenAI Responses API through the backend /api/agent route when OPENAI_API_KEY is present. Static GitHub Pages uses the local connector-ready profile fallback.",
+    "providerNote": "Uses a free local Ollama model through /api/local-agent when available, then optional OpenAI Responses API through /api/agent, then the local connector-ready profile fallback.",
     "synthesisScope": [
       "Archive sources",
       "Queued extraction jobs",
@@ -639,6 +639,7 @@
       "Three-user profile context",
       "In-app browser state and captured browser leads",
       "Collaboration document drafts",
+      "Internal memory bank snapshots",
       "Team chat and recommendation review state"
     ]
   },
@@ -647,7 +648,7 @@
     "title": "ErydirCeisiwr Backend Mechanics Core",
     "sourceReferenceId": "ref-upload-erydir-core",
     "summary": "Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.",
-    "operatingMode": "Local static archive with connector-ready OpenAI, team chat, and web-extraction hooks.",
+    "operatingMode": "Local static archive with free local-model hooks, optional OpenAI connector, team chat, memory bank, and web-extraction hooks.",
     "stages": [
       "Intent intake",
       "Profile context merge",
@@ -666,7 +667,7 @@
     ],
     "hardLimits": [
       "Static hosts cannot run live global-web scraping or model routes",
-      "OpenAI model execution requires /api/agent on a backend with OPENAI_API_KEY",
+      "Free local model execution requires Ollama running on the local machine; optional OpenAI execution requires /api/agent and OPENAI_API_KEY",
       "No long copyrighted PDF text embedded in exported app data",
       "No biomedical claim may be upgraded beyond its evidence tier without verification"
     ]
@@ -753,23 +754,14 @@
     }
   ],
   "externalApis": {
-    "parallelExtract": {
-      "provider": "Parallel",
-      "localEndpoint": "/api/extract",
-      "upstreamEndpoint": "https://api.parallel.ai/v1/extract",
-      "auth": "Server-side PARALLEL_API_KEY",
-      "defaultUrls": [
-        "https://www.google.com"
-      ],
-      "advancedSettings": {
-        "full_content": false
-      },
-      "clients": [
-        "Python REST proxy",
-        "Parallel Python SDK compatible",
-        "curl REST",
-        "parallel-web TypeScript compatible"
-      ]
+    "freeLocalAgent": {
+      "provider": "Ollama local open-model runtime",
+      "localEndpoint": "/api/local-agent",
+      "upstreamEndpoint": "http://127.0.0.1:11434/api/chat",
+      "auth": "No API key; runs on the user's machine",
+      "defaultModel": "llama3.2:3b",
+      "installHint": "Install Ollama, run `ollama pull llama3.2:3b`, then start this app with python server.py.",
+      "browserOnlyFallback": "Static GitHub Pages cannot run local model inference through /api/local-agent, so the app falls back to browser/app synthesis there."
     },
     "localWebScraper": {
       "provider": "CORE Python scraper",
@@ -820,7 +812,6 @@
       ]
     }
   },
-  "parallelExtractRuns": [],
   "webScrapeRuns": [],
   "teamMessages": [],
   "collabDocs": [

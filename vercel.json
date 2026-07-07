@@ -7,8 +7,8 @@
       "dest": "/api/health.py"
     },
     {
-      "src": "/api/extract",
-      "dest": "/api/extract.py"
+      "src": "/api/local-agent",
+      "dest": "/api/local_agent.py"
     },
     {
       "src": "/api/search",

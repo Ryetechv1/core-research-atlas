@@ -9,6 +9,7 @@
       content="A static research web app for cataloging historical, cultural, occult, metaphysical, and speculative biological shapeshifting research."
     >
     <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23000'/%3E%3Cpath d='M32 8 52 20v24L32 56 12 44V20z' fill='none' stroke='%23fff' stroke-width='5'/%3E%3Cpath d='M32 18v28M20 25l24 14M44 25 20 39' stroke='%23aaa' stroke-width='4'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
     <script>
       window.coreCseEvents = window.coreCseEvents || [];
@@ -155,6 +156,7 @@
                 <button class="segment" type="button" data-panel="agentPanel">Agent</button>
                 <button class="segment" type="button" data-panel="teamPanel">Team</button>
                 <button class="segment" type="button" data-panel="collabPanel">Docs</button>
+                <button class="segment" type="button" data-panel="memoryPanel">Memory</button>
                 <button class="segment" type="button" data-panel="profilesPanel">Profiles</button>
                 <button class="segment" type="button" data-panel="codexPanel">Codex</button>
               </div>
@@ -263,7 +265,7 @@
                       name="files"
                       type="file"
                       multiple
-                      accept=".txt,.json,.py,.md,.markdown,.html,.htm,.doc,.docx,.pdf,.csv,.xml,.yaml,.yml,.zip"
+                      accept=".txt,.json,.py,.js,.css,.md,.markdown,.html,.htm,.doc,.docx,.pdf,.csv,.xml,.yaml,.yml,.zip,.png,.jpg,.jpeg,.webp,.gif,.svg,.bmp,.tif,.tiff,.heic,.avif"
                     >
                   </label>
                   <div class="form-grid">
@@ -415,7 +417,7 @@
                     height="500px"
                     sandbox="allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox"
                     referrerpolicy="no-referrer"
-                    src="https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0"
+                    srcdoc="<p style='font-family:system-ui,sans-serif;color:#111;background:#fff;margin:0;padding:24px;'>Open a result or URL to load the virtual browser frame. Google CSE search results render in the supported embedded panel above.</p>"
                   ></iframe>
                 </div>
 
@@ -557,43 +559,6 @@
                   <div id="autoBotStatus" class="bot-status"></div>
                 </section>
 
-                <form id="parallelExtractForm" class="api-panel">
-                  <div class="panel-heading compact">
-                    <div>
-                      <h2>Parallel Extract API</h2>
-                      <p>Python proxy endpoint: /api/extract</p>
-                    </div>
-                    <span class="detail-chip">Server-side key</span>
-                  </div>
-                  <label>
-                    URL list
-                    <textarea name="urls" rows="3" required>https://www.google.com</textarea>
-                  </label>
-                  <div class="form-grid two-column">
-                    <label>
-                      Full content
-                      <select name="fullContent">
-                        <option value="false" selected>false</option>
-                        <option value="true">true</option>
-                      </select>
-                    </label>
-                    <label>
-                      Request format
-                      <input name="format" value="Parallel Extract / advanced_settings" readonly>
-                    </label>
-                  </div>
-                  <div class="form-actions">
-                    <button class="primary-button" type="submit">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M22 2 11 13"></path>
-                        <path d="m22 2-7 20-4-9-9-4z"></path>
-                      </svg>
-                      Run Extract
-                    </button>
-                  </div>
-                  <pre id="parallelExtractOutput" class="api-output" aria-live="polite">No Parallel request run yet.</pre>
-                </form>
-
                 <form id="webScrapeForm" class="api-panel">
                   <div class="panel-heading compact">
                     <div>
@@ -638,10 +603,11 @@
                   <div class="panel-heading compact">
                     <div>
                       <h2 id="extractionResultsTitle">Extraction Results</h2>
-                      <p>Normalized source cards from the agent prompt, Extract Console, Parallel, local scraper, and optional AIQ research backend.</p>
+                      <p>Normalized source cards from the agent prompt, Extract Console, local scraper, Google/CSE browser cards, imported files, and optional AIQ research backend.</p>
                     </div>
                     <span class="detail-chip">Persistent IDs</span>
                   </div>
+                  <div id="extractionVisualFeed" class="extraction-visual-feed" aria-live="polite"></div>
                   <div id="extractionResults" class="result-list" aria-live="polite"></div>
                 </section>
 
@@ -655,7 +621,7 @@
                   <div class="panel-heading">
                     <div>
                       <h2>ChatGPT Pro Research Agent</h2>
-                    <p>Prompt-driven research interface using the OpenAI-backed agent route when available, plus app context, Google/CSE web results, site extraction cards, and team/source history.</p>
+                    <p>Prompt-driven research interface using the free local model route when available, optional OpenAI route, app context, Google/CSE web results, site extraction cards, memory snapshots, and team/source history.</p>
                     </div>
                     <button class="ghost-button" id="clearAgentButton" type="button">Clear Chat</button>
                   </div>
@@ -821,7 +787,7 @@
                   </div>
                   <label>
                     Import document
-                    <input id="collabImportInput" type="file" accept=".txt,.md,.html,.json,.py,.js,.css,.doc,.docx,.pdf">
+                    <input id="collabImportInput" type="file" accept=".txt,.md,.html,.json,.py,.js,.css,.doc,.docx,.pdf,.png,.jpg,.jpeg,.webp,.gif,.svg,.bmp,.tif,.tiff,.heic,.avif">
                   </label>
                   <p id="collabImportStatus" class="browser-status">Import TXT, MD, HTML, JSON, DOC/DOCX/PDF metadata, or paste text into a draft.</p>
                   <div id="collabDocList" class="collab-doc-list" aria-live="polite"></div>
@@ -883,6 +849,24 @@
                     <button class="ghost-button" id="collabDocToSourceButton" type="button">Add to Sources</button>
                   </div>
                 </section>
+              </div>
+            </section>
+
+            <section id="memoryPanel" class="panel-view">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Internal Memory Bank</h2>
+                    <p>Append-only safety snapshots for source changes, uploads, document drafts, team chat history, profile edits, browser leads, and extraction results.</p>
+                  </div>
+                  <div class="form-actions">
+                    <button class="primary-button" id="createMemorySnapshotButton" type="button">Create Snapshot</button>
+                    <button class="ghost-button" id="exportMemoryBankButton" type="button">Export Memory</button>
+                  </div>
+                </div>
+                <div id="memoryBankSummary" class="memory-bank-summary"></div>
+                <div id="memorySnapshotList" class="memory-snapshot-list" aria-live="polite"></div>
+                <div id="memorySnapshotPreview" class="selected-record memory-snapshot-preview"></div>
               </div>
             </section>
 

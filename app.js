@@ -1,6 +1,8 @@
 "use strict";
 
 const STORAGE_KEY = "core-shapeshifting-research-atlas";
+const MEMORY_BANK_KEY = `${STORAGE_KEY}:memory-bank`;
+const STORAGE_BACKUP_KEY = `${STORAGE_KEY}:last-good-backup`;
 const SESSION_KEY = "core-shapeshifting-active-user";
 const GOOGLE_SEARCH_BASE_URL = "https://www.google.com/search?q=";
 const GOOGLE_CSE_ID = "56f7592d1993141c3";
@@ -9,6 +11,7 @@ const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gs
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
 const HEALTH_API_PATH = "/api/health";
 const SEARCH_API_PATH = "/api/search";
+const LOCAL_AGENT_API_PATH = "/api/local-agent";
 const AGENT_API_PATH = "/api/agent";
 const TEAM_CHAT_STORAGE_KEY = `${STORAGE_KEY}:team-chat`;
 const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
@@ -34,6 +37,8 @@ const SOURCE_TYPES = [
   "Dataset",
   "Video / Transcript",
 ];
+
+const IMAGE_IMPORT_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp", ".tif", ".tiff", ".heic", ".avif"];
 
 const PROFILE_SECTIONS = [
   "Origin and path",
@@ -157,7 +162,7 @@ const BACKEND_CORE = {
   sourceReferenceId: "ref-upload-erydir-core",
   summary:
     "Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.",
-  operatingMode: "Local static archive with connector-ready OpenAI, team chat, and web-extraction hooks.",
+  operatingMode: "Local static archive with free local-model hooks, optional OpenAI connector, team chat, memory bank, and web-extraction hooks.",
   stages: [
     "Intent intake",
     "Profile context merge",
@@ -176,7 +181,7 @@ const BACKEND_CORE = {
   ],
   hardLimits: [
     "Static hosts cannot run live global-web scraping or model routes",
-    "OpenAI model execution requires /api/agent on a backend with OPENAI_API_KEY",
+    "Free local model execution requires Ollama running on the local machine; optional OpenAI execution requires /api/agent and OPENAI_API_KEY",
     "No long copyrighted PDF text embedded in exported app data",
     "No biomedical claim may be upgraded beyond its evidence tier without verification",
   ],
@@ -253,16 +258,16 @@ const SEED_DATA = {
     corePrompt:
       "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
     aiConnectorNote:
-      "The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state.",
+      "The ChatGPT Pro console now prefers /api/local-agent with a free local Ollama model when available. OpenAI /api/agent remains optional. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, memory snapshots, collaboration documents, and extraction-job state.",
   },
   internalModel: {
     displayName: "ChatGPT 5.5 Pro Internal Core",
-    status: "OpenAI-backed when /api/agent is configured; local profile fallback otherwise",
+    status: "Free local-model first; optional OpenAI-backed route; local profile fallback otherwise",
     gateway: INTERNAL_MODEL_GATEWAY,
     gatewayOperation: "fetchInternalData",
     targetParameter: "target_id",
     providerNote:
-      "Uses the OpenAI Responses API through the backend /api/agent route when OPENAI_API_KEY is present. Static GitHub Pages uses the local connector-ready profile fallback.",
+      "Uses a free local Ollama model through /api/local-agent when available, then optional OpenAI Responses API through /api/agent, then the local connector-ready profile fallback.",
     synthesisScope: [
       "Archive sources",
       "Queued extraction jobs",
@@ -270,20 +275,21 @@ const SEED_DATA = {
       "Three-user profile context",
       "In-app browser state and captured browser leads",
       "Collaboration document drafts",
+      "Internal memory bank snapshots",
       "Team chat and recommendation review state",
     ],
   },
   backendCore: BACKEND_CORE,
   referenceLibrary: REFERENCE_LIBRARY,
   externalApis: {
-    parallelExtract: {
-      provider: "Parallel",
-      localEndpoint: "/api/extract",
-      upstreamEndpoint: "https://api.parallel.ai/v1/extract",
-      auth: "Server-side PARALLEL_API_KEY",
-      defaultUrls: ["https://www.google.com"],
-      advancedSettings: { full_content: false },
-      clients: ["Python REST proxy", "Parallel Python SDK compatible", "curl REST", "parallel-web TypeScript compatible"],
+    freeLocalAgent: {
+      provider: "Ollama local open-model runtime",
+      localEndpoint: LOCAL_AGENT_API_PATH,
+      upstreamEndpoint: "http://127.0.0.1:11434/api/chat",
+      auth: "No API key; runs on the user's machine",
+      defaultModel: "llama3.2:3b",
+      installHint: "Install Ollama, run `ollama pull llama3.2:3b`, then start this app with python server.py.",
+      browserOnlyFallback: "Static GitHub Pages cannot run local model inference through /api/local-agent, so the app falls back to browser/app synthesis there.",
     },
     localWebScraper: {
       provider: "CORE Python scraper",
@@ -408,7 +414,6 @@ const SEED_DATA = {
   browserHistory: [],
   browserSearchResults: [],
   browserPreview: null,
-  parallelExtractRuns: [],
   webScrapeRuns: [],
   teamMessages: [],
   collabDocs: DEFAULT_COLLAB_DOCS,
@@ -706,12 +711,15 @@ const state = {
     checking: null,
     available: false,
     routes: [],
+    freeLocalAgentConfigured: false,
+    localAgentModel: "llama3.2:3b",
     googleSearchConfigured: false,
     openaiAgentConfigured: false,
     agentModel: "gpt-5.5",
     platform: "static",
   },
   importBusy: false,
+  activeMemorySnapshotId: "",
   teamChatPollTimer: null,
   pendingSearchChoice: null,
   autoBot: {
@@ -795,10 +803,9 @@ function cacheElements() {
   els.stopAutoBotButton = document.getElementById("stopAutoBotButton");
   els.runAutoBotNowButton = document.getElementById("runAutoBotNowButton");
   els.autoBotStatus = document.getElementById("autoBotStatus");
-  els.parallelExtractForm = document.getElementById("parallelExtractForm");
-  els.parallelExtractOutput = document.getElementById("parallelExtractOutput");
   els.webScrapeForm = document.getElementById("webScrapeForm");
   els.webScrapeOutput = document.getElementById("webScrapeOutput");
+  els.extractionVisualFeed = document.getElementById("extractionVisualFeed");
   els.agentForm = document.getElementById("agentForm");
   els.agentScrapeForm = document.getElementById("agentScrapeForm");
   els.agentSearchWindow = document.getElementById("agentSearchWindow");
@@ -829,6 +836,11 @@ function cacheElements() {
   els.exportCollabJsonButton = document.getElementById("exportCollabJsonButton");
   els.printCollabDocButton = document.getElementById("printCollabDocButton");
   els.collabDocToSourceButton = document.getElementById("collabDocToSourceButton");
+  els.createMemorySnapshotButton = document.getElementById("createMemorySnapshotButton");
+  els.exportMemoryBankButton = document.getElementById("exportMemoryBankButton");
+  els.memoryBankSummary = document.getElementById("memoryBankSummary");
+  els.memorySnapshotList = document.getElementById("memorySnapshotList");
+  els.memorySnapshotPreview = document.getElementById("memorySnapshotPreview");
   els.profileTabs = document.getElementById("profileTabs");
   els.profileForm = document.getElementById("profileForm");
   els.profileExtendedSections = document.getElementById("profileExtendedSections");
@@ -894,7 +906,6 @@ function wireEvents() {
   els.browserAddSourceButton.addEventListener("click", addCurrentBrowserPageToSources);
   els.extractionForm.addEventListener("submit", handleQueueExtraction);
   els.extractKeywordSearchForm.addEventListener("submit", (event) => handleKeywordSearch(event, "extract"));
-  els.parallelExtractForm.addEventListener("submit", handleParallelExtract);
   els.webScrapeForm.addEventListener("submit", handleWebScrape);
   els.copyExtractionQueueButton.addEventListener("click", copyExtractionQueue);
   els.clearExtractionQueueButton.addEventListener("click", clearExtractionQueue);
@@ -920,6 +931,8 @@ function wireEvents() {
   els.exportCollabJsonButton.addEventListener("click", () => exportActiveCollabDoc("json"));
   els.printCollabDocButton.addEventListener("click", printActiveCollabDoc);
   els.collabDocToSourceButton.addEventListener("click", addActiveCollabDocToSources);
+  els.createMemorySnapshotButton.addEventListener("click", () => createManualMemorySnapshot("Manual user snapshot"));
+  els.exportMemoryBankButton.addEventListener("click", exportMemoryBank);
   els.searchChoiceInternalButton.addEventListener("click", () => resolveSearchChoice("internal"));
   els.searchChoiceExternalButton.addEventListener("click", () => resolveSearchChoice("external"));
   els.searchChoiceCancelButton.addEventListener("click", () => resolveSearchChoice("cancel"));
@@ -1066,7 +1079,6 @@ function renderPermissionState() {
     "fileImportForm",
     "extractionForm",
     "extractKeywordSearchForm",
-    "parallelExtractForm",
     "webScrapeForm",
     "agentForm",
     "agentScrapeForm",
@@ -1115,6 +1127,8 @@ function renderPermissionState() {
     "exportCollabJsonButton",
     "printCollabDocButton",
     "collabDocToSourceButton",
+    "createMemorySnapshotButton",
+    "exportMemoryBankButton",
   ].forEach((id) => {
     const control = document.getElementById(id);
     if (control) control.disabled = guest;
@@ -1163,6 +1177,7 @@ function render() {
   renderAgent();
   renderTeamChat();
   renderCollabDocs();
+  renderMemoryBank();
   renderProfiles();
   renderModelCore();
   renderMetrics();
@@ -1268,7 +1283,12 @@ function renderSelected(source) {
       <span><strong>ID:</strong> ${escapeHtml(source.id)}</span>
       <span><strong>Tradition:</strong> ${escapeHtml(source.tradition || "Unspecified")}</span>
       <span><strong>CORE:</strong> ${escapeHtml((source.coreLinks || []).join(", ") || "None")}</span>
+      <span><strong>Log file:</strong> ${escapeHtml(sourceLogLocator(source))}</span>
     </div>
+    <details class="source-log-details" open>
+      <summary>Source Log Content / Information</summary>
+      <pre class="source-log-pre">${escapeHtml(formatSourceLog(source))}</pre>
+    </details>
     <div class="form-actions">
       ${source.url ? `<button class="primary-button iconless" type="button" data-source-open="${escapeHtml(source.id)}">Open In Browser</button>` : ""}
       <button class="ghost-button iconless" type="button" data-source-preview="${escapeHtml(source.id)}">Full Source Info</button>
@@ -1280,6 +1300,36 @@ function renderSelected(source) {
   els.selectedRecord.querySelectorAll("[data-source-preview]").forEach((button) => {
     button.addEventListener("click", () => previewSourceInBrowser(button.dataset.sourcePreview));
   });
+}
+
+function sourceLogLocator(source) {
+  if (source.referenceId) return `data/reference_ingest.json#${source.referenceId}`;
+  if (source.url?.startsWith("local-collab-doc://")) return source.url;
+  return `data/research_seed.json#${source.id}`;
+}
+
+function formatSourceLog(source) {
+  return JSON.stringify(
+    {
+      sourceLogFile: sourceLogLocator(source),
+      id: source.id,
+      title: source.title,
+      category: source.category,
+      species: source.species,
+      domain: source.domain,
+      sourceType: source.sourceType,
+      url: source.url || "",
+      evidenceTier: source.evidenceTier,
+      citationStatus: source.citationStatus,
+      tradition: source.tradition,
+      terms: source.terms || [],
+      coreLinks: source.coreLinks || [],
+      notes: source.notes || "",
+      fullRecord: source,
+    },
+    null,
+    2
+  );
 }
 
 function openSourceInBrowser(sourceId) {
@@ -1417,7 +1467,7 @@ async function analyzeFileInBrowser(file) {
   let text = "";
   const warnings = [];
 
-  if ([".txt", ".json", ".py", ".md", ".markdown", ".html", ".htm", ".csv", ".xml", ".yaml", ".yml"].includes(extension)) {
+  if ([".txt", ".json", ".py", ".js", ".css", ".md", ".markdown", ".html", ".htm", ".csv", ".xml", ".yaml", ".yml"].includes(extension)) {
     text = await file.text();
     if (extension === ".html" || extension === ".htm") text = stripHtml(text);
     if (extension === ".json") {
@@ -1952,7 +2002,7 @@ function loadInAppBrowserFrame(url, preview = null) {
 function shouldAttemptIframeEmbed(url) {
   if (!url) return false;
   if (isLocalCollabDocUrl(url)) return false;
-  if (isCseUrl(url)) return true;
+  if (isCseUrl(url)) return false;
   if (/^(data|assets|docs|dist)\//i.test(url) || url.startsWith("./") || url.startsWith("../") || url.startsWith("/")) return true;
   return !/^https?:\/\//i.test(url);
 }
@@ -2151,6 +2201,7 @@ function renderBrowserSearchResults() {
             </header>
             ${item.url ? `<p class="result-url">${escapeHtml(item.url)}</p>` : ""}
             <p>${escapeHtml(item.summary || "No preview summary available.")}</p>
+            ${renderBrowserCardLinks(item)}
             <div class="form-actions">
               ${item.url ? `<button class="primary-button iconless" type="button" data-browser-result-open="${escapeHtml(item.id)}">Open In App</button>` : ""}
               <button class="ghost-button iconless" type="button" data-browser-result-preview="${escapeHtml(item.id)}">Full Info</button>
@@ -2173,6 +2224,28 @@ function renderBrowserSearchResults() {
       if (result?.url) addBrowserUrlToSources(result.url);
     });
   });
+  els.browserSearchResults.querySelectorAll("[data-open-browser-url]").forEach((button) => {
+    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, button.textContent.trim() || button.dataset.openBrowserUrl));
+  });
+}
+
+function renderBrowserCardLinks(item) {
+  const links = dedupeLinks([
+    ...(item.url ? [{ url: item.url, title: "Primary site" }] : []),
+    ...(item.links || []),
+  ]).slice(0, 5);
+  if (!links.length) return "";
+  return `
+    <div class="browser-card-links">
+      <strong>Sites and links</strong>
+      ${links
+        .map(
+          (link) =>
+            `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(link.url)}">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</button>`
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function replayBufferedCseEvents() {
@@ -2372,6 +2445,7 @@ function buildVirtualBrowserResults(query, currentUrl = "") {
         url: source.url || "",
         summary: source.notes,
         sourceInfo: `${source.category} / ${source.domain} / ${source.citationStatus}`,
+        links: source.url ? [{ url: source.url, title: source.title }] : [],
         details: JSON.stringify(source, null, 2),
         score,
       });
@@ -2390,6 +2464,7 @@ function buildVirtualBrowserResults(query, currentUrl = "") {
           url: item.url || item.finalUrl || "",
           summary: item.summary,
           sourceInfo: `${record.owner || "local"} / ${new Date(record.createdAt).toLocaleString()}`,
+          links: item.links || [],
           details: JSON.stringify({ recordId: record.id, item }, null, 2),
           score,
         });
@@ -3002,6 +3077,8 @@ async function detectBackendCapabilities({ renderAfter = true } = {}) {
         checking: null,
         available: response.ok && data.ok !== false,
         routes: Array.isArray(data.routes) ? data.routes : [],
+        freeLocalAgentConfigured: Boolean(data.freeLocalAgentConfigured),
+        localAgentModel: data.localAgentModel || "llama3.2:3b",
         googleSearchConfigured: Boolean(data.googleSearchConfigured),
         openaiAgentConfigured: Boolean(data.openaiAgentConfigured),
         agentModel: data.agentModel || "gpt-5.5",
@@ -3019,6 +3096,8 @@ async function detectBackendCapabilities({ renderAfter = true } = {}) {
         checking: null,
         available: false,
         routes: [],
+        freeLocalAgentConfigured: false,
+        localAgentModel: "llama3.2:3b",
         googleSearchConfigured: false,
         openaiAgentConfigured: false,
         agentModel: "gpt-5.5",
@@ -3273,85 +3352,6 @@ function renderCompactSearchItem(resultId, item, index) {
       </div>
     </article>
   `;
-}
-
-async function handleParallelExtract(event) {
-  event.preventDefault();
-  if (!ensureCanWrite("run Parallel Extract")) return;
-  const formData = new FormData(els.parallelExtractForm);
-  const urls = parseUrlList(String(formData.get("urls")));
-  const fullContent = String(formData.get("fullContent")) === "true";
-  const sourcePrompt = getActiveExtractionPrompt();
-  if (!urls.length) {
-    els.parallelExtractOutput.textContent = "Add at least one URL.";
-    return;
-  }
-
-  const payload = {
-    urls,
-    objective: sourcePrompt,
-    browser_context: getBrowserContext(),
-    advanced_settings: {
-      full_content: fullContent,
-    },
-  };
-  els.parallelExtractOutput.textContent = "Running Parallel Extract request through /api/extract...";
-
-  try {
-    const response = await fetch("/api/extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    const run = {
-      id: `parallel-${Date.now()}`,
-      owner: state.currentUser?.username || "local",
-      createdAt: new Date().toISOString(),
-      request: payload,
-      ok: response.ok && data.ok !== false,
-      status: response.status,
-      response: data,
-    };
-    state.archive.parallelExtractRuns.unshift(run);
-    state.archive.parallelExtractRuns = state.archive.parallelExtractRuns.slice(0, 20);
-    appendExtractionResult(
-      createExtractionResultRecord({
-        engine: "parallel",
-        request: payload,
-        response: data,
-        status: response.status,
-        ok: run.ok,
-        sourcePrompt,
-      })
-    );
-    persistArchive();
-    els.parallelExtractOutput.textContent = JSON.stringify(data, null, 2);
-    renderExtractionResults();
-    renderAgent();
-    renderModelCore();
-  } catch (error) {
-    const errorData = {
-      ok: false,
-      error:
-        "Could not reach /api/extract. Start the Python server with `python server.py` and configure PARALLEL_API_KEY server-side.",
-      detail: error.message,
-    };
-    appendExtractionResult(
-      createExtractionResultRecord({
-        engine: "parallel",
-        request: payload,
-        response: errorData,
-        status: 0,
-        ok: false,
-        sourcePrompt,
-      })
-    );
-    persistArchive();
-    els.parallelExtractOutput.textContent = JSON.stringify(errorData, null, 2);
-    renderExtractionResults();
-    renderAgent();
-  }
 }
 
 async function handleWebScrape(event) {
@@ -3630,7 +3630,6 @@ function domainFromUrl(url) {
 
 function engineLabel(engine) {
   const labels = {
-    parallel: "Parallel Extract",
     scrape: "Local Scraper",
     "google-search": "Google Web Search",
     "agent-web-search": "Agent Google Web Search",
@@ -3690,7 +3689,10 @@ function renderExtractionResults() {
   const results = state.archive.extractionResults || [];
   if (!results.length) {
     els.extractionResults.innerHTML =
-      '<div class="empty-state">No extraction results yet. Run Parallel Extract or Local Web Scraper to create source cards.</div>';
+      '<div class="empty-state">No extraction results yet. Run Local Web Scraper, Agent Keyword Search, file import, or browser search to create source cards.</div>';
+    if (els.extractionVisualFeed) {
+      els.extractionVisualFeed.innerHTML = '<div class="empty-state">Fetched information previews will appear here after a search, scrape, or import.</div>';
+    }
     return;
   }
 
@@ -3730,6 +3732,7 @@ function renderExtractionResults() {
       )
       .join("")}
   `;
+  renderExtractionVisualFeed(results);
 
   els.extractionResults.querySelectorAll("[data-copy-result]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3758,6 +3761,56 @@ function renderExtractionResults() {
     button.addEventListener("click", () => {
       promoteExtractionItem(button.dataset.promoteResult, Number(button.dataset.itemIndex || 0));
     });
+  });
+}
+
+function renderExtractionVisualFeed(results = state.archive.extractionResults || []) {
+  if (!els.extractionVisualFeed) return;
+  const cards = results
+    .flatMap((result) =>
+      (result.items || []).map((item, index) => ({
+        result,
+        item,
+        index,
+      }))
+    )
+    .slice(0, 8);
+  if (!cards.length) {
+    els.extractionVisualFeed.innerHTML = '<div class="empty-state">No fetched information cards are available yet.</div>';
+    return;
+  }
+  const hero = cards[0];
+  const heroUrl = hero.item.url || hero.item.finalUrl || "";
+  els.extractionVisualFeed.innerHTML = `
+    <section class="visual-feed-browser">
+      <header>
+        <div>
+          <strong>${escapeHtml(hero.item.title || "Fetched result preview")}</strong>
+          <small>${escapeHtml(engineLabel(hero.result.engine))} / ${escapeHtml(heroUrl || "no URL")}</small>
+        </div>
+        ${heroUrl ? `<button class="primary-button iconless" type="button" data-open-extraction-item="${escapeHtml(hero.result.id)}" data-item-index="${hero.index}">Open In App</button>` : ""}
+      </header>
+      <p>${escapeHtml(hero.item.summary || hero.result.sourcePrompt || "No summary text was returned.")}</p>
+      <div class="visual-feed-links">
+        ${cards
+          .map(({ result, item, index }) => {
+            const url = item.url || item.finalUrl || "";
+            return `
+              <button class="visual-feed-link" type="button" data-preview-extraction-item="${escapeHtml(result.id)}" data-item-index="${index}">
+                <strong>${escapeHtml(item.title || "Untitled result")}</strong>
+                <span>${escapeHtml(url || engineLabel(result.engine))}</span>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+  els.extractionVisualFeed.querySelectorAll("[data-open-extraction-item]").forEach((button) => {
+    button.addEventListener("click", () => openExtractionItemInBrowser(button.dataset.openExtractionItem, Number(button.dataset.itemIndex || 0)));
+  });
+  els.extractionVisualFeed.querySelectorAll("[data-preview-extraction-item]").forEach((button) => {
+    button.addEventListener("click", () => previewExtractionItemInBrowser(button.dataset.previewExtractionItem, Number(button.dataset.itemIndex || 0)));
   });
 }
 
@@ -4253,13 +4306,17 @@ function buildAgentSearchQuery(prompt, sourceTypes = []) {
 
 async function requestOpenAIAgentAnswer(prompt, options) {
   const capabilities = await ensureBackendCapabilities();
+  if (hasBackendRoute(LOCAL_AGENT_API_PATH, capabilities)) {
+    const localResult = await requestFreeLocalAgentAnswer(prompt, options, capabilities);
+    if (localResult) return localResult;
+  }
   if (!hasBackendRoute(AGENT_API_PATH, capabilities) || capabilities.openaiAgentConfigured === false) {
     return {
-      backend: capabilities.available ? "local-fallback-missing-openai-key" : "local-fallback-static-host",
+      backend: capabilities.available ? "local-fallback-no-cloud-model" : "local-fallback-static-host",
       content: generateAgentResponse(prompt, {
         ...options,
         agentBackendReason: capabilities.available
-          ? "OPENAI_API_KEY is not configured on this backend host."
+          ? "No free local Ollama model answered, and OPENAI_API_KEY is not configured. The browser synthesizer answered from app context."
           : "This host cannot run backend API routes, so the local synthesizer answered from app/browser context.",
       }),
     };
@@ -4303,6 +4360,36 @@ async function requestOpenAIAgentAnswer(prompt, options) {
   }
 }
 
+async function requestFreeLocalAgentAnswer(prompt, options, capabilities) {
+  const payload = buildAgentApiPayload(prompt, options, capabilities);
+  payload.model = capabilities.localAgentModel || "llama3.2:3b";
+  payload.localModel = capabilities.localAgentModel || "llama3.2:3b";
+  try {
+    const response = await fetch(LOCAL_AGENT_API_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || data.ok === false) {
+      options.freeLocalAgentReason = data.error || "The free local model route returned an error.";
+      return null;
+    }
+    const answer = data.response?.output_text || "";
+    if (!answer) {
+      options.freeLocalAgentReason = "The free local model route returned no text output.";
+      return null;
+    }
+    return {
+      backend: data.response?.model || capabilities.localAgentModel || "ollama-local-free",
+      content: answer,
+    };
+  } catch (error) {
+    options.freeLocalAgentReason = error.message;
+    return null;
+  }
+}
+
 function buildAgentApiPayload(prompt, options, capabilities) {
   const browserContext = options.browserContext || getBrowserContext();
   return {
@@ -4315,6 +4402,7 @@ function buildAgentApiPayload(prompt, options, capabilities) {
     webRecord: summarizeExtractionRecord(options.webRecord),
     sourceMatches: rankSources(`${prompt} ${browserContext.searchText}`).slice(0, 8),
     references: rankReferences(prompt).slice(0, 5),
+    memoryBank: summarizeMemoryBankForAgent(),
     collabDocs: getCollabDocs()
       .slice(0, 8)
       .map((doc) => ({
@@ -4329,6 +4417,20 @@ function buildAgentApiPayload(prompt, options, capabilities) {
     teamMessages: (state.archive.teamMessages || []).slice(0, 10),
     recentExtractions: (state.archive.extractionResults || []).slice(0, 6).map(summarizeExtractionRecord),
     activeProfile: getProfile(state.currentUser?.username || state.activeProfileUsername),
+  };
+}
+
+function summarizeMemoryBankForAgent() {
+  const bank = getMemoryBank();
+  return {
+    snapshotCount: bank.snapshots?.length || 0,
+    latest: (bank.snapshots || []).slice(0, 5).map((snapshot) => ({
+      id: snapshot.id,
+      reason: snapshot.reason,
+      owner: snapshot.owner,
+      createdAt: snapshot.createdAt,
+      counts: snapshot.counts,
+    })),
   };
 }
 
@@ -4402,7 +4504,7 @@ function generateAgentResponse(prompt, options) {
   const activeProfile = getProfile(state.currentUser?.username || state.activeProfileUsername);
   const model = getInternalModel();
   const core = getBackendCore();
-  const parallelApi = state.archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
+  const freeLocalApi = state.archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
   const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
@@ -4414,6 +4516,7 @@ function generateAgentResponse(prompt, options) {
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
   const collabDocs = getCollabDocs();
+  const memoryBank = getMemoryBank();
   const browserHistory = getBrowserHistory();
   const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected").slice(0, 3);
   const operation = getGatewayOperation(model);
@@ -4451,7 +4554,7 @@ function generateAgentResponse(prompt, options) {
   const sourceTypes = options.sourceTypes.join(", ") || "all source types";
   const capabilities = state.backendCapabilities;
   const backendLine = capabilities.available
-    ? `Backend runtime: ${capabilities.platform}; OpenAI agent ${capabilities.openaiAgentConfigured ? `configured for ${capabilities.agentModel}` : "not configured"}; Google JSON search ${capabilities.googleSearchConfigured ? "configured" : "not configured"}.`
+    ? `Backend runtime: ${capabilities.platform}; free local model ${capabilities.freeLocalAgentConfigured ? `reachable as ${capabilities.localAgentModel}` : "not reachable"}; OpenAI agent ${capabilities.openaiAgentConfigured ? `configured for ${capabilities.agentModel}` : "not configured"}; Google JSON search ${capabilities.googleSearchConfigured ? "configured" : "not configured"}.`
     : "Backend runtime: static host. Python/API routes are unavailable here, so the agent uses embedded CSE cards plus local app synthesis.";
 
   return [
@@ -4461,13 +4564,14 @@ function generateAgentResponse(prompt, options) {
     `Web and site evidence:\n${webLine}`,
     `App archive answer layer: ${sourceLine}`,
     `Mode: ${options.mode}. Access depth: ${options.depth}. Source access: ${sourceTypes}.`,
-    `Model surface: ${capabilities.openaiAgentConfigured ? `${capabilities.agentModel} through ${AGENT_API_PATH}` : `${model.displayName || "ChatGPT 5.5 Pro Internal Core"} local connector-ready profile`}. The internal gateway is mapped to ${operation}(${targetParam}) through ${getGatewayPath(model)}.`,
+    `Model surface: ${capabilities.freeLocalAgentConfigured ? `${capabilities.localAgentModel} through ${LOCAL_AGENT_API_PATH}` : capabilities.openaiAgentConfigured ? `${capabilities.agentModel} through ${AGENT_API_PATH}` : `${model.displayName || "ChatGPT 5.5 Pro Internal Core"} local connector-ready profile`}. The internal gateway is mapped to ${operation}(${targetParam}) through ${getGatewayPath(model)}.`,
+    `Free local model path: ${freeLocalApi.localEndpoint} calls ${freeLocalApi.upstreamEndpoint} with ${freeLocalApi.auth}. ${options.freeLocalAgentReason ? `Local model note: ${options.freeLocalAgentReason}` : freeLocalApi.installHint}`,
     `Google web search path: ${googleJsonApi.localEndpoint} uses ${googleJsonApi.auth}; when unavailable, the Browser panel uses embedded CSE ${cseApi.searchEngineId} result callbacks and internal result cards.`,
-    `Parallel extraction path: ${parallelApi.localEndpoint} can call ${parallelApi.upstreamEndpoint} from the Python server when PARALLEL_API_KEY is configured.`,
     `Local scraping path: ${scraperApi.localEndpoint} performs dependency-free HTML/text extraction with private-network target safeguards. Keyword search mode invisibly builds ${GOOGLE_SEARCH_BASE_URL}{keywords}.`,
     `Google Programmable Search: CSE ${cseApi.searchEngineId} is embedded in the Browser panel with public URL ${cseApi.publicUrl}.`,
     `File import layer: ${importedFiles.length} imported file logs are available; latest import ${importedFiles[0]?.fileName || "none"} created ${importedFiles[0]?.recordsCreated || 0} source records.`,
     `Collaboration document layer: ${collabDocs.length} local draft(s) are available to the agent. Current drafts: ${docLine}`,
+    `Internal memory bank: ${memoryBank.snapshots?.length || 0} safety snapshot(s) available; latest ${memoryBank.snapshots?.[0]?.reason || "none"}.`,
     `In-app browser layer: ${browserHistory.length} captured browser targets; active target ${browserContext.currentUrl}. The agent and Extract console use this browser context when building searches and source cards.`,
     `Virtual browser memory: ${browserContext.virtualResults?.length || 0} result card(s) are attached; active preview ${browserContext.preview?.title || "none"}.`,
     `Team collaboration layer: ${teamMessages.length} posts stored; ${openRecommendations.length} open source recommendation(s) can be rejected or promoted into Sources.`,
@@ -4504,7 +4608,7 @@ function renderAgent() {
   const model = getInternalModel();
   const core = getBackendCore();
   const references = getReferenceLibrary();
-  const parallelApi = state.archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
+  const freeLocalApi = state.archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
   const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
@@ -4514,6 +4618,7 @@ function renderAgent() {
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
   const collabDocs = getCollabDocs();
+  const memoryBank = getMemoryBank();
   const browserHistory = getBrowserHistory();
   const browserContext = getBrowserContext();
   const teamMessages = state.archive.teamMessages || [];
@@ -4521,20 +4626,21 @@ function renderAgent() {
   const capabilities = state.backendCapabilities;
   els.agentContextSummary.innerHTML = `
     <article><strong>Model Surface</strong><span>${escapeHtml(model.displayName)}; ${escapeHtml(model.status)}.</span></article>
-    <article><strong>Runtime</strong><span>${escapeHtml(capabilities.available ? capabilities.platform : "static host")} / ${capabilities.openaiAgentConfigured ? `OpenAI ${escapeHtml(capabilities.agentModel)}` : "local synthesis fallback"}.</span></article>
-    <article><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))} via ${escapeHtml(getGatewayPath(model))}; ${capabilities.openaiAgentConfigured ? "OpenAI-backed answers enabled on this backend." : "connector-ready local profile fallback."}</span></article>
+    <article><strong>Runtime</strong><span>${escapeHtml(capabilities.available ? capabilities.platform : "static host")} / ${capabilities.freeLocalAgentConfigured ? `Free local ${escapeHtml(capabilities.localAgentModel)}` : capabilities.openaiAgentConfigured ? `OpenAI ${escapeHtml(capabilities.agentModel)}` : "local synthesis fallback"}.</span></article>
+    <article><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))} via ${escapeHtml(getGatewayPath(model))}; ${capabilities.freeLocalAgentConfigured ? "Ollama local-model answers enabled." : capabilities.openaiAgentConfigured ? "OpenAI-backed answers enabled on this backend." : "connector-ready local profile fallback."}</span></article>
     <article><strong>Backend Core</strong><span>${escapeHtml(core.title)} with ${core.stages.length} staged mechanics.</span></article>
     <article><strong>Archive</strong><span>${state.archive.sources.length} records, ${state.archive.extractionJobs.length} queued extraction jobs.</span></article>
     <article><strong>Extraction Results</strong><span>${resultCount} result records, ${sourceCardCount} normalized source cards available to the agent.</span></article>
-    <article><strong>Parallel Extract</strong><span>${escapeHtml(parallelApi.localEndpoint)} / ${state.archive.parallelExtractRuns.length} local request logs.</span></article>
+    <article><strong>Free Local Model</strong><span>${escapeHtml(freeLocalApi.localEndpoint)} / ${capabilities.freeLocalAgentConfigured ? `reachable as ${escapeHtml(capabilities.localAgentModel)}` : escapeHtml(freeLocalApi.installHint)}.</span></article>
     <article><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} / ${state.archive.webScrapeRuns.length} local request logs.</span></article>
     <article><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} / ${capabilities.googleSearchConfigured ? "server key detected" : "embedded CSE fallback"}.</span></article>
     <article><strong>Keyword Search</strong><span>${escapeHtml(GOOGLE_SEARCH_BASE_URL)} + user keywords; modal chooses internal window or external link.</span></article>
     <article><strong>Google CSE</strong><span>${escapeHtml(cseApi.searchEngineId)} / ${escapeHtml(cseApi.publicUrl)}.</span></article>
     <article><strong>File Import</strong><span>${importedFiles.length} imported file logs; ${importedFiles.reduce((sum, item) => sum + (item.recordsCreated || 0), 0)} sources created from uploads.</span></article>
     <article><strong>Collaboration Docs</strong><span>${collabDocs.length} local-first draft${collabDocs.length === 1 ? "" : "s"} available for agent context, export, and source promotion.</span></article>
+    <article><strong>Memory Bank</strong><span>${memoryBank.snapshots?.length || 0} recovery snapshot${memoryBank.snapshots?.length === 1 ? "" : "s"} protect sources, uploads, documents, and team chat history.</span></article>
     <article><strong>In-App Browser</strong><span>${browserHistory.length} captured targets; active ${escapeHtml(browserContext.currentUrl)}.</span></article>
-    <article><strong>Browser Pull</strong><span>Agent, keyword scraper, Parallel Extract, and Extract jobs include current URL, CSE URL, history, ${browserContext.virtualResults?.length || 0} internal result cards, and active preview ${escapeHtml(browserContext.preview?.title || "none")}.</span></article>
+    <article><strong>Browser Pull</strong><span>Agent, keyword scraper, local scraper, and Extract jobs include current URL, CSE URL, history, ${browserContext.virtualResults?.length || 0} internal result cards, and active preview ${escapeHtml(browserContext.preview?.title || "none")}.</span></article>
     <article><strong>Team Feed</strong><span>${teamMessages.length} posts; ${openRecommendations.length} open recommendations available for source review.</span></article>
     <article><strong>Auto Bot</strong><span>${botFindings.length} findings logged; ${botFindings.filter((entry) => entry.accepted).length} accepted into source sections.</span></article>
     <article><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} / ${escapeHtml(aiqApi.status)}.</span></article>
@@ -4548,7 +4654,7 @@ function renderModelCore() {
   const model = getInternalModel();
   const core = getBackendCore();
   const references = getReferenceLibrary();
-  const parallelApi = state.archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
+  const freeLocalApi = state.archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
   const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
@@ -4557,9 +4663,10 @@ function renderModelCore() {
   if (els.modelCoreSummary) {
     els.modelCoreSummary.innerHTML = `
       <div class="status-row"><strong>${escapeHtml(model.displayName)}</strong><span>${escapeHtml(model.providerNote)}</span></div>
+      <div class="status-row"><strong>Free Local Agent Route</strong><span>${escapeHtml(LOCAL_AGENT_API_PATH)} / ${capabilities.freeLocalAgentConfigured ? `Ollama reachable as ${capabilities.localAgentModel}` : "not reachable until Ollama is running locally"}.</span></div>
       <div class="status-row"><strong>OpenAI Agent Route</strong><span>${escapeHtml(AGENT_API_PATH)} / ${capabilities.openaiAgentConfigured ? `configured for ${capabilities.agentModel}` : "not available on this host or missing OPENAI_API_KEY"}.</span></div>
       <div class="status-row"><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))}(${escapeHtml(model.targetParameter || "target_id")}) at ${escapeHtml(getGatewayPath(model))}</span></div>
-      <div class="status-row"><strong>Parallel Extract</strong><span>${escapeHtml(parallelApi.localEndpoint)} proxies ${escapeHtml(parallelApi.upstreamEndpoint)} with ${escapeHtml(parallelApi.auth)}.</span></div>
+      <div class="status-row"><strong>Free Model Setup</strong><span>${escapeHtml(freeLocalApi.installHint)}</span></div>
       <div class="status-row"><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} extracts HTML/text directly with safeguards: ${escapeHtml(scraperApi.safeguards.slice(0, 2).join("; "))}.</span></div>
       <div class="status-row"><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} uses ${escapeHtml(googleJsonApi.auth)} and returns normalized web result cards when ${capabilities.googleSearchConfigured ? "configured" : "hosted with GOOGLE_CUSTOM_SEARCH_API_KEY"}.</span></div>
       <div class="status-row"><strong>Google CSE</strong><span>${escapeHtml(cseApi.scriptUrl)} renders ${escapeHtml(cseApi.elements.join(" + "))}; public URL ${escapeHtml(cseApi.publicUrl)}.</span></div>
@@ -5060,6 +5167,15 @@ async function collabDocFromFile(file) {
   } else if (["txt", "md", "py", "js", "css"].includes(ext) || file.type.startsWith("text/")) {
     contentHtml = textToDocHtml(await file.text(), ext);
     type = ext === "md" ? "Grimoire Chapter" : "Research Brief";
+  } else if (IMAGE_IMPORT_EXTENSIONS.includes(`.${ext}`) || file.type.startsWith("image/")) {
+    contentHtml = `
+      <h2>Imported Image Metadata</h2>
+      <p><strong>File:</strong> ${escapeHtml(name)}</p>
+      <p><strong>Type:</strong> ${escapeHtml(file.type || ext || "image")}</p>
+      <p><strong>Size:</strong> ${escapeHtml(String(file.size))} bytes</p>
+      <p>This image is logged for visual-source review. Add OCR or vision parsing in a backend step if the image contains research text.</p>
+    `;
+    type = "Source Review";
   } else {
     contentHtml = `
       <h2>Imported File Metadata</h2>
@@ -5356,10 +5472,18 @@ function mergeById(baseItems = [], incomingItems = []) {
 function loadArchive() {
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (!saved) return normalizeArchive(SEED_DATA);
+    if (!saved) {
+      const backup = window.localStorage.getItem(STORAGE_BACKUP_KEY);
+      return normalizeArchive(backup ? JSON.parse(backup) : SEED_DATA);
+    }
     return normalizeArchive(JSON.parse(saved));
   } catch {
-    return normalizeArchive(SEED_DATA);
+    try {
+      const backup = window.localStorage.getItem(STORAGE_BACKUP_KEY);
+      return normalizeArchive(backup ? JSON.parse(backup) : SEED_DATA);
+    } catch {
+      return normalizeArchive(SEED_DATA);
+    }
   }
 }
 
@@ -5381,9 +5505,9 @@ function normalizeArchive(input) {
     ? archive.backendCore.hardLimits
     : base.backendCore.hardLimits;
   archive.externalApis = { ...base.externalApis, ...(archive.externalApis || {}) };
-  archive.externalApis.parallelExtract = {
-    ...base.externalApis.parallelExtract,
-    ...(archive.externalApis.parallelExtract || {}),
+  archive.externalApis.freeLocalAgent = {
+    ...base.externalApis.freeLocalAgent,
+    ...(archive.externalApis.freeLocalAgent || {}),
   };
   archive.externalApis.localWebScraper = {
     ...base.externalApis.localWebScraper,
@@ -5433,7 +5557,6 @@ function normalizeArchive(input) {
   archive.browserHistory = archive.browserHistory || [];
   archive.browserSearchResults = archive.browserSearchResults || [];
   archive.browserPreview = archive.browserPreview || null;
-  archive.parallelExtractRuns = archive.parallelExtractRuns || [];
   archive.webScrapeRuns = archive.webScrapeRuns || [];
   archive.teamMessages = archive.teamMessages || [];
   archive.collabDocs = mergeById(DEFAULT_COLLAB_DOCS, archive.collabDocs || []).map((doc) => ({
@@ -5447,9 +5570,141 @@ function normalizeArchive(input) {
   return archive;
 }
 
-function persistArchive() {
+function persistArchive(reason = "Archive update") {
   if (isGuestUser()) return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.archive));
+  const encoded = JSON.stringify(state.archive);
+  try {
+    const previous = window.localStorage.getItem(STORAGE_KEY);
+    if (previous) window.localStorage.setItem(STORAGE_BACKUP_KEY, previous);
+    window.localStorage.setItem(STORAGE_KEY, encoded);
+    rememberArchive(reason);
+  } catch (error) {
+    try {
+      window.localStorage.setItem(STORAGE_BACKUP_KEY, encoded);
+    } catch {
+      // Browser storage may be full or disabled. The in-memory state still remains for this session.
+    }
+    console.warn("Archive persistence failed", error);
+  }
+}
+
+function getMemoryBank() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(MEMORY_BANK_KEY) || "{}");
+    return {
+      version: 1,
+      createdAt: saved.createdAt || new Date().toISOString(),
+      updatedAt: saved.updatedAt || "",
+      snapshots: Array.isArray(saved.snapshots) ? saved.snapshots : [],
+    };
+  } catch {
+    return { version: 1, createdAt: new Date().toISOString(), updatedAt: "", snapshots: [] };
+  }
+}
+
+function writeMemoryBank(bank) {
+  window.localStorage.setItem(MEMORY_BANK_KEY, JSON.stringify(bank));
+}
+
+function rememberArchive(reason = "Archive update") {
+  if (isGuestUser()) return;
+  const bank = getMemoryBank();
+  const now = new Date().toISOString();
+  const snapshot = {
+    id: `memory-${Date.now()}-${Math.round(Math.random() * 999)}`,
+    reason,
+    owner: state.currentUser?.username || "local",
+    createdAt: now,
+    counts: archiveCounts(state.archive),
+    archive: clone(state.archive),
+  };
+  bank.snapshots.unshift(snapshot);
+  bank.updatedAt = now;
+  try {
+    writeMemoryBank(bank);
+  } catch {
+    bank.snapshots = bank.snapshots.slice(0, 40);
+    try {
+      writeMemoryBank(bank);
+    } catch {
+      // Avoid breaking the app if browser storage quota is exhausted.
+    }
+  }
+}
+
+function archiveCounts(archive) {
+  return {
+    sources: archive.sources?.length || 0,
+    extractionResults: archive.extractionResults?.length || 0,
+    importedFiles: archive.importedFiles?.length || 0,
+    teamMessages: archive.teamMessages?.length || 0,
+    collabDocs: archive.collabDocs?.length || 0,
+    profiles: archive.profiles?.length || 0,
+  };
+}
+
+function renderMemoryBank() {
+  if (!els.memoryBankSummary || !els.memorySnapshotList) return;
+  const bank = getMemoryBank();
+  const snapshots = bank.snapshots || [];
+  const latest = snapshots[0];
+  const selected = snapshots.find((snapshot) => snapshot.id === state.activeMemorySnapshotId) || latest;
+  if (selected) state.activeMemorySnapshotId = selected.id;
+  els.memoryBankSummary.innerHTML = `
+    <article class="memory-stat"><strong>${snapshots.length}</strong><span>saved safety snapshots</span></article>
+    <article class="memory-stat"><strong>${escapeHtml(latest ? new Date(latest.createdAt).toLocaleString() : "None")}</strong><span>latest memory write</span></article>
+    <article class="memory-stat"><strong>${escapeHtml(latest?.owner || "None")}</strong><span>latest owner</span></article>
+  `;
+  els.memorySnapshotList.innerHTML = snapshots.length
+    ? snapshots
+        .slice(0, 80)
+        .map(
+          (snapshot) => `
+            <button class="memory-snapshot-item${selected?.id === snapshot.id ? " is-active" : ""}" type="button" data-memory-id="${escapeHtml(snapshot.id)}">
+              <strong>${escapeHtml(snapshot.reason || "Archive update")}</strong>
+              <span>${escapeHtml(snapshot.owner || "local")} / ${new Date(snapshot.createdAt).toLocaleString()}</span>
+              <small>${snapshot.counts.sources} sources / ${snapshot.counts.teamMessages} team posts / ${snapshot.counts.collabDocs} docs / ${snapshot.counts.importedFiles} uploads</small>
+            </button>
+          `
+        )
+        .join("")
+    : '<div class="empty-state">No memory snapshots yet. The app will create one the next time a signed-in user saves changes.</div>';
+  els.memorySnapshotList.querySelectorAll("[data-memory-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activeMemorySnapshotId = button.dataset.memoryId;
+      renderMemoryBank();
+    });
+  });
+  renderMemorySnapshotPreview(selected);
+}
+
+function renderMemorySnapshotPreview(snapshot) {
+  if (!els.memorySnapshotPreview) return;
+  if (!snapshot) {
+    els.memorySnapshotPreview.innerHTML = '<div class="empty-state">Select a memory snapshot to inspect the saved archive summary.</div>';
+    return;
+  }
+  els.memorySnapshotPreview.innerHTML = `
+    <h3>${escapeHtml(snapshot.reason || "Archive update")}</h3>
+    <p>${escapeHtml(new Date(snapshot.createdAt).toLocaleString())} / ${escapeHtml(snapshot.owner || "local")}</p>
+    <div class="source-info-grid">
+      ${Object.entries(snapshot.counts || {})
+        .map(([key, value]) => `<span><strong>${escapeHtml(key)}</strong>${escapeHtml(String(value))}</span>`)
+        .join("")}
+    </div>
+    <pre class="source-log-pre">${escapeHtml(JSON.stringify(snapshot.archive, null, 2).slice(0, 6000))}</pre>
+  `;
+}
+
+function createManualMemorySnapshot(reason = "Manual snapshot") {
+  if (!ensureCanWrite("create memory snapshots")) return;
+  rememberArchive(reason);
+  renderMemoryBank();
+}
+
+function exportMemoryBank() {
+  if (!ensureCanWrite("export memory bank data")) return;
+  download("core-memory-bank.json", "application/json", JSON.stringify(getMemoryBank(), null, 2));
 }
 
 function countBy(items, key) {
@@ -5508,7 +5763,7 @@ async function copyOrDownload(filename, contents) {
 }
 
 function buildTextDigest(archive) {
-  const parallelApi = archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
+  const freeLocalApi = archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
   const scraperApi = archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
@@ -5532,11 +5787,12 @@ function buildTextDigest(archive) {
     `${archive.backendCore.title}: ${archive.backendCore.summary}`,
     `Stages: ${archive.backendCore.stages.join(", ")}`,
     "",
-    "Parallel Extract API:",
-    `Local endpoint: ${parallelApi.localEndpoint}`,
-    `Upstream endpoint: ${parallelApi.upstreamEndpoint}`,
-    `Authentication: ${parallelApi.auth}`,
-    `Saved request logs: ${archive.parallelExtractRuns?.length || 0}`,
+    "Free Local Model Agent:",
+    `Local endpoint: ${freeLocalApi.localEndpoint}`,
+    `Ollama endpoint: ${freeLocalApi.upstreamEndpoint}`,
+    `Authentication: ${freeLocalApi.auth}`,
+    `Default model: ${freeLocalApi.defaultModel}`,
+    `Install: ${freeLocalApi.installHint}`,
     "",
     "Local Web Scraper:",
     `Local endpoint: ${scraperApi.localEndpoint}`,
@@ -5579,6 +5835,9 @@ function buildTextDigest(archive) {
     "Collaboration Documents:",
     `${archive.collabDocs?.length || 0} draft documents stored`,
     ...((archive.collabDocs || []).slice(0, 8).map((doc) => `- ${doc.title} (${doc.type}; ${doc.status}; ${doc.owner})`)),
+    "",
+    "Internal Memory Bank:",
+    `${getMemoryBank().snapshots?.length || 0} local recovery snapshots stored in browser storage`,
     "",
     "NVIDIA AIQ Research:",
     `Backend URL: ${aiqApi.backendUrl}`,
@@ -5630,7 +5889,7 @@ function buildTextDigest(archive) {
 }
 
 function buildHtmlDigest(archive) {
-  const parallelApi = archive.externalApis?.parallelExtract || SEED_DATA.externalApis.parallelExtract;
+  const freeLocalApi = archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
   const scraperApi = archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
@@ -5707,8 +5966,8 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 <h2>Internal Model Core</h2>
 <p>${escapeHtml(archive.internalModel.displayName)} / ${escapeHtml(archive.internalModel.status)}. Gateway: ${escapeHtml(getGatewayOperation(archive.internalModel))}(${escapeHtml(archive.internalModel.targetParameter || "target_id")}) at ${escapeHtml(getGatewayPath(archive.internalModel))}.</p>
 <p>${escapeHtml(archive.backendCore.title)}: ${escapeHtml(archive.backendCore.summary)}</p>
-<h2>Parallel Extract API</h2>
-<p>Local endpoint: ${escapeHtml(parallelApi.localEndpoint)}. Upstream endpoint: ${escapeHtml(parallelApi.upstreamEndpoint)}. Authentication: ${escapeHtml(parallelApi.auth)}.</p>
+<h2>Free Local Model Agent</h2>
+<p>Local endpoint: ${escapeHtml(freeLocalApi.localEndpoint)}. Ollama endpoint: ${escapeHtml(freeLocalApi.upstreamEndpoint)}. Authentication: ${escapeHtml(freeLocalApi.auth)}. Default model: ${escapeHtml(freeLocalApi.defaultModel)}.</p>
 <h2>Local Web Scraper</h2>
 <p>Local endpoint: ${escapeHtml(scraperApi.localEndpoint)}. Authentication: ${escapeHtml(scraperApi.auth)}. Keyword mode: ${escapeHtml(String(Boolean(scraperApi.keywordMode)))}. Hidden search base: ${escapeHtml(scraperApi.searchBaseUrl || GOOGLE_SEARCH_BASE_URL)}. Safeguards: ${escapeHtml((scraperApi.safeguards || []).join(", "))}.</p>
 <h2>Google Programmable Search</h2>
@@ -5728,6 +5987,8 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Owner</th><th>Preview</th></tr></thead>
 <tbody>${docRows || '<tr><td colspan="5">No collaboration documents yet.</td></tr>'}</tbody>
 </table>
+<h2>Internal Memory Bank</h2>
+<p>${escapeHtml(String(getMemoryBank().snapshots?.length || 0))} local recovery snapshots are stored in browser storage.</p>
 <h2>NVIDIA AIQ Research</h2>
 <p>Backend URL: ${escapeHtml(aiqApi.backendUrl)}. Status: ${escapeHtml(aiqApi.status)}.</p>
 <h2>Extraction Results</h2>

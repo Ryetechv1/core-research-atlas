@@ -11,12 +11,12 @@ th{background:#edf1ed}
 </style>
 <h1>CORE Shapeshifting Research Atlas</h1>
 <p>Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.</p>
-<p>The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state.</p>
+<p>The ChatGPT Pro console now prefers /api/local-agent with a free local Ollama model when available. OpenAI /api/agent remains optional. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, memory snapshots, collaboration documents, and extraction-job state.</p>
 <h2>Internal Model Core</h2>
-<p>ChatGPT 5.5 Pro Internal Core / OpenAI-backed when /api/agent is configured; local profile fallback otherwise. Gateway: fetchInternalData(target_id) at /resource/fetch.</p>
+<p>ChatGPT 5.5 Pro Internal Core / Free local-model first; optional OpenAI-backed route; local profile fallback otherwise. Gateway: fetchInternalData(target_id) at /resource/fetch.</p>
 <p>ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.</p>
-<h2>Parallel Extract API</h2>
-<p>Local endpoint: /api/extract. Upstream endpoint: https://api.parallel.ai/v1/extract. Authentication: Server-side PARALLEL_API_KEY.</p>
+<h2>Free Local Model Agent</h2>
+<p>Local endpoint: /api/local-agent. Ollama endpoint: http://127.0.0.1:11434/api/chat. Authentication: No API key; runs on the user&#x27;s machine. Default model: llama3.2:3b.</p>
 <h2>Local Web Scraper</h2>
 <p>Local endpoint: /api/scrape. Authentication: No API key; public http/https targets only. Keyword mode: True. Hidden search base: https://www.google.com/search?q=. Safeguards: Blocks localhost/private/reserved IPs by default, 2 MB fetch cap, No JavaScript execution.</p>
 <h2>Google Programmable Search</h2>
@@ -36,6 +36,8 @@ th{background:#edf1ed}
 <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Owner</th><th>Preview</th></tr></thead>
 <tbody><tr><td>CORE Research Brief</td><td>Research Brief</td><td>Draft</td><td>UserSeth</td><td>Research Objective Use this workspace to draft source-backed briefs, grimoire chapters, meeting notes, PDF handoffs, and review packets. Keep links visible and mark every claim by evidence tier before promoting it into S</td></tr></tbody>
 </table>
+<h2>Internal Memory Bank</h2>
+<p>Browser runtime snapshots are stored locally by the app and can be exported from the Memory tab.</p>
 <h2>NVIDIA AIQ Research</h2>
 <p>Backend URL: http://localhost:8000. Status: Optional local/self-hosted research backend.</p>
 <h2>Extraction Results</h2>

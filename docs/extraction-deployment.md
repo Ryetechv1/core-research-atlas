@@ -1,13 +1,14 @@
 # Web Scraping Extraction Deployment
 
-This project now exposes three extraction APIs plus one collaboration endpoint:
+This project exposes local extraction, import, free-model, and collaboration APIs:
 
-- `POST /api/extract` proxies Parallel Extract with `PARALLEL_API_KEY`.
 - `POST /api/scrape` runs the local dependency-free HTML/text scraper.
 - `POST /api/import-file` parses uploaded research files for source import.
+- `POST /api/local-agent` calls a free local Ollama-compatible model endpoint.
+- `POST /api/agent` optionally calls OpenAI when `OPENAI_API_KEY` is configured.
 - `GET/POST /api/team-chat` syncs runtime team messages, updates, links, recommendations, votes, rejects, and promote-to-source actions.
 
-Both accept:
+`/api/scrape` accepts:
 
 ```json
 {
@@ -20,14 +21,17 @@ Both accept:
 }
 ```
 
-`include_links` applies to `/api/scrape`; Parallel ignores it.
+`include_links` controls whether the scraper returns page links for in-app previews.
+
+`/api/local-agent` accepts archive, profile, browser, source, extraction, and memory-bank context from the agent console and returns a synthesized answer from the configured local model.
 
 `/api/import-file` accepts multipart form data with a field named `file`. It returns extracted text, summary, keywords, parser warnings, and child-file summaries for ZIP exports.
 
 ## Local Python
 
 ```powershell
-$env:PARALLEL_API_KEY = "your_parallel_key"
+$env:LOCAL_AGENT_MODEL = "llama3.2:3b"
+$env:LOCAL_AGENT_BASE_URL = "http://127.0.0.1:11434"
 python server.py
 ```
 
@@ -41,15 +45,25 @@ python server.py --host 0.0.0.0 --port 5177
 
 Open `http://YOUR-LAN-IP:5177/` from the mobile browser. Do not use `localhost` from the phone because it points to the phone itself.
 
-## Result Display and Persistence
+For the free model path, install and run Ollama separately, then pull a model:
+
+```powershell
+ollama pull llama3.2:3b
+```
+
+If Ollama is not running, the app falls back to the optional OpenAI route and then to the browser-only synthesis path.
+
+## Result Display, Previews, and Persistence
 
 The browser app stores normalized extraction records in `archive.extractionResults`. Each record has:
 
 - A stable local ID, owner, timestamp, engine, status, request, and source prompt.
-- Normalized result items with title, URL, final URL, content type/status, summary, and links/citations.
+- Normalized result items with title, URL, final URL, content type/status, summary, preview links, citations, and fetched text.
 - Copy JSON and Promote actions for moving a result item into the source archive.
 
 This follows the same persistence rule used for AI generation UIs: every expensive or non-repeatable generation/extraction gets an ID and is stored immediately. The current build persists to localStorage and exported JSON/HTML/TXT; production should replace that with a database.
+
+The Extract panel also renders the newest result in a visual feed/browser card, with the fetched information, original URL, links, and an Open In-App action.
 
 ## Keyword Search Mode
 
@@ -82,11 +96,14 @@ The bot is opt-in and review-gated:
 
 The Import panel posts uploads to `/api/import-file`, then creates normalized `file-import` extraction results and optional Source records. The server parser is dependency-light:
 
-- Text-like files are decoded directly.
+- Text-like files are decoded directly, including TXT, Markdown, HTML, JSON,
+  Python, JavaScript, and CSS.
 - `.docx` uses stdlib ZIP/XML extraction.
 - `.pdf` uses `pypdf` or `PyPDF2` if present, otherwise printable text recovery.
 - `.doc` is printable-text best effort.
 - `.zip` is treated as an export bundle and scans supported child files.
+- Image files such as PNG, JPG, JPEG, WebP, GIF, SVG, BMP, TIFF, HEIC, and AVIF
+  are imported as metadata records for source logging and review.
 
 When hosted inside ChatGPT as an Apps SDK widget, the UI feature-detects `window.openai.selectFiles`, `window.openai.uploadFile`, and `window.openai.getFileDownloadUrl`. The normal file input remains the fallback.
 
@@ -108,23 +125,40 @@ The Team panel posts to `/api/team-chat` when the Python server or Vercel handle
 
 NVIDIA AI-Q is registered as an optional backend at `http://localhost:8000`. It is not called automatically. A production connector should health-check the trusted AI-Q server first, then attach returned reports, citations, and source URLs as `extractionResults` records.
 
+## Free Local Model Options
+
+The implemented backend route uses Ollama because it is the simplest free local model path for this Python app: the browser posts to `/api/local-agent`, and Python posts to `LOCAL_AGENT_BASE_URL/api/chat`.
+
+Other no-billing options are documented for future work:
+
+- WebLLM can run models in the browser with WebGPU and no server key.
+- Transformers.js can run smaller browser-side or Node-side models.
+- llama.cpp-compatible servers can be adapted by changing `LOCAL_AGENT_BASE_URL` and the request adapter.
+
+## Internal Memory Bank
+
+The app stores a memory bank in browser localStorage under the app namespace. Each successful archive update creates a timestamped snapshot with:
+
+- reason
+- owner
+- source/chat/document/extraction counts
+- the complete archive payload
+
+This protects against accidental in-app overwrites, but it is still browser storage. Users should export the memory bank before clearing browser data, changing browsers, or moving devices.
+
 ## Render Web Service
 
 Use `render.yaml`.
 
 - Start command binds to `0.0.0.0` and `$PORT`.
 - Health check path is `/api/health`.
-- `PARALLEL_API_KEY` is declared as a non-synced secret.
+- `LOCAL_AGENT_MODEL` and `LOCAL_AGENT_BASE_URL` are declared for the local model adapter. Hosted Render services usually cannot access a model running on your laptop; use this route for self-hosted model infrastructure or keep the browser fallback.
 
 ## Vercel
 
 Use `vercel.json` plus the `api/` Python serverless handlers.
 
-Required project environment variable:
-
-```text
-PARALLEL_API_KEY
-```
+No paid extraction key is required. Optional OpenAI support uses `OPENAI_API_KEY`; the free local model route requires an accessible Ollama-compatible server.
 
 Useful Vercel REST API endpoints for automation:
 
@@ -134,18 +168,7 @@ Useful Vercel REST API endpoints for automation:
 
 ## Cloudflare Workers / Agents
 
-Use `cloudflare-extraction-agent/`.
-
-```bash
-cd cloudflare-extraction-agent
-npm install
-npx wrangler secret put PARALLEL_API_KEY
-npm run deploy
-```
-
-The Worker exposes `/api/health`, `/api/extract`, `/api/scrape`, and an Agents SDK route at `/agents/ExtractionAgent/{session}`.
-
-Cloudflare Agents provide durable state, real-time connections, scheduling, and tool-style routing. This scaffold keeps request history in the agent state and mirrors the Python API shape.
+The old paid extraction Worker scaffold was removed. A future Cloudflare Worker can still be added for durable scraping queues, scheduled research jobs, or a hosted model gateway, but it should be built around the current normalized `archive.extractionResults` shape.
 
 ## Catalyst by Zoho
 
