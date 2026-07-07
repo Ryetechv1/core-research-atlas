@@ -1,0 +1,119 @@
+CORE Shapeshifting Research Atlas - Codex Integration Brief
+
+Purpose
+Create a collaborative research system for studying shapeshifting traditions,
+metaphysics, occult science, speculative physiology, and theoretical biological
+models around wolf, fox, kitsune, and dragon forms.
+
+Current internal-app additions
+- Local 3-user sign-in modal for UserSeth, UserSemaj, and UserKhiimori.
+- Editable profile pages with animal form, animal spirits and names, identity
+  statement, and five extended response sections.
+- Source-type listings and filters for documentation, PDFs, WebP/images, URLs,
+  archives, books/manuscripts, forums/communities, datasets, and transcripts.
+- Web extraction/search console that creates structured jobs for future
+  outsourcing, scraping, PDF extraction, archive search, image/OCR, and citation
+  gathering.
+- Connector-ready ChatGPT 5.5 Pro agent UI that locally synthesizes archive,
+  profile, and extraction state. It does not perform live model calls or global
+  web fetching until a backend/API connector is added.
+- Uploaded Internal Core System Gateway JSON installed as the local model
+  profile for the agent. This is a connector-ready configuration layer, not a
+  created or hosted OpenAI model.
+- ErydirCeisiwr PDF installed as the backend mechanics core for internal
+  routing, profile context merge, reference lookup, evidence separation,
+  synthesis, extraction queue expansion, and export logging. It is not used as
+  visual design.
+- Uploaded PDFs installed as a metadata-only reference layer. Do not embed long
+  copyrighted or unverified source text in app data or exports.
+- Parallel Extract API installed through the local Python server. The browser
+  posts to /api/extract; server.py proxies https://api.parallel.ai/v1/extract
+  using PARALLEL_API_KEY from environment or ignored .env.local. Do not put the
+  key in index.html, app.js, TypeScript bundles, JSON seed files, or docs.
+- Local web scraping extraction installed through /api/scrape. It uses
+  dependency-free Python HTML/text extraction, blocks private/local targets by
+  default, caps fetch size, and does not execute JavaScript.
+- Deployment artifacts now include Render web service config, Vercel Python API
+  handlers, and a Cloudflare Workers / Agents scaffold. Catalyst by Zoho is
+  blocked until catalyst init creates .catalystrc and catalyst.json.
+
+Research stance
+The app should catalog supernatural, metaphysical, occult, esoteric, and
+spiritual claims without presenting them as established biomedical fact.
+Physical transformation claims should be marked as speculative unless backed by
+verifiable evidence. Scientific material such as morphogenesis, phantom limbs,
+body schema, regeneration, and developmental biology should be used as analogy
+or constraint unless a source directly supports a stronger claim.
+
+Core categories
+- Documents
+- Historical Data
+- Cultural Data
+- Occult Data
+- Mechanics
+- Theoretical Concepts
+- Simulations
+
+Required source fields
+- id
+- title
+- category
+- species
+- domain
+- evidenceTier
+- citationStatus
+- tradition
+- terms
+- notes
+- coreLinks
+
+Expansion priorities
+1. Replace static demo sign-in with real authentication, password hashing,
+   access control, and server-side sessions.
+2. Add source ingestion from URLs, PDFs, books, notes, and manual entries.
+3. Add citation verifier fields: author, publication date, URL, archive date,
+   primary/secondary status, quote extracts, and review owner.
+4. Add live extraction workers for documentation, PDFs, URLs, archives,
+   WebP/images, OCR, datasets, and transcripts.
+5. Wire the AI Agent console to an approved OpenAI model/API flow or another
+   chosen provider through a secure backend.
+6. Add a graph view linking terms such as lycanthropy, alopecanthropy,
+   dracanthrope, therianthropy, kitsune-tsuki, phantom shift, mental shift,
+   animal aura, morphogenetic field, and holographic blueprint.
+7. Add team collaboration fields for the two other members: owner, reviewer,
+   status, comments, and change history.
+8. Add richer simulation notebooks that keep every output labeled as
+   speculative, symbolic, analogical, or evidence-backed.
+
+Plugin/toolchain notes
+- Browser and Chrome: visual QA, screenshots, responsive checks.
+- Computer Use: manual browsing, archival inspection, and UI verification.
+- OpenAI Developers: optional AI extraction, summarization, and citation
+  parsing when an API key is configured through the secure connector flow.
+- NVIDIA: optional future acceleration or model research notes.
+- GitHub: source control, issues, reviews, and release packs.
+- Vercel: static deployment target.
+- HeyGen: optional video walkthroughs or research explainers.
+- Base44, Catalyst by Zoho, Quicknode, YepCode, and similar tools: optional
+  future integrations, not required for the static starter app.
+
+Deliverable files in this starter
+- index.html
+- styles.css
+- app.js
+- data/research_seed.json
+- data/internal_model_gateway.json
+- data/reference_ingest.json
+- server.py
+- render.yaml
+- vercel.json
+- api/
+- cloudflare-extraction-agent/
+- scripts/parallel_extract.py
+- scripts/web_scrape_extract.py
+- scripts/export_pack.py
+- integrations/parallel_extract.ts
+- docs/extraction-deployment.md
+- docs/codex-build-brief.txt
+- assets/concept-dashboard.png
+- assets/morphogenesis-diagram.png

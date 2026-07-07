@@ -1,0 +1,16 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+server.log
+server.err.log
+*.log
+
+# Local QA/browser runtime state
+qa/chrome-*/
+
+# Local OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

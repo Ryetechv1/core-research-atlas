@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CORE Shapeshifting Research Atlas</title>
+    <meta
+      name="description"
+      content="A static research web app for cataloging historical, cultural, occult, metaphysical, and speculative biological shapeshifting research."
+    >
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+    <script async src="https://cse.google.com/cse.js?cx=56f7592d1993141c3"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup" aria-label="Project">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M12 2.8 20.4 7.6v8.8L12 21.2l-8.4-4.8V7.6L12 2.8Z"></path>
+              <path d="M12 6.2v11.6M7.1 9l9.8 6M16.9 9l-9.8 6"></path>
+            </svg>
+          </span>
+          <div>
+            <h1>CORE Shapeshifting Research Atlas</h1>
+            <p>Collaborative archive for folklore, metaphysics, theory, and source discipline.</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <label class="search-box" for="searchInput">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m16.5 16.5 4 4"></path>
+            </svg>
+            <input id="searchInput" type="search" placeholder="Search sources, terms, notes">
+          </label>
+          <div class="user-badge" id="currentUserBadge" hidden></div>
+          <button class="ghost-button" id="signOutButton" type="button" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <path d="m16 17 5-5-5-5M21 12H9"></path>
+            </svg>
+            Sign out
+          </button>
+          <button class="icon-button" id="resetButton" type="button" title="Reset local archive">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+              <path d="M3 4v6h6"></path>
+            </svg>
+          </button>
+          <button class="primary-button" id="exportJsonButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3v12"></path>
+              <path d="m7 10 5 5 5-5"></path>
+              <path d="M5 19h14"></path>
+            </svg>
+            Export JSON
+          </button>
+        </div>
+      </header>
+
+      <aside class="sidebar" aria-label="Research navigation">
+        <div class="sidebar-section">
+          <h2>Contents</h2>
+          <nav id="categoryNav" class="nav-list" aria-label="Source categories"></nav>
+        </div>
+
+        <div class="sidebar-section">
+          <h2>Forms</h2>
+          <div id="speciesFilters" class="species-grid" aria-label="Species filters"></div>
+        </div>
+
+        <div class="sidebar-section collaboration">
+          <h2>Team Roles</h2>
+          <div class="role-card">
+            <strong>Archivist</strong>
+            <span>Finds, logs, and cites sources.</span>
+          </div>
+          <div class="role-card">
+            <strong>Framework Analyst</strong>
+            <span>Maps claims into CORE concepts.</span>
+          </div>
+          <div class="role-card">
+            <strong>Simulation Steward</strong>
+            <span>Keeps models labeled as speculative.</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="hero-panel" aria-labelledby="overviewTitle">
+          <div class="hero-copy">
+            <h2 id="overviewTitle">Build the grimoire as a research system, not a pile of notes.</h2>
+            <p>
+              Every item is tagged by tradition, source class, species form, evidence tier,
+              and theoretical mechanism so folklore, occult claims, and biological analogies
+              can be studied without collapsing them into the same certainty level.
+            </p>
+          </div>
+          <div class="metric-row" aria-label="Archive summary">
+            <article>
+              <span id="sourceCount">0</span>
+              <strong>Sources</strong>
+            </article>
+            <article>
+              <span id="verifiedCount">0</span>
+              <strong>Verified</strong>
+            </article>
+            <article>
+              <span id="theoryCount">0</span>
+              <strong>Theory Links</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-grid">
+          <div class="main-column">
+            <section class="toolbar-panel" aria-label="Source tools">
+              <div class="segmented-control" role="tablist" aria-label="Workspace mode">
+                <button class="segment is-active" type="button" data-panel="sourcePanel">Sources</button>
+                <button class="segment" type="button" data-panel="importPanel">Import</button>
+                <button class="segment" type="button" data-panel="browserPanel">Browser</button>
+                <button class="segment" type="button" data-panel="extractionPanel">Extract</button>
+                <button class="segment" type="button" data-panel="agentPanel">Agent</button>
+                <button class="segment" type="button" data-panel="profilesPanel">Profiles</button>
+                <button class="segment" type="button" data-panel="simulationPanel">Sim</button>
+                <button class="segment" type="button" data-panel="codexPanel">Codex</button>
+              </div>
+              <div class="toolbar-actions">
+                <button class="ghost-button" id="exportTextButton" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7 3h7l4 4v14H7z"></path>
+                    <path d="M14 3v5h5M9 13h6M9 17h6"></path>
+                  </svg>
+                  TXT
+                </button>
+                <button class="ghost-button" id="exportHtmlButton" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"></path>
+                  </svg>
+                  HTML
+                </button>
+              </div>
+            </section>
+
+            <section id="sourcePanel" class="panel-view is-active">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Source Log</h2>
+                    <p>Starter records are intentionally marked for verification or research expansion.</p>
+                  </div>
+                  <div class="panel-heading-actions">
+                    <label class="compact-filter">
+                      Type
+                      <select id="sourceTypeFilter"></select>
+                    </label>
+                    <button class="secondary-button" id="toggleAddFormButton" type="button">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14"></path>
+                      </svg>
+                      Add Source
+                    </button>
+                  </div>
+                </div>
+
+                <form id="addSourceForm" class="add-form" hidden>
+                  <div class="form-grid">
+                    <label>
+                      Title
+                      <input name="title" required placeholder="Source, text, tradition, or field note">
+                    </label>
+                    <label>
+                      Category
+                      <select name="category" required></select>
+                    </label>
+                    <label>
+                      Form
+                      <select name="species" required></select>
+                    </label>
+                    <label>
+                      Domain
+                      <select name="domain" required></select>
+                    </label>
+                    <label>
+                      Evidence tier
+                      <select name="evidenceTier" required></select>
+                    </label>
+                    <label>
+                      Citation status
+                      <select name="citationStatus" required></select>
+                    </label>
+                    <label>
+                      Source type
+                      <select name="sourceType" required></select>
+                    </label>
+                    <label>
+                      URL or archive path
+                      <input name="url" placeholder="https://, archive ID, PDF path">
+                    </label>
+                  </div>
+                  <label>
+                    Notes
+                    <textarea name="notes" rows="3" placeholder="What should the team verify, compare, or extract?"></textarea>
+                  </label>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">Save Source</button>
+                    <button class="ghost-button" type="button" id="cancelAddButton">Cancel</button>
+                  </div>
+                </form>
+
+                <div id="sourceList" class="source-list" aria-live="polite"></div>
+              </div>
+            </section>
+
+            <section id="importPanel" class="panel-view">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>File Import and ChatGPT Data Transfer</h2>
+                    <p>Upload research files or ChatGPT export files, analyze them, and fold the useful information into Sources and Extraction Results.</p>
+                  </div>
+                  <span class="detail-chip">Local analysis</span>
+                </div>
+
+                <form id="fileImportForm" class="api-panel file-import-panel">
+                  <label>
+                    Research files
+                    <input
+                      id="fileImportInput"
+                      name="files"
+                      type="file"
+                      multiple
+                      accept=".txt,.json,.py,.md,.markdown,.html,.htm,.doc,.docx,.pdf,.csv,.xml,.yaml,.yml,.zip"
+                    >
+                  </label>
+                  <div class="form-grid">
+                    <label>
+                      Default category
+                      <select name="category"></select>
+                    </label>
+                    <label>
+                      Default form
+                      <select name="species"></select>
+                    </label>
+                    <label>
+                      Default domain
+                      <select name="domain"></select>
+                    </label>
+                    <label>
+                      Evidence tier
+                      <select name="evidenceTier"></select>
+                    </label>
+                    <label>
+                      Citation status
+                      <select name="citationStatus"></select>
+                    </label>
+                    <label>
+                      Import strategy
+                      <select name="strategy">
+                        <option value="auto" selected>Auto-detect sections</option>
+                        <option value="single">One source per file</option>
+                        <option value="chatgpt">ChatGPT conversations</option>
+                        <option value="archive">Merge app archive JSON</option>
+                      </select>
+                    </label>
+                  </div>
+                  <fieldset class="checkbox-panel">
+                    <legend>Import actions</legend>
+                    <label class="check-tile" for="importCreateSources">
+                      <input id="importCreateSources" name="createSources" type="checkbox" checked>
+                      <span>Add to Sources</span>
+                    </label>
+                    <label class="check-tile" for="importCreateResults">
+                      <input id="importCreateResults" name="createResults" type="checkbox" checked>
+                      <span>Add to Extraction Results</span>
+                    </label>
+                    <label class="check-tile" for="importChatGptMode">
+                      <input id="importChatGptMode" name="chatgptMode" type="checkbox" checked>
+                      <span>Detect ChatGPT export structure</span>
+                    </label>
+                  </fieldset>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v12"></path>
+                        <path d="m7 10 5 5 5-5"></path>
+                        <path d="M5 21h14"></path>
+                      </svg>
+                      Analyze and Import
+                    </button>
+                    <button class="ghost-button" id="clearImportedFilesButton" type="button">Clear Import Log</button>
+                  </div>
+                </form>
+
+                <section class="api-panel chatgpt-file-bridge">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2>ChatGPT Mobile / App File Bridge</h2>
+                      <p>When this app runs inside ChatGPT, it can request authorized files from the ChatGPT file library. Outside ChatGPT, use the normal file picker above.</p>
+                    </div>
+                    <span class="detail-chip">Feature detected</span>
+                  </div>
+                  <div id="chatGptFileBridgeStatus" class="status-list"></div>
+                  <div class="form-actions">
+                    <button class="primary-button" id="selectChatGptFilesButton" type="button">Select ChatGPT Files</button>
+                    <button class="ghost-button" id="saveFilesToChatGptButton" type="button">Save Picked Files to ChatGPT Library</button>
+                  </div>
+                </section>
+
+                <section class="results-panel" aria-labelledby="importResultsTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="importResultsTitle">Import Analysis</h2>
+                      <p>Imported files become source records with summaries, keywords, warnings, and source-card entries for the agent.</p>
+                    </div>
+                    <span class="detail-chip">Source intake</span>
+                  </div>
+                  <div id="importResults" class="import-results" aria-live="polite"></div>
+                  <div id="importedFileList" class="import-list"></div>
+                </section>
+              </div>
+            </section>
+
+            <section id="browserPanel" class="panel-view">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Google Programmable Search Browser</h2>
+                    <p>Search through the configured Google CSE inside the app, keep locator history, and send useful pages into the source archive.</p>
+                  </div>
+                  <span class="detail-chip">CSE 56f7592d1993141c3</span>
+                </div>
+
+                <form id="inAppBrowserForm" class="api-panel browser-control-panel">
+                  <label>
+                    CSE public URL or search keywords
+                    <input name="target" required value="https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0" placeholder="https://example.com or lycanthropy folklore archive">
+                  </label>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">Open In App</button>
+                    <button class="ghost-button" id="browserExternalButton" type="button">Open Public CSE</button>
+                    <button class="ghost-button" id="browserAddSourceButton" type="button">Add Current Page to Sources</button>
+                  </div>
+                  <p id="inAppBrowserStatus" class="browser-status">No page loaded yet.</p>
+                </form>
+
+                <section class="api-panel cse-panel" aria-labelledby="googleCseTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="googleCseTitle">Embedded Google CSE</h2>
+                      <p>Uses the provided search engine ID and renders the search box/results directly in the app.</p>
+                    </div>
+                    <a id="googleCsePublicLink" class="detail-chip cse-public-link" href="https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0" target="_blank" rel="noopener noreferrer">Public URL</a>
+                  </div>
+                  <div class="cse-meta-row">
+                    <span class="detail-chip">cx: 56f7592d1993141c3</span>
+                    <span class="detail-chip">cse.google.com</span>
+                  </div>
+                  <div class="google-cse-embed">
+                    <div class="gcse-searchbox"></div>
+                    <div class="gcse-searchresults"></div>
+                  </div>
+                </section>
+
+                <div class="browser-shell">
+                  <iframe
+                    id="inAppBrowserFrame"
+                    title="In-app research browser"
+                    width="100%"
+                    height="500px"
+                    sandbox="allow-forms allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                    referrerpolicy="no-referrer"
+                    src="https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0"
+                  ></iframe>
+                </div>
+
+                <section class="results-panel" aria-labelledby="browserHistoryTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="browserHistoryTitle">Browser History</h2>
+                      <p>Recent in-app browsing targets can be reopened or converted into source leads.</p>
+                    </div>
+                  </div>
+                  <div id="browserHistory" class="browser-history" aria-live="polite"></div>
+                </section>
+              </div>
+            </section>
+
+            <section id="extractionPanel" class="panel-view">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Global Web Extraction Console</h2>
+                    <p>Build search, scraping, archive, PDF, image, and documentation extraction jobs for a future backend or connector run.</p>
+                  </div>
+                  <button class="ghost-button" id="copyExtractionQueueButton" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy Queue
+                  </button>
+                </div>
+
+                <form id="extractionForm" class="research-console">
+                  <label>
+                    Research prompt
+                    <textarea name="prompt" rows="4" required placeholder="Describe what to find, extract, cite, compare, and synthesize across the web."></textarea>
+                  </label>
+                  <div class="form-grid">
+                    <label>
+                      Search mode
+                      <select name="mode">
+                        <option>Broad discovery</option>
+                        <option>Primary-source hunt</option>
+                        <option>Academic and documentation</option>
+                        <option>Archive and PDF sweep</option>
+                        <option>Image / WebP / OCR sweep</option>
+                      </select>
+                    </label>
+                    <label>
+                      Depth
+                      <select name="depth">
+                        <option>Quick scan</option>
+                        <option selected>Deep research</option>
+                        <option>Exhaustive multi-pass</option>
+                      </select>
+                    </label>
+                    <label>
+                      Max leads
+                      <input name="maxLeads" type="number" min="5" max="500" value="50">
+                    </label>
+                  </div>
+                  <fieldset class="checkbox-panel">
+                    <legend>Source types</legend>
+                    <div id="extractionSourceTypes" class="checkbox-grid"></div>
+                  </fieldset>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12h14M13 5l7 7-7 7"></path>
+                      </svg>
+                      Queue Extraction
+                    </button>
+                    <button class="ghost-button" id="clearExtractionQueueButton" type="button">Clear Queue</button>
+                  </div>
+                </form>
+
+                <form id="extractKeywordSearchForm" class="api-panel keyword-search-panel">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2>Keyword Search Scraper</h2>
+                      <p>Type keywords only. The Google search URL is generated invisibly before scraping or opening results.</p>
+                    </div>
+                    <span class="detail-chip">Google q mode</span>
+                  </div>
+                  <label>
+                    Search keywords
+                    <textarea name="query" rows="3" required placeholder="wolf shapeshifting folklore primary sources"></textarea>
+                  </label>
+                  <div class="form-grid two-column">
+                    <label>
+                      Full content
+                      <select name="fullContent">
+                        <option value="false" selected>false</option>
+                        <option value="true">true</option>
+                      </select>
+                    </label>
+                    <label>
+                      Include links
+                      <select name="includeLinks">
+                        <option value="true" selected>true</option>
+                        <option value="false">false</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M21 21l-4.3-4.3"></path>
+                        <circle cx="11" cy="11" r="8"></circle>
+                      </svg>
+                      Search Keywords
+                    </button>
+                  </div>
+                  <div id="extractSearchWindow" class="embedded-search-window" hidden></div>
+                </form>
+
+                <section class="bot-panel" aria-labelledby="autoBotTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="autoBotTitle">Automated AI Research Bot</h2>
+                      <p>Opt-in recursive search across content sections. It checks one query per minute and asks before adding anything.</p>
+                    </div>
+                    <span class="detail-chip">1 minute loop</span>
+                  </div>
+                  <div class="form-grid two-column">
+                    <label>
+                      Starting section
+                      <select id="autoBotSection"></select>
+                    </label>
+                    <label>
+                      Seed focus
+                      <input id="autoBotFocus" placeholder="phantom limbs, lycanthropy, kitsune henka">
+                    </label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="primary-button" id="startAutoBotButton" type="button">Start Bot</button>
+                    <button class="ghost-button" id="stopAutoBotButton" type="button">Stop Bot</button>
+                    <button class="ghost-button" id="runAutoBotNowButton" type="button">Run Now</button>
+                  </div>
+                  <div id="autoBotStatus" class="bot-status"></div>
+                </section>
+
+                <form id="parallelExtractForm" class="api-panel">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2>Parallel Extract API</h2>
+                      <p>Python proxy endpoint: /api/extract</p>
+                    </div>
+                    <span class="detail-chip">Server-side key</span>
+                  </div>
+                  <label>
+                    URL list
+                    <textarea name="urls" rows="3" required>https://www.google.com</textarea>
+                  </label>
+                  <div class="form-grid two-column">
+                    <label>
+                      Full content
+                      <select name="fullContent">
+                        <option value="false" selected>false</option>
+                        <option value="true">true</option>
+                      </select>
+                    </label>
+                    <label>
+                      Request format
+                      <input name="format" value="Parallel Extract / advanced_settings" readonly>
+                    </label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M22 2 11 13"></path>
+                        <path d="m22 2-7 20-4-9-9-4z"></path>
+                      </svg>
+                      Run Extract
+                    </button>
+                  </div>
+                  <pre id="parallelExtractOutput" class="api-output" aria-live="polite">No Parallel request run yet.</pre>
+                </form>
+
+                <form id="webScrapeForm" class="api-panel">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2>Local Web Scraper</h2>
+                      <p>Keyword mode builds the Google search URL invisibly and sends it to /api/scrape.</p>
+                    </div>
+                    <span class="detail-chip">Keyword Search</span>
+                  </div>
+                  <label>
+                    Search keywords
+                    <textarea name="query" rows="3" required placeholder="therianthropy phantom shift historical sources">shapeshifting folklore primary sources</textarea>
+                  </label>
+                  <div class="form-grid two-column">
+                    <label>
+                      Full content
+                      <select name="fullContent">
+                        <option value="false" selected>false</option>
+                        <option value="true">true</option>
+                      </select>
+                    </label>
+                    <label>
+                      Include links
+                      <select name="includeLinks">
+                        <option value="true" selected>true</option>
+                        <option value="false">false</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M21 21l-4.3-4.3"></path>
+                        <circle cx="11" cy="11" r="8"></circle>
+                      </svg>
+                      Scrape URL
+                    </button>
+                  </div>
+                  <pre id="webScrapeOutput" class="api-output" aria-live="polite">No local scrape run yet.</pre>
+                </form>
+
+                <section class="results-panel" aria-labelledby="extractionResultsTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="extractionResultsTitle">Extraction Results</h2>
+                      <p>Normalized source cards from the agent prompt, Extract Console, Parallel, local scraper, and optional AIQ research backend.</p>
+                    </div>
+                    <span class="detail-chip">Persistent IDs</span>
+                  </div>
+                  <div id="extractionResults" class="result-list" aria-live="polite"></div>
+                </section>
+
+                <div class="job-list" id="extractionJobs" aria-live="polite"></div>
+              </div>
+            </section>
+
+            <section id="agentPanel" class="panel-view">
+              <div class="agent-layout">
+                <div class="agent-main">
+                  <div class="panel-heading">
+                    <div>
+                      <h2>ChatGPT 5.5 Pro Research Agent</h2>
+                      <p>Connector-ready local synthesis console. It uses the same extraction parameters and current archive/profile context.</p>
+                    </div>
+                    <button class="ghost-button" id="clearAgentButton" type="button">Clear Chat</button>
+                  </div>
+
+                  <div id="agentTranscript" class="agent-transcript" aria-live="polite"></div>
+
+                  <form id="agentScrapeForm" class="api-panel agent-scrape-panel">
+                    <div class="panel-heading compact">
+                      <div>
+                        <h2>Agent Keyword Scraper</h2>
+                        <p>Runs the same local Google keyword scraper with the active agent prompt as extraction context.</p>
+                      </div>
+                      <span class="detail-chip">Shared tool</span>
+                    </div>
+                    <label>
+                      Search keywords
+                      <textarea name="query" rows="3" required placeholder="dragon transformation physiology folklore PDF"></textarea>
+                    </label>
+                    <div class="form-grid two-column">
+                      <label>
+                        Full content
+                        <select name="fullContent">
+                          <option value="false" selected>false</option>
+                          <option value="true">true</option>
+                        </select>
+                      </label>
+                      <label>
+                        Include links
+                        <select name="includeLinks">
+                          <option value="true" selected>true</option>
+                          <option value="false">false</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div class="form-actions">
+                      <button class="primary-button" type="submit">Search From Agent</button>
+                    </div>
+                    <div id="agentSearchWindow" class="embedded-search-window" hidden></div>
+                  </form>
+
+                  <form id="agentForm" class="agent-composer">
+                    <label>
+                      Agent prompt
+                      <textarea name="prompt" rows="4" required placeholder="Ask for a synthesis, source plan, extraction strategy, profile-aware research brief, or theory comparison."></textarea>
+                    </label>
+                    <div class="form-grid">
+                      <label>
+                        Reasoning mode
+                        <select name="mode">
+                          <option>Research synthesis</option>
+                          <option>Source discovery plan</option>
+                          <option>Evidence comparison</option>
+                          <option>Profile-integrated brief</option>
+                        </select>
+                      </label>
+                      <label>
+                        Access depth
+                        <select name="depth">
+                          <option>Quick</option>
+                          <option selected>Deep</option>
+                          <option>Exhaustive</option>
+                        </select>
+                      </label>
+                      <label>
+                        Queue extraction
+                        <select name="queueExtraction">
+                          <option value="yes" selected>Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </label>
+                    </div>
+                    <fieldset class="checkbox-panel">
+                      <legend>Agent source access</legend>
+                      <div id="agentSourceTypes" class="checkbox-grid"></div>
+                    </fieldset>
+                    <div class="form-actions">
+                      <button class="primary-button" type="submit">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M22 2 11 13"></path>
+                          <path d="m22 2-7 20-4-9-9-4z"></path>
+                        </svg>
+                        Send
+                      </button>
+                    </div>
+                  </form>
+                </div>
+                <aside class="agent-side">
+                  <h2>Agent Parameters</h2>
+                  <div id="agentContextSummary" class="mini-stack"></div>
+                </aside>
+              </div>
+            </section>
+
+            <section id="profilesPanel" class="panel-view">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Three-User Profile System</h2>
+                    <p>Profile data is saved locally and integrated into search prompts, source planning, and agent synthesis.</p>
+                  </div>
+                  <div class="profile-tabs" id="profileTabs"></div>
+                </div>
+
+                <form id="profileForm" class="profile-form">
+                  <div class="form-grid">
+                    <label>
+                      Display name
+                      <input name="displayName" required>
+                    </label>
+                    <label>
+                      Username
+                      <input name="username" readonly>
+                    </label>
+                    <label>
+                      Animal form
+                      <input name="animalForm" placeholder="Wolf, fox, kitsune, dragon, hybrid">
+                    </label>
+                  </div>
+                  <label>
+                    Animal spirit names
+                    <textarea name="animalSpirits" rows="3" placeholder="List up to several animal spirits and their names."></textarea>
+                  </label>
+                  <label>
+                    Shapeshifter identity statement
+                    <textarea name="identityStatement" rows="3" placeholder="Who are you as a shapeshifter?"></textarea>
+                  </label>
+                  <div class="profile-sections" id="profileExtendedSections"></div>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">Save Profile</button>
+                    <button class="ghost-button" id="exportProfilesButton" type="button">Export Profiles</button>
+                  </div>
+                </form>
+
+                <div class="integration-panel">
+                  <h2>System Integration Memory</h2>
+                  <p id="profileIntegrationSummary"></p>
+                </div>
+              </div>
+            </section>
+
+            <section id="simulationPanel" class="panel-view">
+              <div class="simulation-layout">
+                <div class="sim-copy">
+                  <h2>Theoretical Mechanism Sandbox</h2>
+                  <p>
+                    This model is a narrative reasoning tool for comparing concepts. It is not a biological,
+                    medical, or experimental protocol.
+                  </p>
+                </div>
+                <div class="sim-controls" id="simControls"></div>
+                <div class="sim-output">
+                  <div class="output-ring" aria-hidden="true">
+                    <span id="simScore">0</span>
+                  </div>
+                  <div>
+                    <h3 id="simLabel">Speculative baseline</h3>
+                    <p id="simInterpretation"></p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="codexPanel" class="panel-view">
+              <div class="codex-grid">
+                <article>
+                  <h2>Codex Build Brief</h2>
+                  <p>
+                    Use this app as the source-of-truth scaffold. Future Codex work can add
+                    real crawling, citation extraction, collaborative sync, richer graph views,
+                    or simulation notebooks.
+                  </p>
+                  <button class="primary-button" id="copyBriefButton" type="button">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy Brief
+                  </button>
+                </article>
+                <article>
+                  <h2>Export Targets</h2>
+                  <ul class="check-list">
+                    <li>Research seed JSON for app state or database import.</li>
+                    <li>Plain-text grimoire outline for prompt chaining.</li>
+                    <li>Static HTML digest for quick sharing.</li>
+                    <li>Python packer for reproducible offline exports.</li>
+                  </ul>
+                </article>
+                <article>
+                  <h2>Internal Model Core</h2>
+                  <div id="modelCoreSummary" class="status-list"></div>
+                </article>
+                <article>
+                  <h2>Uploaded Reference Layer</h2>
+                  <div id="referenceLibrary" class="status-list"></div>
+                </article>
+              </div>
+            </section>
+          </div>
+
+          <aside class="inspector" aria-label="CORE framework inspector">
+            <div class="diagram-card">
+              <img src="assets/morphogenesis-diagram.png" alt="Abstract morphogenesis diagram with human and animal-form silhouettes.">
+            </div>
+
+            <section class="inspector-card">
+              <div class="panel-heading compact">
+                <div>
+                  <h2>Selected Record</h2>
+                  <p id="selectedMeta">No source selected</p>
+                </div>
+              </div>
+              <div id="selectedRecord" class="selected-record"></div>
+            </section>
+
+            <section class="inspector-card">
+              <h2>CORE Framework</h2>
+              <div id="frameworkList" class="framework-list"></div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <div class="auth-overlay" id="authOverlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <form class="auth-card" id="authForm">
+        <span class="brand-mark auth-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img">
+            <path d="M12 2.8 20.4 7.6v8.8L12 21.2l-8.4-4.8V7.6L12 2.8Z"></path>
+            <path d="M12 6.2v11.6M7.1 9l9.8 6M16.9 9l-9.8 6"></path>
+          </svg>
+        </span>
+        <h2 id="authTitle">Restricted Research Access</h2>
+        <p>Sign in as one of the three project users to open the atlas.</p>
+        <label>
+          Username
+          <input name="username" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="primary-button" type="submit">Sign in</button>
+        <p class="auth-error" id="authError" role="alert"></p>
+      </form>
+    </div>
+
+    <div class="choice-overlay" id="searchChoiceOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="searchChoiceTitle">
+      <div class="choice-card">
+        <h2 id="searchChoiceTitle">How should this search open?</h2>
+        <p id="searchChoiceSummary"></p>
+        <div class="form-actions">
+          <button class="primary-button" id="searchChoiceInternalButton" type="button">Show inside app</button>
+          <button class="ghost-button" id="searchChoiceExternalButton" type="button">Open external link</button>
+          <button class="ghost-button" id="searchChoiceCancelButton" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="choice-overlay" id="botAlertOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="botAlertTitle">
+      <div class="choice-card bot-alert-card">
+        <h2 id="botAlertTitle">Automated research finding</h2>
+        <div id="botAlertContent"></div>
+        <p class="bot-question">do you like this information?</p>
+        <div class="form-actions" id="botDecisionActions">
+          <button class="primary-button" id="botAcceptButton" type="button">Yes</button>
+          <button class="ghost-button" id="botRejectButton" type="button">No</button>
+        </div>
+        <form id="botFeedbackForm" class="bot-feedback-form" hidden>
+          <label>
+            What should the bot improve, change, or look for?
+            <textarea name="feedback" rows="3" required placeholder="Look for older sources, PDFs, academic terms, or less modern commentary."></textarea>
+          </label>
+          <div class="form-actions">
+            <button class="primary-button" type="submit">Search better</button>
+            <button class="ghost-button" id="botDismissButton" type="button">Dismiss</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <template id="sourceRowTemplate">
+      <button class="source-row" type="button">
+        <span class="species-token"></span>
+        <span class="source-main">
+          <strong></strong>
+          <small></small>
+        </span>
+        <span class="tier-chip"></span>
+        <span class="type-chip"></span>
+        <span class="status-chip"></span>
+      </button>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

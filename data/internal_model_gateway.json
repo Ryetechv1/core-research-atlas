@@ -1,0 +1,53 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Internal Core System Gateway",
+        "version": "1.0.0",
+        "description": "Enables ChatGPT 5.5 Pro to orchestrate data flows and execute specialized backend actions."
+    },
+    "servers": [
+        {
+            "url": "https://static.app/chatgpt-hosting",
+            "description": "Secure Enterprise Private Environment"
+        }
+    ],
+    "paths": {
+        "/resource/fetch": {
+            "get": {
+                "operationId": "fetchInternalData",
+                "summary": "Queries core backend properties based on specific parameters",
+                "parameters": [
+                    {
+                        "name": "target_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The unique reference string of the requested internal asset"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation execution",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "payload": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

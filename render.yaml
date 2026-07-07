@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: core-research-atlas
+    runtime: python
+    plan: starter
+    buildCommand: python -m py_compile server.py scripts/parallel_extract.py scripts/web_scrape_extract.py
+    startCommand: python server.py --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: PARALLEL_API_KEY
+        sync: false
+      - key: ALLOW_PRIVATE_SCRAPE_TARGETS
+        value: "0"

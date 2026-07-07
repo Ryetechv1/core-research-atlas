@@ -1,0 +1,279 @@
+CORE Shapeshifting Research Atlas
+Version: 0.4.0
+
+Epistemic policy:
+Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.
+
+AI/search connector note:
+The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this static build it performs local synthesis from archive, profile, uploaded reference metadata, and extraction-job state; true web fetching or OpenAI model execution requires a backend/API connector.
+
+Internal model core:
+ChatGPT 5.5 Pro Internal Core - Local internal model profile / connector-ready
+Gateway operation: fetchInternalData(target_id) at /resource/fetch
+OpenAI Developers can be used later for secure API-key setup and backend integration. This static file does not create or host an actual OpenAI model.
+
+Backend mechanics core:
+ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.
+Stages: Intent intake, Profile context merge, Reference lookup, Evidence-tier separation, Mechanics synthesis, Extraction queue expansion, Export and review logging
+
+Parallel Extract API:
+Local endpoint: /api/extract
+Upstream endpoint: https://api.parallel.ai/v1/extract
+Authentication: Server-side PARALLEL_API_KEY
+Saved request logs: 0
+
+Local Web Scraper:
+Local endpoint: /api/scrape
+Authentication: No API key; public http/https targets only
+Saved request logs: 0
+Keyword mode: True
+Hidden search base: https://www.google.com/search?q=
+Safeguards: Blocks localhost/private/reserved IPs by default, 2 MB fetch cap, No JavaScript execution
+
+Google Programmable Search:
+Search engine ID: 56f7592d1993141c3
+Script URL: https://cse.google.com/cse.js?cx=56f7592d1993141c3
+Public URL: https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0
+Elements: gcse-searchbox, gcse-searchresults
+
+Automated AI Research Bot:
+Findings logged: 0
+Accepted findings: 0
+Cadence: opt-in, one attempt per minute, pauses for user review.
+
+File Import Layer:
+Imported file logs: 0
+Created source records: 0
+
+In-App Browser:
+Captured browser targets: 0
+
+NVIDIA AIQ Research:
+Backend URL: http://localhost:8000
+Status: Optional local/self-hosted research backend
+Capabilities: Intent-routed shallow research with source citation, Async deep research jobs, Source registry selection across web, papers, enterprise, and knowledge layers
+
+Extraction results:
+- No normalized extraction results yet.
+
+Uploaded reference layer:
+- Wolf-Shapeshifting Grimoire: Summary of Sources and Concepts (16 pages; Speculative framework; Needs verification)
+- The Magic of Shapeshifting - Rosalyn Greene (261 pages; Secondary scholarship; Needs verification)
+- ErydirCeisiwr Internal Mechanics Core (47 pages; Speculative framework; Needs verification)
+- Learning to Shift (30 pages; Experiential claim; Needs verification)
+
+Key terms:
+- Shapeshifting
+- Physical Shift
+- Mental Shift
+- Phantom Shift
+- Animal Aura
+- Phantom Body
+- Animal Instincts
+- Animal Spirit
+- Phantom Limbs
+- Shifting Energy
+- Shifting Potential
+- Therianthropy
+- Lycanthropy
+- Alopecanthropy
+- Dracanthrope
+- Kitsune-tsuki henka
+- Kitsune henka-tsuki
+- Core Manifestation Template
+- Holographic Blueprint
+- Morphogenetic Field
+- Morphogenesis
+- Keylontic Sciences
+
+User profiles:
+- UserSeth: Wolf / Dragon research lead
+  Spirits: Unassigned
+  Identity: Administrator profile for setting project direction, reviewing evidence, and coordinating CORE framework growth.
+- UserSemaj: Fox / Kitsune contributor
+  Spirits: Unassigned
+  Identity: Contributor profile for fox, kitsune, folklore, cultural data, and phantom-shift terminology.
+- UserKhiimori: Cross-form researcher
+  Spirits: Unassigned
+  Identity: Contributor profile for cross-form synthesis, occult mechanics, and simulation interpretation.
+
+Extraction jobs:
+- No queued extraction jobs in seed.
+
+Source log:
+
+## Ovid, Metamorphoses: classical transformation narratives
+Category: Documents
+Form: Cross-form
+Domain: Folklore
+Source type: Book / Manuscript
+Evidence: Primary text
+Citation: Needs verification
+Locator: None yet
+Terms: metamorphosis, mythic transformation, divine agency
+Notes: Use as a baseline for literary and mythological transformation motifs. Extract animal-change structure, agency, reversibility, and moral framing.
+
+## Clinical lycanthropy and animal-identity delusion literature
+Category: Theoretical Concepts
+Form: Wolf
+Domain: Psychology
+Source type: PDF
+Evidence: Scientific analogy
+Citation: Needs verification
+Locator: None yet
+Terms: lycanthropy, mental shift, body schema, identity state
+Notes: Compare mental shifting claims with clinical descriptions without pathologizing spiritual identity by default.
+
+## Phantom limb and body-schema research lead
+Category: Mechanics
+Form: Cross-form
+Domain: Physiology
+Source type: Documentation
+Evidence: Scientific analogy
+Citation: Needs verification
+Locator: None yet
+Terms: phantom limbs, phantom body, somatosensory map
+Notes: Use as a grounded analogy for phantom tails, wings, ears, muzzle sensations, and non-ordinary body maps.
+
+## Kitsune-tsuki and fox-possession narratives
+Category: Cultural Data
+Form: Kitsune
+Domain: Folklore
+Source type: Archive
+Evidence: Secondary scholarship
+Citation: Compare sources
+Locator: None yet
+Terms: kitsune-tsuki, kitsune henka, possession, fox spirit
+Notes: Track differences between possession, illusion, disguise, and physical transformation. Preserve transliteration variants.
+
+## Alopecanthropy term file: human-fox transformation
+Category: Theoretical Concepts
+Form: Fox
+Domain: Metaphysics
+Source type: Documentation
+Evidence: Speculative framework
+Citation: Citation missing
+Locator: None yet
+Terms: alopecanthropy, physical shift, animal aura, fox instincts
+Notes: Define how the project will use this term. Distinguish invented taxonomy from historical terminology.
+
+## Dragon transformation motif map
+Category: Cultural Data
+Form: Dragon
+Domain: Folklore
+Source type: URL
+Evidence: Secondary scholarship
+Citation: Needs verification
+Locator: None yet
+Terms: dracanthrope, dragon spirit, wings, scales, breath
+Notes: Separate dragon-as-serpent, dragon-as-deity, dragon-as-guardian, and human-dragon transformation cases by culture.
+
+## Werewolf trial and pamphlet corpus lead
+Category: Historical Data
+Form: Wolf
+Domain: History
+Source type: Archive
+Evidence: Primary text
+Citation: Needs verification
+Locator: None yet
+Terms: lycanthropy, witchcraft, trial records, wolf form
+Notes: Log trial texts, pamphlets, confessions, and legal context separately. Flag coercion and demonological framing.
+
+## Occult glamour, astral form, and animal aura practices
+Category: Occult Data
+Form: Cross-form
+Domain: Occult / Esoteric
+Source type: Book / Manuscript
+Evidence: Experiential claim
+Citation: Citation missing
+Locator: None yet
+Terms: animal aura, astral body, phantom body, glamour
+Notes: Catalog claims as practices or testimonies, not verified mechanisms. Track ritual context and source lineage.
+
+## Morphogenesis and regenerative biology analogy file
+Category: Mechanics
+Form: Cross-form
+Domain: Theoretical Biology
+Source type: PDF
+Evidence: Scientific analogy
+Citation: Needs verification
+Locator: None yet
+Terms: morphogenesis, regeneration, patterning, plasticity
+Notes: Use only as analogy for form generation and tissue patterning. Do not imply macro-scale human-animal transformation is biologically demonstrated.
+
+## Energy budget constraint note for physical shifting
+Category: Simulations
+Form: Cross-form
+Domain: Simulation
+Source type: Dataset
+Evidence: Speculative framework
+Citation: Citation missing
+Locator: None yet
+Terms: energy budget, mass conservation, tissue remodeling, shift potential
+Notes: Simulation variable file for modeling how extreme transformation claims would face energy, heat, mass, and tissue continuity constraints.
+
+## Therianthropy community terminology map
+Category: Cultural Data
+Form: Cross-form
+Domain: Metaphysics
+Source type: Forum / Community
+Evidence: Experiential claim
+Citation: Compare sources
+Locator: None yet
+Terms: therianthropy, m-shift, phantom shift, animal instincts
+Notes: Capture vocabulary respectfully. Separate lived identity terms from historical lycanthropy and occult spellwork.
+
+## Keylontic Sciences and holographic blueprint vocabulary
+Category: Occult Data
+Form: Cross-form
+Domain: Metaphysics
+Source type: URL
+Evidence: Speculative framework
+Citation: Citation missing
+Locator: None yet
+Terms: Keylontic Sciences, holographic blueprint, manifestation template
+Notes: Store as a named metaphysical system. Require source lineage, author attribution, and terminology normalization.
+
+## Uploaded PDF: Wolf-Shapeshifting Grimoire source summary
+Category: Documents
+Form: Wolf
+Domain: Occult / Esoteric
+Source type: PDF
+Evidence: Speculative framework
+Citation: Needs verification
+Locator: data/reference_ingest.json#ref-upload-wolf-grimoire-summary
+Terms: wolf, energy, ritual, occult, spiritual, phantom shift
+Notes: Uploaded 16-page source summary used as a background map for wolf-focused shapeshifting concepts and source discovery. Treat as a guide requiring primary-source follow-up.
+
+## Uploaded PDF: The Magic of Shapeshifting - Rosalyn Greene
+Category: Occult Data
+Form: Cross-form
+Domain: Occult / Esoteric
+Source type: PDF
+Evidence: Secondary scholarship
+Citation: Needs verification
+Locator: data/reference_ingest.json#ref-upload-greene-magic-shapeshifting
+Terms: shapeshifting, physical shift, mental shift, astral, animal spirit, wolf
+Notes: Uploaded occult reference retained as metadata and high-level source lead only. Avoid embedding long excerpts; verify bibliographic provenance before quoting or redistributing.
+
+## Uploaded PDF: ErydirCeisiwr backend mechanics core
+Category: Mechanics
+Form: Cross-form
+Domain: Metaphysics
+Source type: PDF
+Evidence: Speculative framework
+Citation: Needs verification
+Locator: data/reference_ingest.json#ref-upload-erydir-core
+Terms: energy, backend core, routing, synthesis, mechanics
+Notes: Used as an internal operational scaffold for prompt intake, profile merging, reference lookup, evidence separation, synthesis, extraction queueing, and export logging. It is not used as visual design.
+
+## Uploaded PDF: Learning to Shift
+Category: Documents
+Form: Wolf
+Domain: Metaphysics
+Source type: PDF
+Evidence: Experiential claim
+Citation: Needs verification
+Locator: data/reference_ingest.json#ref-upload-learning-to-shift
+Terms: wolf, energy, mental shift, physical shift, phantom shift, fox
+Notes: Background reference for practice vocabulary and experiential claims. Keep outputs profile-aware but preserve uncertainty labels for all transformation mechanics.

@@ -1,0 +1,225 @@
+{
+  "generatedAt": "2026-07-05T00:00:00-06:00",
+  "contentPolicy": "Reference metadata only. Long PDF text is not embedded; copyrighted or unverified material should be cited and summarized by future backend extractors.",
+  "references": [
+    {
+      "id": "ref-upload-wolf-grimoire-summary",
+      "title": "Wolf-Shapeshifting Grimoire: Summary of Sources and Concepts",
+      "fileName": "2-Wolf-Shapeshifting-Grimoire_-Summary-of-Sources-and-Concepts.pdf",
+      "sourceType": "PDF",
+      "pageCount": 16,
+      "sizeBytes": 172859,
+      "sha256": "15500e92b87d9ed8c9d9848436a5e7d94ea2b13f1964b985a5712cbccc8cf106",
+      "role": "Background source map and source-concept summary for wolf-focused shapeshifting research.",
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Needs verification",
+      "backendUse": "Seed source taxonomy, topic clustering, and initial source-discovery leads.",
+      "contentHandling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        {
+          "term": "wolf",
+          "count": 74
+        },
+        {
+          "term": "energy",
+          "count": 40
+        },
+        {
+          "term": "ritual",
+          "count": 24
+        },
+        {
+          "term": "occult",
+          "count": 14
+        },
+        {
+          "term": "spiritual",
+          "count": 10
+        },
+        {
+          "term": "transformation",
+          "count": 10
+        },
+        {
+          "term": "psychological",
+          "count": 10
+        },
+        {
+          "term": "shapeshifting",
+          "count": 5
+        },
+        {
+          "term": "lycanthropy",
+          "count": 5
+        },
+        {
+          "term": "phantom shift",
+          "count": 4
+        },
+        {
+          "term": "phantom limbs",
+          "count": 4
+        },
+        {
+          "term": "astral",
+          "count": 4
+        }
+      ],
+      "pdfMetadata": {
+        "Producer": "WeasyPrint 68.0",
+        "Title": "Wolf-Shapeshifting Grimoire: Summary of Sources and Concepts",
+        "Author": "ChatGPT Deep Research",
+        "Creator": "ChatGPT"
+      }
+    },
+    {
+      "id": "ref-upload-greene-magic-shapeshifting",
+      "title": "The Magic of Shapeshifting - Rosalyn Greene",
+      "fileName": "3-OceanofPDF.com_The_magic_of_shapeshifting_-_Rosalyn_Greene.pdf",
+      "sourceType": "PDF",
+      "pageCount": 261,
+      "sizeBytes": 2860960,
+      "sha256": "d3ad3f6681421703a9dc1671cdbe8d5845cd5e85ccc55bec43bdd141571abd2e",
+      "role": "Occult and esoteric shapeshifting reference for background classification only.",
+      "evidenceTier": "Secondary scholarship",
+      "citationStatus": "Needs verification",
+      "backendUse": "Provide occult terminology leads and comparative concepts while avoiding long reproduced excerpts.",
+      "contentHandling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        {
+          "term": "wolf",
+          "count": 550
+        },
+        {
+          "term": "physical shift",
+          "count": 378
+        },
+        {
+          "term": "energy",
+          "count": 240
+        },
+        {
+          "term": "shapeshifting",
+          "count": 154
+        },
+        {
+          "term": "mental shift",
+          "count": 149
+        },
+        {
+          "term": "astral",
+          "count": 147
+        },
+        {
+          "term": "fox",
+          "count": 108
+        },
+        {
+          "term": "ritual",
+          "count": 76
+        },
+        {
+          "term": "animal spirit",
+          "count": 65
+        },
+        {
+          "term": "spiritual",
+          "count": 56
+        },
+        {
+          "term": "transformation",
+          "count": 54
+        },
+        {
+          "term": "lycanthropy",
+          "count": 19
+        }
+      ],
+      "pdfMetadata": {
+        "Author": "Rosalyn Greene",
+        "CreationDate": "D:20250217195950+00'00'",
+        "Creator": "calibre 7.4.0",
+        "ModDate": "D:20250217195950+00'00'",
+        "Producer": "calibre 7.4.0",
+        "Title": "The Magic of Shapeshifting"
+      }
+    },
+    {
+      "id": "ref-upload-erydir-core",
+      "title": "ErydirCeisiwr Internal Mechanics Core",
+      "fileName": "4-ErydirCeisiwr.pdf",
+      "sourceType": "PDF",
+      "pageCount": 47,
+      "sizeBytes": 2271691,
+      "sha256": "adc0c7a8ef1f8f5338ec9660dae47818f40aa269e7e3be6da1fb44edcfd0a49f",
+      "role": "Global internal backend mechanics core and operational structure reference.",
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Needs verification",
+      "backendUse": "Drive internal routing, layered synthesis, staged review, profile-aware context, and export structure.",
+      "contentHandling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        {
+          "term": "energy",
+          "count": 14
+        }
+      ],
+      "pdfMetadata": {
+        "Producer": "GPL Ghostscript 10.02.1",
+        "CreationDate": "D:20260524183021Z00'00'",
+        "ModDate": "D:20260524183021Z00'00'",
+        "Title": "",
+        "Author": "",
+        "Subject": "",
+        "Keywords": "",
+        "Creator": ""
+      }
+    },
+    {
+      "id": "ref-upload-learning-to-shift",
+      "title": "Learning to Shift",
+      "fileName": "5-Learning-to-shift..pdf",
+      "sourceType": "PDF",
+      "pageCount": 30,
+      "sizeBytes": 615377,
+      "sha256": "922961b98ca711ce2d3a867627a03a3fdd9c320fcf7cb4999a49efd08cd2d2ad",
+      "role": "Experiential/background reference for shifting vocabulary, practice claims, and research prompts.",
+      "evidenceTier": "Experiential claim",
+      "citationStatus": "Needs verification",
+      "backendUse": "Seed practice-related source leads and profile-aware prompt scaffolds with explicit uncertainty labels.",
+      "contentHandling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        {
+          "term": "wolf",
+          "count": 141
+        },
+        {
+          "term": "energy",
+          "count": 11
+        },
+        {
+          "term": "mental shift",
+          "count": 7
+        },
+        {
+          "term": "physical shift",
+          "count": 4
+        },
+        {
+          "term": "phantom shift",
+          "count": 1
+        },
+        {
+          "term": "fox",
+          "count": 1
+        }
+      ],
+      "pdfMetadata": {
+        "Title": "Learning to shift.",
+        "Producer": "iOS Version 18.7.8 (Build 22H352) Quartz PDFContext",
+        "Creator": "Safari",
+        "CreationDate": "D:20260527201710Z00'00'",
+        "ModDate": "D:20260527201710Z00'00'"
+      }
+    }
+  ]
+}

@@ -1,0 +1,823 @@
+{
+  "project": {
+    "name": "CORE Shapeshifting Research Atlas",
+    "version": "0.4.0",
+    "epistemicPolicy": "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
+    "corePrompt": "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
+    "aiConnectorNote": "The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this static build it performs local synthesis from archive, profile, uploaded reference metadata, and extraction-job state; true web fetching or OpenAI model execution requires a backend/API connector."
+  },
+  "categories": [
+    "Documents",
+    "Historical Data",
+    "Cultural Data",
+    "Occult Data",
+    "Mechanics",
+    "Theoretical Concepts",
+    "Simulations"
+  ],
+  "species": [
+    "Wolf",
+    "Fox",
+    "Kitsune",
+    "Dragon",
+    "Cross-form"
+  ],
+  "domains": [
+    "Folklore",
+    "History",
+    "Occult / Esoteric",
+    "Metaphysics",
+    "Theoretical Biology",
+    "Physiology",
+    "Psychology",
+    "Simulation"
+  ],
+  "sourceTypes": [
+    "Documentation",
+    "PDF",
+    "WebP / Image",
+    "URL",
+    "Archive",
+    "Book / Manuscript",
+    "Forum / Community",
+    "Dataset",
+    "Video / Transcript"
+  ],
+  "evidenceTiers": [
+    "Primary text",
+    "Secondary scholarship",
+    "Scientific analogy",
+    "Experiential claim",
+    "Speculative framework"
+  ],
+  "citationStatuses": [
+    "Verified",
+    "Needs verification",
+    "Citation missing",
+    "Compare sources"
+  ],
+  "keyTerms": [
+    "Shapeshifting",
+    "Physical Shift",
+    "Mental Shift",
+    "Phantom Shift",
+    "Animal Aura",
+    "Phantom Body",
+    "Animal Instincts",
+    "Animal Spirit",
+    "Phantom Limbs",
+    "Shifting Energy",
+    "Shifting Potential",
+    "Therianthropy",
+    "Lycanthropy",
+    "Alopecanthropy",
+    "Dracanthrope",
+    "Kitsune-tsuki henka",
+    "Kitsune henka-tsuki",
+    "Core Manifestation Template",
+    "Holographic Blueprint",
+    "Morphogenetic Field",
+    "Morphogenesis",
+    "Keylontic Sciences"
+  ],
+  "framework": [
+    {
+      "name": "Core Manifestation Template",
+      "description": "Project vocabulary for the organizing blueprint behind identity, body schema, symbolic form, and proposed transformation mechanics."
+    },
+    {
+      "name": "Morphogenetic Field",
+      "description": "Use as a metaphysical or theoretical mapping layer. Scientific analogies should be separated from esoteric claims."
+    },
+    {
+      "name": "Physiological Hypothesis",
+      "description": "Tracks energy budget, tissue remodeling, neural integration, immune tolerance, and scaling constraints as speculative barriers."
+    },
+    {
+      "name": "Phantom / Mental Shift",
+      "description": "Separates body-schema experiences, phantom limbs, instincts, and identity states from physical transformation claims."
+    },
+    {
+      "name": "Safety and Epistemic Notes",
+      "description": "Flags unsupported claims, medical risk, source uncertainty, and areas requiring primary-source verification."
+    }
+  ],
+  "profiles": [
+    {
+      "username": "UserSeth",
+      "displayName": "Seth",
+      "role": "ADMIN",
+      "animalForm": "Wolf / Dragon research lead",
+      "animalSpirits": "Unassigned",
+      "identityStatement": "Administrator profile for setting project direction, reviewing evidence, and coordinating CORE framework growth.",
+      "extended": [
+        "Defines the atlas structure, research policy, and verification standards.",
+        "Tracks wolf and dragon instinct models as research artifacts.",
+        "Maintains occult and metaphysical terminology without removing evidence labels.",
+        "Owns source discipline, export packs, and future backend integrations.",
+        "Profile data may be used by the local agent to tune synthesis tone and research priorities."
+      ]
+    },
+    {
+      "username": "UserSemaj",
+      "displayName": "Semaj",
+      "role": "Member",
+      "animalForm": "Fox / Kitsune contributor",
+      "animalSpirits": "Unassigned",
+      "identityStatement": "Contributor profile for fox, kitsune, folklore, cultural data, and phantom-shift terminology.",
+      "extended": [
+        "Expands cultural sources and comparative folklore records.",
+        "Tracks fox instincts, aura, phantom limbs, and kitsune spirit vocabulary.",
+        "Flags transliteration variants and cultural context for review.",
+        "Supports archive cleanup and source comparison.",
+        "Profile data may guide agent summaries toward fox and kitsune research needs."
+      ]
+    },
+    {
+      "username": "UserKhiimori",
+      "displayName": "Khiimori",
+      "role": "Member",
+      "animalForm": "Cross-form researcher",
+      "animalSpirits": "Unassigned",
+      "identityStatement": "Contributor profile for cross-form synthesis, occult mechanics, and simulation interpretation.",
+      "extended": [
+        "Maps shared terms across wolf, fox, kitsune, and dragon traditions.",
+        "Reviews energy, phantom body, animal aura, and morphogenetic-field concepts.",
+        "Connects metaphysical claims to source lineage and uncertainty notes.",
+        "Supports simulation parameter design and interpretation.",
+        "Profile data may guide agent output toward cross-form integration."
+      ]
+    }
+  ],
+  "extractionJobs": [],
+  "extractionResults": [],
+  "autoBotFindings": [],
+  "importedFiles": [],
+  "browserHistory": [],
+  "agentMessages": [
+    {
+      "role": "assistant",
+      "owner": "system",
+      "createdAt": "2026-07-04T00:00:00.000Z",
+      "content": "Agent console initialized. I can synthesize the local archive, active user profile, and queued extraction parameters. Live internet fetching requires a backend or connector."
+    }
+  ],
+  "sourceSchema": {
+    "required": [
+      "id",
+      "title",
+      "category",
+      "species",
+      "domain",
+      "sourceType",
+      "url",
+      "evidenceTier",
+      "citationStatus",
+      "tradition",
+      "terms",
+      "notes",
+      "coreLinks"
+    ],
+    "optionalFutureFields": [
+      "url",
+      "author",
+      "publicationDate",
+      "archiveDate",
+      "quoteExtracts",
+      "reliabilityScore",
+      "teamOwner",
+      "reviewNotes",
+      "simulationVariables"
+    ]
+  },
+  "sources": [
+    {
+      "id": "src-ovid-metamorphoses",
+      "title": "Ovid, Metamorphoses: classical transformation narratives",
+      "category": "Documents",
+      "species": "Cross-form",
+      "domain": "Folklore",
+      "sourceType": "Book / Manuscript",
+      "url": "",
+      "evidenceTier": "Primary text",
+      "citationStatus": "Needs verification",
+      "tradition": "Greco-Roman",
+      "terms": [
+        "metamorphosis",
+        "mythic transformation",
+        "divine agency"
+      ],
+      "notes": "Use as a baseline for literary and mythological transformation motifs. Extract animal-change structure, agency, reversibility, and moral framing.",
+      "coreLinks": [
+        "Core Manifestation Template",
+        "Morphogenetic Field"
+      ]
+    },
+    {
+      "id": "src-clinical-lycanthropy",
+      "title": "Clinical lycanthropy and animal-identity delusion literature",
+      "category": "Theoretical Concepts",
+      "species": "Wolf",
+      "domain": "Psychology",
+      "sourceType": "PDF",
+      "url": "",
+      "evidenceTier": "Scientific analogy",
+      "citationStatus": "Needs verification",
+      "tradition": "Modern clinical literature",
+      "terms": [
+        "lycanthropy",
+        "mental shift",
+        "body schema",
+        "identity state"
+      ],
+      "notes": "Compare mental shifting claims with clinical descriptions without pathologizing spiritual identity by default.",
+      "coreLinks": [
+        "Phantom / Mental Shift",
+        "Safety and Epistemic Notes"
+      ]
+    },
+    {
+      "id": "src-phantom-limbs",
+      "title": "Phantom limb and body-schema research lead",
+      "category": "Mechanics",
+      "species": "Cross-form",
+      "domain": "Physiology",
+      "sourceType": "Documentation",
+      "url": "",
+      "evidenceTier": "Scientific analogy",
+      "citationStatus": "Needs verification",
+      "tradition": "Neuroscience",
+      "terms": [
+        "phantom limbs",
+        "phantom body",
+        "somatosensory map"
+      ],
+      "notes": "Use as a grounded analogy for phantom tails, wings, ears, muzzle sensations, and non-ordinary body maps.",
+      "coreLinks": [
+        "Phantom / Mental Shift",
+        "Physiological Hypothesis"
+      ]
+    },
+    {
+      "id": "src-kitsune-tsuki",
+      "title": "Kitsune-tsuki and fox-possession narratives",
+      "category": "Cultural Data",
+      "species": "Kitsune",
+      "domain": "Folklore",
+      "sourceType": "Archive",
+      "url": "",
+      "evidenceTier": "Secondary scholarship",
+      "citationStatus": "Compare sources",
+      "tradition": "Japanese",
+      "terms": [
+        "kitsune-tsuki",
+        "kitsune henka",
+        "possession",
+        "fox spirit"
+      ],
+      "notes": "Track differences between possession, illusion, disguise, and physical transformation. Preserve transliteration variants.",
+      "coreLinks": [
+        "Core Manifestation Template",
+        "Phantom / Mental Shift"
+      ]
+    },
+    {
+      "id": "src-alopecanthropy",
+      "title": "Alopecanthropy term file: human-fox transformation",
+      "category": "Theoretical Concepts",
+      "species": "Fox",
+      "domain": "Metaphysics",
+      "sourceType": "Documentation",
+      "url": "",
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Citation missing",
+      "tradition": "Project vocabulary",
+      "terms": [
+        "alopecanthropy",
+        "physical shift",
+        "animal aura",
+        "fox instincts"
+      ],
+      "notes": "Define how the project will use this term. Distinguish invented taxonomy from historical terminology.",
+      "coreLinks": [
+        "Core Manifestation Template",
+        "Safety and Epistemic Notes"
+      ]
+    },
+    {
+      "id": "src-dragon-transformation",
+      "title": "Dragon transformation motif map",
+      "category": "Cultural Data",
+      "species": "Dragon",
+      "domain": "Folklore",
+      "sourceType": "URL",
+      "url": "",
+      "evidenceTier": "Secondary scholarship",
+      "citationStatus": "Needs verification",
+      "tradition": "Comparative mythology",
+      "terms": [
+        "dracanthrope",
+        "dragon spirit",
+        "wings",
+        "scales",
+        "breath"
+      ],
+      "notes": "Separate dragon-as-serpent, dragon-as-deity, dragon-as-guardian, and human-dragon transformation cases by culture.",
+      "coreLinks": [
+        "Morphogenetic Field",
+        "Core Manifestation Template"
+      ]
+    },
+    {
+      "id": "src-werewolf-trials",
+      "title": "Werewolf trial and pamphlet corpus lead",
+      "category": "Historical Data",
+      "species": "Wolf",
+      "domain": "History",
+      "sourceType": "Archive",
+      "url": "",
+      "evidenceTier": "Primary text",
+      "citationStatus": "Needs verification",
+      "tradition": "Early modern Europe",
+      "terms": [
+        "lycanthropy",
+        "witchcraft",
+        "trial records",
+        "wolf form"
+      ],
+      "notes": "Log trial texts, pamphlets, confessions, and legal context separately. Flag coercion and demonological framing.",
+      "coreLinks": [
+        "Safety and Epistemic Notes",
+        "Core Manifestation Template"
+      ]
+    },
+    {
+      "id": "src-occult-glamour",
+      "title": "Occult glamour, astral form, and animal aura practices",
+      "category": "Occult Data",
+      "species": "Cross-form",
+      "domain": "Occult / Esoteric",
+      "sourceType": "Book / Manuscript",
+      "url": "",
+      "evidenceTier": "Experiential claim",
+      "citationStatus": "Citation missing",
+      "tradition": "Western esotericism",
+      "terms": [
+        "animal aura",
+        "astral body",
+        "phantom body",
+        "glamour"
+      ],
+      "notes": "Catalog claims as practices or testimonies, not verified mechanisms. Track ritual context and source lineage.",
+      "coreLinks": [
+        "Morphogenetic Field",
+        "Phantom / Mental Shift"
+      ]
+    },
+    {
+      "id": "src-morphogenesis",
+      "title": "Morphogenesis and regenerative biology analogy file",
+      "category": "Mechanics",
+      "species": "Cross-form",
+      "domain": "Theoretical Biology",
+      "sourceType": "PDF",
+      "url": "",
+      "evidenceTier": "Scientific analogy",
+      "citationStatus": "Needs verification",
+      "tradition": "Developmental biology",
+      "terms": [
+        "morphogenesis",
+        "regeneration",
+        "patterning",
+        "plasticity"
+      ],
+      "notes": "Use only as analogy for form generation and tissue patterning. Do not imply macro-scale human-animal transformation is biologically demonstrated.",
+      "coreLinks": [
+        "Physiological Hypothesis",
+        "Morphogenetic Field"
+      ]
+    },
+    {
+      "id": "src-energy-budget",
+      "title": "Energy budget constraint note for physical shifting",
+      "category": "Simulations",
+      "species": "Cross-form",
+      "domain": "Simulation",
+      "sourceType": "Dataset",
+      "url": "",
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Citation missing",
+      "tradition": "Project model",
+      "terms": [
+        "energy budget",
+        "mass conservation",
+        "tissue remodeling",
+        "shift potential"
+      ],
+      "notes": "Simulation variable file for modeling how extreme transformation claims would face energy, heat, mass, and tissue continuity constraints.",
+      "coreLinks": [
+        "Physiological Hypothesis",
+        "Safety and Epistemic Notes"
+      ]
+    },
+    {
+      "id": "src-therianthropy-community",
+      "title": "Therianthropy community terminology map",
+      "category": "Cultural Data",
+      "species": "Cross-form",
+      "domain": "Metaphysics",
+      "sourceType": "Forum / Community",
+      "url": "",
+      "evidenceTier": "Experiential claim",
+      "citationStatus": "Compare sources",
+      "tradition": "Modern identity communities",
+      "terms": [
+        "therianthropy",
+        "m-shift",
+        "phantom shift",
+        "animal instincts"
+      ],
+      "notes": "Capture vocabulary respectfully. Separate lived identity terms from historical lycanthropy and occult spellwork.",
+      "coreLinks": [
+        "Phantom / Mental Shift",
+        "Core Manifestation Template"
+      ]
+    },
+    {
+      "id": "src-keylontic",
+      "title": "Keylontic Sciences and holographic blueprint vocabulary",
+      "category": "Occult Data",
+      "species": "Cross-form",
+      "domain": "Metaphysics",
+      "sourceType": "URL",
+      "url": "",
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Citation missing",
+      "tradition": "Contemporary esoteric system",
+      "terms": [
+        "Keylontic Sciences",
+        "holographic blueprint",
+        "manifestation template"
+      ],
+      "notes": "Store as a named metaphysical system. Require source lineage, author attribution, and terminology normalization.",
+      "coreLinks": [
+        "Core Manifestation Template",
+        "Morphogenetic Field"
+      ]
+    },
+    {
+      "id": "src-upload-wolf-grimoire-summary",
+      "title": "Uploaded PDF: Wolf-Shapeshifting Grimoire source summary",
+      "category": "Documents",
+      "species": "Wolf",
+      "domain": "Occult / Esoteric",
+      "sourceType": "PDF",
+      "url": "data/reference_ingest.json#ref-upload-wolf-grimoire-summary",
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Needs verification",
+      "tradition": "Project-uploaded summary",
+      "terms": [
+        "wolf",
+        "energy",
+        "ritual",
+        "occult",
+        "spiritual",
+        "phantom shift"
+      ],
+      "notes": "Uploaded 16-page source summary used as a background map for wolf-focused shapeshifting concepts and source discovery. Treat as a guide requiring primary-source follow-up.",
+      "coreLinks": [
+        "Core Manifestation Template",
+        "Phantom / Mental Shift",
+        "Safety and Epistemic Notes"
+      ],
+      "referenceId": "ref-upload-wolf-grimoire-summary"
+    },
+    {
+      "id": "src-upload-greene-magic-shapeshifting",
+      "title": "Uploaded PDF: The Magic of Shapeshifting - Rosalyn Greene",
+      "category": "Occult Data",
+      "species": "Cross-form",
+      "domain": "Occult / Esoteric",
+      "sourceType": "PDF",
+      "url": "data/reference_ingest.json#ref-upload-greene-magic-shapeshifting",
+      "evidenceTier": "Secondary scholarship",
+      "citationStatus": "Needs verification",
+      "tradition": "Modern occult shapeshifting literature",
+      "terms": [
+        "shapeshifting",
+        "physical shift",
+        "mental shift",
+        "astral",
+        "animal spirit",
+        "wolf"
+      ],
+      "notes": "Uploaded occult reference retained as metadata and high-level source lead only. Avoid embedding long excerpts; verify bibliographic provenance before quoting or redistributing.",
+      "coreLinks": [
+        "Morphogenetic Field",
+        "Phantom / Mental Shift",
+        "Safety and Epistemic Notes"
+      ],
+      "referenceId": "ref-upload-greene-magic-shapeshifting"
+    },
+    {
+      "id": "src-upload-erydir-core",
+      "title": "Uploaded PDF: ErydirCeisiwr backend mechanics core",
+      "category": "Mechanics",
+      "species": "Cross-form",
+      "domain": "Metaphysics",
+      "sourceType": "PDF",
+      "url": "data/reference_ingest.json#ref-upload-erydir-core",
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Needs verification",
+      "tradition": "Project internal mechanics",
+      "terms": [
+        "energy",
+        "backend core",
+        "routing",
+        "synthesis",
+        "mechanics"
+      ],
+      "notes": "Used as an internal operational scaffold for prompt intake, profile merging, reference lookup, evidence separation, synthesis, extraction queueing, and export logging. It is not used as visual design.",
+      "coreLinks": [
+        "Core Manifestation Template",
+        "Morphogenetic Field",
+        "Physiological Hypothesis"
+      ],
+      "referenceId": "ref-upload-erydir-core"
+    },
+    {
+      "id": "src-upload-learning-to-shift",
+      "title": "Uploaded PDF: Learning to Shift",
+      "category": "Documents",
+      "species": "Wolf",
+      "domain": "Metaphysics",
+      "sourceType": "PDF",
+      "url": "data/reference_ingest.json#ref-upload-learning-to-shift",
+      "evidenceTier": "Experiential claim",
+      "citationStatus": "Needs verification",
+      "tradition": "Project-uploaded shifting guide",
+      "terms": [
+        "wolf",
+        "energy",
+        "mental shift",
+        "physical shift",
+        "phantom shift",
+        "fox"
+      ],
+      "notes": "Background reference for practice vocabulary and experiential claims. Keep outputs profile-aware but preserve uncertainty labels for all transformation mechanics.",
+      "coreLinks": [
+        "Phantom / Mental Shift",
+        "Core Manifestation Template",
+        "Safety and Epistemic Notes"
+      ],
+      "referenceId": "ref-upload-learning-to-shift"
+    }
+  ],
+  "simulationDefaults": {
+    "morphologicalGap": 86,
+    "tissuePlasticity": 18,
+    "energyBudget": 12,
+    "neuralIntegration": 34,
+    "fieldCoherence": 52
+  },
+  "internalModel": {
+    "displayName": "ChatGPT 5.5 Pro Internal Core",
+    "status": "Local internal model profile / connector-ready",
+    "gateway": {
+      "openapi": "3.0.0",
+      "info": {
+        "title": "Internal Core System Gateway",
+        "version": "1.0.0",
+        "description": "Enables ChatGPT 5.5 Pro to orchestrate data flows and execute specialized backend actions."
+      },
+      "servers": [
+        {
+          "url": "https://static.app/chatgpt-hosting",
+          "description": "Secure Enterprise Private Environment"
+        }
+      ],
+      "paths": {
+        "/resource/fetch": {
+          "get": {
+            "operationId": "fetchInternalData",
+            "summary": "Queries core backend properties based on specific parameters",
+            "parameters": [
+              {
+                "name": "target_id",
+                "in": "query",
+                "required": true,
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The unique reference string of the requested internal asset"
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Successful operation execution",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string"
+                        },
+                        "payload": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "gatewayOperation": "fetchInternalData",
+    "targetParameter": "target_id",
+    "providerNote": "OpenAI Developers can be used later for secure API-key setup and backend integration. This static file does not create or host an actual OpenAI model.",
+    "synthesisScope": [
+      "Archive sources",
+      "Queued extraction jobs",
+      "Uploaded PDF reference metadata",
+      "Three-user profile context",
+      "CORE framework and simulation controls"
+    ]
+  },
+  "backendCore": {
+    "id": "erydir-core-mechanics",
+    "title": "ErydirCeisiwr Backend Mechanics Core",
+    "sourceReferenceId": "ref-upload-erydir-core",
+    "summary": "Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.",
+    "operatingMode": "Local static simulation with connector-ready OpenAI and web-extraction hooks.",
+    "stages": [
+      "Intent intake",
+      "Profile context merge",
+      "Reference lookup",
+      "Evidence-tier separation",
+      "Mechanics synthesis",
+      "Extraction queue expansion",
+      "Export and review logging"
+    ],
+    "permissions": [
+      "Read local archive state",
+      "Read three project profiles",
+      "Read uploaded reference metadata",
+      "Create local extraction jobs",
+      "Generate local synthesis output"
+    ],
+    "hardLimits": [
+      "No live global-web scraping in the static build",
+      "No real OpenAI model execution without a backend and secure API key",
+      "No long copyrighted PDF text embedded in exported app data",
+      "No biomedical claim may be upgraded beyond its evidence tier without verification"
+    ]
+  },
+  "referenceLibrary": [
+    {
+      "id": "ref-upload-wolf-grimoire-summary",
+      "sourceId": "src-upload-wolf-grimoire-summary",
+      "title": "Wolf-Shapeshifting Grimoire: Summary of Sources and Concepts",
+      "fileName": "2-Wolf-Shapeshifting-Grimoire_-Summary-of-Sources-and-Concepts.pdf",
+      "sourceType": "PDF",
+      "pageCount": 16,
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Needs verification",
+      "role": "Background source map and source-concept summary for wolf-focused shapeshifting research.",
+      "backendUse": "Seed source taxonomy, topic clustering, and initial source-discovery leads.",
+      "handling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        "wolf",
+        "energy",
+        "ritual",
+        "occult",
+        "spiritual",
+        "transformation"
+      ]
+    },
+    {
+      "id": "ref-upload-greene-magic-shapeshifting",
+      "sourceId": "src-upload-greene-magic-shapeshifting",
+      "title": "The Magic of Shapeshifting - Rosalyn Greene",
+      "fileName": "3-OceanofPDF.com_The_magic_of_shapeshifting_-_Rosalyn_Greene.pdf",
+      "sourceType": "PDF",
+      "pageCount": 261,
+      "evidenceTier": "Secondary scholarship",
+      "citationStatus": "Needs verification",
+      "role": "Occult and esoteric shapeshifting reference for background classification only.",
+      "backendUse": "Provide occult terminology leads and comparative concepts while avoiding long reproduced excerpts.",
+      "handling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        "wolf",
+        "physical shift",
+        "energy",
+        "shapeshifting",
+        "mental shift",
+        "astral"
+      ]
+    },
+    {
+      "id": "ref-upload-erydir-core",
+      "sourceId": "src-upload-erydir-core",
+      "title": "ErydirCeisiwr Internal Mechanics Core",
+      "fileName": "4-ErydirCeisiwr.pdf",
+      "sourceType": "PDF",
+      "pageCount": 47,
+      "evidenceTier": "Speculative framework",
+      "citationStatus": "Needs verification",
+      "role": "Global internal backend mechanics core and operational structure reference.",
+      "backendUse": "Drive internal routing, layered synthesis, staged review, profile-aware context, and export structure.",
+      "handling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        "energy"
+      ]
+    },
+    {
+      "id": "ref-upload-learning-to-shift",
+      "sourceId": "src-upload-learning-to-shift",
+      "title": "Learning to Shift",
+      "fileName": "5-Learning-to-shift..pdf",
+      "sourceType": "PDF",
+      "pageCount": 30,
+      "evidenceTier": "Experiential claim",
+      "citationStatus": "Needs verification",
+      "role": "Experiential/background reference for shifting vocabulary, practice claims, and research prompts.",
+      "backendUse": "Seed practice-related source leads and profile-aware prompt scaffolds with explicit uncertainty labels.",
+      "handling": "Metadata and short descriptive summaries only; do not embed long copyrighted or unverified source text in the app.",
+      "detectedTerms": [
+        "wolf",
+        "energy",
+        "mental shift",
+        "physical shift",
+        "phantom shift",
+        "fox"
+      ]
+    }
+  ],
+  "externalApis": {
+    "parallelExtract": {
+      "provider": "Parallel",
+      "localEndpoint": "/api/extract",
+      "upstreamEndpoint": "https://api.parallel.ai/v1/extract",
+      "auth": "Server-side PARALLEL_API_KEY",
+      "defaultUrls": [
+        "https://www.google.com"
+      ],
+      "advancedSettings": {
+        "full_content": false
+      },
+      "clients": [
+        "Python REST proxy",
+        "Parallel Python SDK compatible",
+        "curl REST",
+        "parallel-web TypeScript compatible"
+      ]
+    },
+    "localWebScraper": {
+      "provider": "CORE Python scraper",
+      "localEndpoint": "/api/scrape",
+      "auth": "No API key; public http/https targets only",
+      "defaultUrls": [
+        "https://www.google.com/search?q="
+      ],
+      "keywordMode": true,
+      "searchBaseUrl": "https://www.google.com/search?q=",
+      "advancedSettings": {
+        "full_content": false,
+        "include_links": true
+      },
+      "safeguards": [
+        "Blocks localhost/private/reserved IPs by default",
+        "2 MB fetch cap",
+        "No JavaScript execution"
+      ]
+    },
+    "googleProgrammableSearch": {
+      "provider": "Google Programmable Search Engine",
+      "searchEngineId": "56f7592d1993141c3",
+      "scriptUrl": "https://cse.google.com/cse.js?cx=56f7592d1993141c3",
+      "publicUrl": "https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0",
+      "elements": [
+        "gcse-searchbox",
+        "gcse-searchresults"
+      ],
+      "status": "Embedded in Browser panel with external public URL fallback."
+    },
+    "nvidiaAIQResearch": {
+      "provider": "NVIDIA AI-Q Research",
+      "backendUrl": "http://localhost:8000",
+      "auth": "Configured in the AI-Q backend, not in this static app",
+      "status": "Optional local/self-hosted research backend",
+      "capabilities": [
+        "Intent-routed shallow research with source citation",
+        "Async deep research jobs",
+        "Source registry selection across web, papers, enterprise, and knowledge layers"
+      ]
+    }
+  },
+  "parallelExtractRuns": [],
+  "webScrapeRuns": []
+}
