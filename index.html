@@ -154,6 +154,7 @@
                 <button class="segment" type="button" data-panel="extractionPanel">Extract</button>
                 <button class="segment" type="button" data-panel="agentPanel">Agent</button>
                 <button class="segment" type="button" data-panel="teamPanel">Team</button>
+                <button class="segment" type="button" data-panel="collabPanel">Docs</button>
                 <button class="segment" type="button" data-panel="profilesPanel">Profiles</button>
                 <button class="segment" type="button" data-panel="codexPanel">Codex</button>
               </div>
@@ -800,6 +801,87 @@
                     <span class="detail-chip">3 users</span>
                   </div>
                   <div id="teamChatFeed" class="team-chat-feed" aria-live="polite"></div>
+                </section>
+              </div>
+            </section>
+
+            <section id="collabPanel" class="panel-view">
+              <div class="collab-docs-grid">
+                <section class="api-panel docs-library-panel" aria-labelledby="collabDocsTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="collabDocsTitle">Collaboration Docs</h2>
+                      <p>Draft research documents, briefs, PDFs, source notes, and team handoffs inside the app.</p>
+                    </div>
+                    <span class="detail-chip">Local-first</span>
+                  </div>
+                  <div class="form-actions">
+                    <button class="primary-button" id="newCollabDocButton" type="button">New Doc</button>
+                    <button class="ghost-button" id="exportCollabLibraryButton" type="button">Export Library</button>
+                  </div>
+                  <label>
+                    Import document
+                    <input id="collabImportInput" type="file" accept=".txt,.md,.html,.json,.py,.js,.css,.doc,.docx,.pdf">
+                  </label>
+                  <p id="collabImportStatus" class="browser-status">Import TXT, MD, HTML, JSON, DOC/DOCX/PDF metadata, or paste text into a draft.</p>
+                  <div id="collabDocList" class="collab-doc-list" aria-live="polite"></div>
+                </section>
+
+                <section class="api-panel docs-editor-panel" aria-labelledby="collabEditorTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="collabEditorTitle">Document Drafting Workspace</h2>
+                      <p>Write like a shared research document: sections, formatting, source links, exports, and PDF print handoff.</p>
+                    </div>
+                    <span id="collabDocStatusChip" class="detail-chip">No doc</span>
+                  </div>
+                  <div class="form-grid two-column">
+                    <label>
+                      Title
+                      <input id="collabDocTitleInput" placeholder="Research brief title">
+                    </label>
+                    <label>
+                      Type
+                      <select id="collabDocTypeSelect">
+                        <option>Research Brief</option>
+                        <option>PDF Draft</option>
+                        <option>Source Review</option>
+                        <option>Meeting Notes</option>
+                        <option>Grimoire Chapter</option>
+                      </select>
+                    </label>
+                    <label>
+                      Status
+                      <select id="collabDocStatusSelect">
+                        <option>Draft</option>
+                        <option>Review</option>
+                        <option>Approved</option>
+                        <option>Archived</option>
+                      </select>
+                    </label>
+                    <label>
+                      Owner
+                      <input id="collabDocOwnerInput" placeholder="Owner">
+                    </label>
+                  </div>
+                  <div class="doc-toolbar" aria-label="Document formatting toolbar">
+                    <button class="ghost-button iconless" type="button" data-doc-command="bold">B</button>
+                    <button class="ghost-button iconless" type="button" data-doc-command="italic">I</button>
+                    <button class="ghost-button iconless" type="button" data-doc-command="formatBlock:h2">H2</button>
+                    <button class="ghost-button iconless" type="button" data-doc-command="formatBlock:h3">H3</button>
+                    <button class="ghost-button iconless" type="button" data-doc-command="insertUnorderedList">List</button>
+                    <button class="ghost-button iconless" type="button" data-doc-command="formatBlock:blockquote">Quote</button>
+                    <button class="ghost-button iconless" id="insertBrowserLeadButton" type="button">Browser Lead</button>
+                  </div>
+                  <div id="collabDocEditor" class="collab-doc-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
+                  <div class="form-actions">
+                    <button class="primary-button" id="saveCollabDocButton" type="button">Save Draft</button>
+                    <button class="ghost-button" id="exportCollabTextButton" type="button">TXT</button>
+                    <button class="ghost-button" id="exportCollabHtmlButton" type="button">HTML</button>
+                    <button class="ghost-button" id="exportCollabJsonButton" type="button">JSON</button>
+                    <button class="ghost-button" id="printCollabDocButton" type="button">PDF / Print</button>
+                    <button class="ghost-button" id="collabDocToSourceButton" type="button">Add to Sources</button>
+                  </div>
                 </section>
               </div>
             </section>

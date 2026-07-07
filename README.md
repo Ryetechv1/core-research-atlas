@@ -118,16 +118,18 @@ python scripts/web_scrape_extract.py https://www.google.com
 
 ## OpenAI Research Agent
 
-The ChatGPT Pro Research Agent now calls `/api/agent` when the app is running on a backend host with `OPENAI_API_KEY` configured. That route uses the OpenAI Responses API with `OPENAI_AGENT_MODEL`, defaulting to `gpt-5.5`, and sends the model the active prompt, browser context, web result cards, scraped site previews, source matches, uploaded-reference metadata, team posts, and active profile data.
+The ChatGPT Pro Research Agent now calls `/api/agent` when the app is running on a backend host with `OPENAI_API_KEY` configured. That route uses the OpenAI Responses API with `OPENAI_AGENT_MODEL`, defaulting to `gpt-5.5`, optional hosted `web_search`, and reasoning effort from `OPENAI_AGENT_REASONING_EFFORT`. It sends the model the active prompt, browser context, web result cards, scraped site previews, source matches, collaboration documents, uploaded-reference metadata, team posts, and active profile data.
 
 Local setup:
 
 ```powershell
 $env:OPENAI_AGENT_MODEL = "gpt-5.5"
+$env:OPENAI_AGENT_WEB_SEARCH = "1"
+$env:OPENAI_AGENT_REASONING_EFFORT = "low"
 python server.py
 ```
 
-The API key belongs in `.env.local` or the host's secret manager, never in browser JavaScript. On GitHub Pages, `/api/agent` cannot run because Pages is static, so the agent automatically falls back to the local app synthesizer while keeping source URLs and CSE/browser cards visible.
+The API key belongs in `.env.local` or the host's secret manager, never in browser JavaScript. On GitHub Pages, `/api/agent` cannot run because Pages is static, so the agent automatically falls back to the local app synthesizer while keeping source URLs and CSE/browser cards visible. If `/api/agent` is reachable but OpenAI returns `billing_not_active`, the code path and key are wired, but the OpenAI project must have billing/model access enabled before live model responses will work.
 
 Deployment notes for Render, Vercel, Cloudflare Workers/Agents, and Catalyst are in `docs/extraction-deployment.md`.
 
@@ -177,6 +179,12 @@ The Team panel lets the three project users post messages, updates, links, and r
 
 GitHub Pages is static, so it cannot share new team posts across different devices by itself. Cross-device team chat requires a backend deployment for `/api/team-chat` or a real database-backed service.
 
+## Collaboration Docs
+
+The Docs panel is a local-first drafting workspace for research briefs, PDF drafts, source reviews, meeting notes, and grimoire chapters. It supports rich text drafting, inserting the active in-app browser lead, importing `.txt`, `.md`, `.html`, `.json`, `.py`, `.js`, `.css`, `.doc`, `.docx`, and `.pdf` files, exporting individual documents to TXT/HTML/JSON, exporting the full document library, print-to-PDF handoff, and promoting a document into Sources.
+
+Browser-only imports parse text, Markdown, HTML, JSON, and code directly. DOC, DOCX, and PDF imports are stored as metadata-only document drafts unless a backend parser is added. Guest mode can browse documents and profiles but cannot edit, import, export, post, promote, or save changes.
+
 ## Automated AI Research Bot
 
 The Extract panel includes an opt-in automated research bot. It rotates through content sections, builds a focused keyword query, runs at most one scrape attempt per minute, and pauses when it finds a useful source card. The user must answer "Yes" before the finding is added to a source section. "No" opens a short feedback prompt and uses that feedback on the next recursive search.
@@ -200,7 +208,7 @@ Then open `http://YOUR-LAN-IP:5177/` from the phone. `127.0.0.1` and `localhost`
 - Replace static demo sign-in with real backend auth and secure password hashing.
 - URL/PDF/source ingestion with citation metadata.
 - Live extraction workers for URLs, documentation sites, PDFs, WebP/image OCR, archives, and datasets.
-- Secure OpenAI model connector for the AI Agent console. The current "ChatGPT 5.5 Pro" surface is a local internal profile and does not create or host a real OpenAI model.
+- Activate billing/model access on the OpenAI project used by `/api/agent` if live model calls return `billing_not_active`.
 - Team ownership fields for the two additional contributors.
 - Graph view for terms, traditions, entities, species forms, and CORE framework links.
 - Database-backed collaboration when a backend is chosen.

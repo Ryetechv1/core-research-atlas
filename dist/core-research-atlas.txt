@@ -1,5 +1,5 @@
 CORE Shapeshifting Research Atlas
-Version: 0.5.0
+Version: 0.6.0
 
 Epistemic policy:
 Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.
@@ -56,6 +56,10 @@ Captured browser targets: 0
 Team Chat and Recommendations:
 Team posts stored: 0
 Open recommendations: 0
+
+Collaboration Documents:
+Draft documents stored: 1
+- CORE Research Brief (Research Brief; Draft; UserSeth)
 
 NVIDIA AIQ Research:
 Backend URL: http://localhost:8000

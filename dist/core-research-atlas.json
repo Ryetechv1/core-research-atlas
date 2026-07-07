@@ -1,7 +1,7 @@
 {
   "project": {
     "name": "CORE Shapeshifting Research Atlas",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "epistemicPolicy": "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     "corePrompt": "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
     "aiConnectorNote": "The ChatGPT Pro console uses /api/agent with OpenAI gpt-5.5 when a backend host has OPENAI_API_KEY configured. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state."
@@ -638,6 +638,7 @@
       "Uploaded PDF reference metadata",
       "Three-user profile context",
       "In-app browser state and captured browser leads",
+      "Collaboration document drafts",
       "Team chat and recommendation review state"
     ]
   },
@@ -821,5 +822,17 @@
   },
   "parallelExtractRuns": [],
   "webScrapeRuns": [],
-  "teamMessages": []
+  "teamMessages": [],
+  "collabDocs": [
+    {
+      "id": "doc-core-research-brief",
+      "title": "CORE Research Brief",
+      "type": "Research Brief",
+      "status": "Draft",
+      "owner": "UserSeth",
+      "createdAt": "2026-07-04T00:00:00.000Z",
+      "updatedAt": "2026-07-04T00:00:00.000Z",
+      "contentHtml": "<h2>Research Objective</h2><p>Use this workspace to draft source-backed briefs, grimoire chapters, meeting notes, PDF handoffs, and review packets. Keep links visible and mark every claim by evidence tier before promoting it into Sources.</p><h3>Current Method</h3><ul><li>Open pages in the in-app browser.</li><li>Insert browser leads into this document.</li><li>Export drafts as text, HTML, JSON, or print them to PDF.</li></ul>"
+    }
+  ]
 }

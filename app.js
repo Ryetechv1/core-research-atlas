@@ -230,10 +230,24 @@ const DEFAULT_PROFILES = [
   },
 ];
 
+const DEFAULT_COLLAB_DOCS = [
+  {
+    id: "doc-core-research-brief",
+    title: "CORE Research Brief",
+    type: "Research Brief",
+    status: "Draft",
+    owner: "UserSeth",
+    createdAt: new Date("2026-07-04T00:00:00").toISOString(),
+    updatedAt: new Date("2026-07-04T00:00:00").toISOString(),
+    contentHtml:
+      "<h2>Research Objective</h2><p>Use this workspace to draft source-backed briefs, grimoire chapters, meeting notes, PDF handoffs, and review packets. Keep links visible and mark every claim by evidence tier before promoting it into Sources.</p><h3>Current Method</h3><ul><li>Open pages in the in-app browser.</li><li>Insert browser leads into this document.</li><li>Export drafts as text, HTML, JSON, or print them to PDF.</li></ul>",
+  },
+];
+
 const SEED_DATA = {
   project: {
     name: "CORE Shapeshifting Research Atlas",
-    version: "0.5.0",
+    version: "0.6.0",
     epistemicPolicy:
       "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     corePrompt:
@@ -255,6 +269,7 @@ const SEED_DATA = {
       "Uploaded PDF reference metadata",
       "Three-user profile context",
       "In-app browser state and captured browser leads",
+      "Collaboration document drafts",
       "Team chat and recommendation review state",
     ],
   },
@@ -396,6 +411,7 @@ const SEED_DATA = {
   parallelExtractRuns: [],
   webScrapeRuns: [],
   teamMessages: [],
+  collabDocs: DEFAULT_COLLAB_DOCS,
   agentMessages: [
     {
       role: "assistant",
@@ -675,6 +691,7 @@ const state = {
   activeSpecies: "All",
   activeSourceType: "All",
   activeProfileUsername: window.localStorage.getItem(SESSION_KEY) || "UserSeth",
+  activeCollabDocId: "",
   currentUser: null,
   search: "",
   selectedId: null,
@@ -794,6 +811,24 @@ function cacheElements() {
   els.teamChatStatus = document.getElementById("teamChatStatus");
   els.refreshTeamChatButton = document.getElementById("refreshTeamChatButton");
   els.useBrowserForTeamPostButton = document.getElementById("useBrowserForTeamPostButton");
+  els.newCollabDocButton = document.getElementById("newCollabDocButton");
+  els.exportCollabLibraryButton = document.getElementById("exportCollabLibraryButton");
+  els.collabImportInput = document.getElementById("collabImportInput");
+  els.collabImportStatus = document.getElementById("collabImportStatus");
+  els.collabDocList = document.getElementById("collabDocList");
+  els.collabDocStatusChip = document.getElementById("collabDocStatusChip");
+  els.collabDocTitleInput = document.getElementById("collabDocTitleInput");
+  els.collabDocTypeSelect = document.getElementById("collabDocTypeSelect");
+  els.collabDocStatusSelect = document.getElementById("collabDocStatusSelect");
+  els.collabDocOwnerInput = document.getElementById("collabDocOwnerInput");
+  els.collabDocEditor = document.getElementById("collabDocEditor");
+  els.insertBrowserLeadButton = document.getElementById("insertBrowserLeadButton");
+  els.saveCollabDocButton = document.getElementById("saveCollabDocButton");
+  els.exportCollabTextButton = document.getElementById("exportCollabTextButton");
+  els.exportCollabHtmlButton = document.getElementById("exportCollabHtmlButton");
+  els.exportCollabJsonButton = document.getElementById("exportCollabJsonButton");
+  els.printCollabDocButton = document.getElementById("printCollabDocButton");
+  els.collabDocToSourceButton = document.getElementById("collabDocToSourceButton");
   els.profileTabs = document.getElementById("profileTabs");
   els.profileForm = document.getElementById("profileForm");
   els.profileExtendedSections = document.getElementById("profileExtendedSections");
@@ -872,6 +907,19 @@ function wireEvents() {
   els.teamChatForm.addEventListener("submit", handleTeamChatSubmit);
   els.refreshTeamChatButton.addEventListener("click", () => syncTeamChat({ renderAfter: true }));
   els.useBrowserForTeamPostButton.addEventListener("click", useBrowserUrlForTeamPost);
+  els.newCollabDocButton.addEventListener("click", createCollabDoc);
+  els.exportCollabLibraryButton.addEventListener("click", exportCollabLibrary);
+  els.collabImportInput.addEventListener("change", handleCollabImport);
+  document.querySelectorAll("[data-doc-command]").forEach((button) => {
+    button.addEventListener("click", () => runDocCommand(button.dataset.docCommand));
+  });
+  els.insertBrowserLeadButton.addEventListener("click", insertBrowserLeadIntoDoc);
+  els.saveCollabDocButton.addEventListener("click", saveActiveCollabDoc);
+  els.exportCollabTextButton.addEventListener("click", () => exportActiveCollabDoc("txt"));
+  els.exportCollabHtmlButton.addEventListener("click", () => exportActiveCollabDoc("html"));
+  els.exportCollabJsonButton.addEventListener("click", () => exportActiveCollabDoc("json"));
+  els.printCollabDocButton.addEventListener("click", printActiveCollabDoc);
+  els.collabDocToSourceButton.addEventListener("click", addActiveCollabDocToSources);
   els.searchChoiceInternalButton.addEventListener("click", () => resolveSearchChoice("internal"));
   els.searchChoiceExternalButton.addEventListener("click", () => resolveSearchChoice("external"));
   els.searchChoiceCancelButton.addEventListener("click", () => resolveSearchChoice("cancel"));
@@ -1053,10 +1101,32 @@ function renderPermissionState() {
     "clearAgentButton",
     "useBrowserForTeamPostButton",
     "exportProfilesButton",
+    "newCollabDocButton",
+    "exportCollabLibraryButton",
+    "collabImportInput",
+    "collabDocTitleInput",
+    "collabDocTypeSelect",
+    "collabDocStatusSelect",
+    "collabDocOwnerInput",
+    "insertBrowserLeadButton",
+    "saveCollabDocButton",
+    "exportCollabTextButton",
+    "exportCollabHtmlButton",
+    "exportCollabJsonButton",
+    "printCollabDocButton",
+    "collabDocToSourceButton",
   ].forEach((id) => {
     const control = document.getElementById(id);
     if (control) control.disabled = guest;
   });
+  document.querySelectorAll("[data-doc-command]").forEach((control) => {
+    control.disabled = guest;
+  });
+  if (els.collabDocEditor) {
+    els.collabDocEditor.contentEditable = guest ? "false" : "true";
+    els.collabDocEditor.classList.toggle("is-read-only", guest);
+    els.collabDocEditor.setAttribute("aria-readonly", String(guest));
+  }
 }
 
 function populateFormOptions() {
@@ -1092,6 +1162,7 @@ function render() {
   renderAutoBotStatus();
   renderAgent();
   renderTeamChat();
+  renderCollabDocs();
   renderProfiles();
   renderModelCore();
   renderMetrics();
@@ -1863,6 +1934,12 @@ function openInAppBrowser(url, label = url, options = {}) {
 function loadInAppBrowserFrame(url, preview = null) {
   if (!els.inAppBrowserFrame) return;
   els.inAppBrowserFrame.dataset.currentUrl = url;
+  if (isLocalCollabDocUrl(url)) {
+    els.inAppBrowserFrame.removeAttribute("src");
+    const doc = getCollabDocFromUrl(url);
+    els.inAppBrowserFrame.srcdoc = doc ? renderCollabDocHtml(doc) : renderBrowserFrameDocument(url, preview);
+    return;
+  }
   if (shouldAttemptIframeEmbed(url)) {
     els.inAppBrowserFrame.removeAttribute("srcdoc");
     els.inAppBrowserFrame.src = url;
@@ -1874,6 +1951,7 @@ function loadInAppBrowserFrame(url, preview = null) {
 
 function shouldAttemptIframeEmbed(url) {
   if (!url) return false;
+  if (isLocalCollabDocUrl(url)) return false;
   if (isCseUrl(url)) return true;
   if (/^(data|assets|docs|dist)\//i.test(url) || url.startsWith("./") || url.startsWith("../") || url.startsWith("/")) return true;
   return !/^https?:\/\//i.test(url);
@@ -2336,6 +2414,23 @@ function buildVirtualBrowserResults(query, currentUrl = "") {
     }
   });
 
+  getCollabDocs().forEach((doc) => {
+    const haystack = [doc.title, doc.type, doc.status, doc.owner, stripHtml(doc.contentHtml || "")].join(" ");
+    const score = browserResultScore(haystack, keywords);
+    if (score > 0) {
+      rows.push({
+        id: `collab-${doc.id}`,
+        type: `Collaboration doc / ${doc.type || "Document"}`,
+        title: doc.title || "Untitled document",
+        url: `local-collab-doc://${doc.id}`,
+        summary: clampText(stripHtml(doc.contentHtml || ""), 260),
+        sourceInfo: `${doc.status || "Draft"} / ${doc.owner || "Unassigned"}`,
+        details: JSON.stringify(doc, null, 2),
+        score,
+      });
+    }
+  });
+
   getReferenceLibrary().forEach((reference) => {
     const haystack = [reference.title, reference.role, reference.backendUse, reference.evidenceTier, ...(reference.detectedTerms || [])].join(" ");
     const score = browserResultScore(haystack, keywords);
@@ -2497,6 +2592,9 @@ function browserStatusMessage(url) {
   if (isCseUrl(url)) {
     return `Loaded Google Programmable Search Engine ${GOOGLE_CSE_ID}. Use the embedded CSE search box above, or open the public CSE URL if the fallback frame is restricted.`;
   }
+  if (isLocalCollabDocUrl(url)) {
+    return "Loaded a collaboration document preview inside the virtual browser.";
+  }
   if (isKnownFrameBlockedUrl(url)) {
     return `Loaded ${url} into the virtual browser preview. Google and many public sites block iframe display, so the app keeps the page URL, source preview, and extractable links in-app.`;
   }
@@ -2523,6 +2621,16 @@ function isKnownFrameBlockedUrl(url) {
   }
 }
 
+function isLocalCollabDocUrl(url) {
+  return String(url || "").startsWith("local-collab-doc://");
+}
+
+function getCollabDocFromUrl(url) {
+  if (!isLocalCollabDocUrl(url)) return null;
+  const id = String(url).replace("local-collab-doc://", "");
+  return getCollabDocs().find((doc) => doc.id === id) || null;
+}
+
 function dedupeBrowserHistory(history) {
   const seen = new Set();
   return history.filter((entry) => {
@@ -2543,6 +2651,17 @@ function getBrowserContext() {
   const teamBrowserLeads = (state.archive.teamMessages || [])
     .filter((item) => ["recommendation", "link"].includes(item.type) && item.url && item.status !== "rejected")
     .slice(0, 5);
+  const collabDocs = getCollabDocs()
+    .map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      type: doc.type,
+      status: doc.status,
+      owner: doc.owner,
+      updatedAt: doc.updatedAt,
+      summary: clampText(stripHtml(doc.contentHtml || ""), 260),
+    }))
+    .slice(0, 5);
   return {
     currentUrl,
     currentDomain: domainFromUrl(currentUrl) || "cse.google.com",
@@ -2552,6 +2671,7 @@ function getBrowserContext() {
     preview,
     browserSources,
     teamBrowserLeads,
+    collabDocs,
     searchText: [
       currentUrl,
       preview?.title,
@@ -2561,6 +2681,7 @@ function getBrowserContext() {
       ...virtualResults.slice(0, 8).flatMap((result) => [result.title, result.url, result.summary, result.sourceInfo]),
       ...browserSources.flatMap((source) => [source.title, source.url, source.notes, ...(source.terms || [])]),
       ...teamBrowserLeads.flatMap((item) => [item.title, item.url, item.text]),
+      ...collabDocs.flatMap((doc) => [doc.title, doc.type, doc.status, doc.summary]),
     ]
       .filter(Boolean)
       .join(" "),
@@ -2572,6 +2693,7 @@ function browserContextSummary(context = getBrowserContext()) {
   const resultLines = (context.virtualResults || []).map((item) => `- ${item.title}: ${item.url || item.type}`).join("\n");
   const sourceLines = context.browserSources.map((source) => `- ${source.title}: ${source.url || "no URL"}`).join("\n");
   const teamLines = context.teamBrowserLeads.map((item) => `- ${item.title || item.type}: ${item.url}`).join("\n");
+  const docLines = (context.collabDocs || []).map((doc) => `- ${doc.title}: ${doc.status || "Draft"} / ${doc.summary}`).join("\n");
   return [
     `Current browser URL: ${context.currentUrl}`,
     `Current browser domain: ${context.currentDomain}`,
@@ -2581,6 +2703,7 @@ function browserContextSummary(context = getBrowserContext()) {
     resultLines ? `Virtual browser result cards:\n${resultLines}` : "Virtual browser result cards: none yet",
     context.browserSources.length ? `Browser source leads:\n${sourceLines}` : "Browser source leads: none promoted yet",
     context.teamBrowserLeads.length ? `Team browser leads:\n${teamLines}` : "Team browser leads: none yet",
+    docLines ? `Collaboration document context:\n${docLines}` : "Collaboration document context: none yet",
   ].join("\n");
 }
 
@@ -3735,6 +3858,7 @@ function promoteExtractionItem(resultId, itemIndex) {
 
 function inferSourceType(url) {
   const lower = String(url || "").toLowerCase();
+  if (lower.startsWith("local-collab-doc://")) return "Documentation";
   if (lower.endsWith(".pdf")) return "PDF";
   if (lower.endsWith(".webp") || lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
     return "WebP / Image";
@@ -4191,6 +4315,17 @@ function buildAgentApiPayload(prompt, options, capabilities) {
     webRecord: summarizeExtractionRecord(options.webRecord),
     sourceMatches: rankSources(`${prompt} ${browserContext.searchText}`).slice(0, 8),
     references: rankReferences(prompt).slice(0, 5),
+    collabDocs: getCollabDocs()
+      .slice(0, 8)
+      .map((doc) => ({
+        id: doc.id,
+        title: doc.title,
+        type: doc.type,
+        status: doc.status,
+        owner: doc.owner,
+        updatedAt: doc.updatedAt,
+        text: clampText(stripHtml(doc.contentHtml || ""), 900),
+      })),
     teamMessages: (state.archive.teamMessages || []).slice(0, 10),
     recentExtractions: (state.archive.extractionResults || []).slice(0, 6).map(summarizeExtractionRecord),
     activeProfile: getProfile(state.currentUser?.username || state.activeProfileUsername),
@@ -4278,6 +4413,7 @@ function generateAgentResponse(prompt, options) {
     latestResults.find((result) => ["agent-web-search", "agent-site-scrape", "google-search", "site-scrape"].includes(result.engine));
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
+  const collabDocs = getCollabDocs();
   const browserHistory = getBrowserHistory();
   const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected").slice(0, 3);
   const operation = getGatewayOperation(model);
@@ -4291,6 +4427,12 @@ function generateAgentResponse(prompt, options) {
   const referenceLine = references.length
     ? references.map((reference) => `${reference.title} (${reference.pageCount} pages; ${reference.evidenceTier})`).join("; ")
     : "No uploaded reference match; use the complete reference layer if needed.";
+  const docLine = collabDocs.length
+    ? collabDocs
+        .slice(0, 4)
+        .map((doc) => `${doc.title} (${doc.type || "Document"}, ${doc.status || "Draft"})`)
+        .join("; ")
+    : "No collaboration documents drafted yet.";
   const extractionLine = latestResults.length
     ? latestResults
         .map((result) => {
@@ -4325,6 +4467,7 @@ function generateAgentResponse(prompt, options) {
     `Local scraping path: ${scraperApi.localEndpoint} performs dependency-free HTML/text extraction with private-network target safeguards. Keyword search mode invisibly builds ${GOOGLE_SEARCH_BASE_URL}{keywords}.`,
     `Google Programmable Search: CSE ${cseApi.searchEngineId} is embedded in the Browser panel with public URL ${cseApi.publicUrl}.`,
     `File import layer: ${importedFiles.length} imported file logs are available; latest import ${importedFiles[0]?.fileName || "none"} created ${importedFiles[0]?.recordsCreated || 0} source records.`,
+    `Collaboration document layer: ${collabDocs.length} local draft(s) are available to the agent. Current drafts: ${docLine}`,
     `In-app browser layer: ${browserHistory.length} captured browser targets; active target ${browserContext.currentUrl}. The agent and Extract console use this browser context when building searches and source cards.`,
     `Virtual browser memory: ${browserContext.virtualResults?.length || 0} result card(s) are attached; active preview ${browserContext.preview?.title || "none"}.`,
     `Team collaboration layer: ${teamMessages.length} posts stored; ${openRecommendations.length} open source recommendation(s) can be rejected or promoted into Sources.`,
@@ -4370,6 +4513,7 @@ function renderAgent() {
   const sourceCardCount = (state.archive.extractionResults || []).reduce((sum, result) => sum + (result.items?.length || 0), 0);
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
+  const collabDocs = getCollabDocs();
   const browserHistory = getBrowserHistory();
   const browserContext = getBrowserContext();
   const teamMessages = state.archive.teamMessages || [];
@@ -4388,6 +4532,7 @@ function renderAgent() {
     <article><strong>Keyword Search</strong><span>${escapeHtml(GOOGLE_SEARCH_BASE_URL)} + user keywords; modal chooses internal window or external link.</span></article>
     <article><strong>Google CSE</strong><span>${escapeHtml(cseApi.searchEngineId)} / ${escapeHtml(cseApi.publicUrl)}.</span></article>
     <article><strong>File Import</strong><span>${importedFiles.length} imported file logs; ${importedFiles.reduce((sum, item) => sum + (item.recordsCreated || 0), 0)} sources created from uploads.</span></article>
+    <article><strong>Collaboration Docs</strong><span>${collabDocs.length} local-first draft${collabDocs.length === 1 ? "" : "s"} available for agent context, export, and source promotion.</span></article>
     <article><strong>In-App Browser</strong><span>${browserHistory.length} captured targets; active ${escapeHtml(browserContext.currentUrl)}.</span></article>
     <article><strong>Browser Pull</strong><span>Agent, keyword scraper, Parallel Extract, and Extract jobs include current URL, CSE URL, history, ${browserContext.virtualResults?.length || 0} internal result cards, and active preview ${escapeHtml(browserContext.preview?.title || "none")}.</span></article>
     <article><strong>Team Feed</strong><span>${teamMessages.length} posts; ${openRecommendations.length} open recommendations available for source review.</span></article>
@@ -4736,6 +4881,353 @@ function rejectTeamRecommendation(id) {
   postTeamChatPayload({ action: "vote", id, decision: "reject", user: state.currentUser?.username || "local" });
 }
 
+function getCollabDocs() {
+  state.archive.collabDocs = state.archive.collabDocs?.length ? state.archive.collabDocs : clone(DEFAULT_COLLAB_DOCS);
+  return state.archive.collabDocs;
+}
+
+function getActiveCollabDoc() {
+  const docs = getCollabDocs();
+  if (!docs.length) return null;
+  let active = docs.find((doc) => doc.id === state.activeCollabDocId);
+  if (!active) {
+    active = docs[0];
+    state.activeCollabDocId = active.id;
+  }
+  return active;
+}
+
+function renderCollabDocs() {
+  if (!els.collabDocList) return;
+  const docs = getCollabDocs();
+  const active = getActiveCollabDoc();
+  els.collabDocList.innerHTML = docs.length
+    ? docs
+        .map(
+          (doc) => `
+            <button class="collab-doc-item${active?.id === doc.id ? " is-active" : ""}" type="button" data-doc-id="${escapeHtml(doc.id)}">
+              <strong>${escapeHtml(doc.title || "Untitled document")}</strong>
+              <span>${escapeHtml(doc.type || "Document")} / ${escapeHtml(doc.status || "Draft")}</span>
+              <small>${escapeHtml(doc.owner || "Unassigned")} / ${new Date(doc.updatedAt || doc.createdAt || Date.now()).toLocaleString()}</small>
+            </button>
+          `
+        )
+        .join("")
+    : '<div class="empty-state">No collaboration documents yet.</div>';
+  els.collabDocList.querySelectorAll("[data-doc-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (els.collabDocEditor && !isGuestUser()) saveActiveCollabDoc({ silent: true });
+      state.activeCollabDocId = button.dataset.docId;
+      renderCollabDocs();
+    });
+  });
+
+  if (!active) {
+    els.collabDocTitleInput.value = "";
+    els.collabDocOwnerInput.value = "";
+    els.collabDocEditor.innerHTML = "";
+    els.collabDocStatusChip.textContent = "No doc";
+    return;
+  }
+
+  els.collabDocTitleInput.value = active.title || "";
+  els.collabDocTypeSelect.value = active.type || "Research Brief";
+  els.collabDocStatusSelect.value = active.status || "Draft";
+  els.collabDocOwnerInput.value = active.owner || state.currentUser?.username || "";
+  els.collabDocStatusChip.textContent = `${active.type || "Document"} / ${active.status || "Draft"}`;
+  els.collabDocEditor.innerHTML = sanitizeDocHtml(active.contentHtml || "<p>Start drafting here.</p>");
+}
+
+function createCollabDoc() {
+  if (!ensureCanWrite("create collaboration documents")) return;
+  const now = new Date().toISOString();
+  const doc = {
+    id: `doc-${Date.now()}`,
+    title: "Untitled Research Draft",
+    type: "Research Brief",
+    status: "Draft",
+    owner: state.currentUser?.username || "local",
+    createdAt: now,
+    updatedAt: now,
+    contentHtml:
+      "<h2>Purpose</h2><p>Write the research objective here.</p><h2>Source Leads</h2><p>Use Browser Lead to attach the current in-app browser page or search result.</p>",
+  };
+  state.archive.collabDocs.unshift(doc);
+  state.activeCollabDocId = doc.id;
+  persistArchive();
+  renderCollabDocs();
+}
+
+function saveActiveCollabDoc({ silent = false } = {}) {
+  if (!ensureCanWrite("save collaboration documents")) return false;
+  const doc = getActiveCollabDoc();
+  if (!doc) return false;
+  doc.title = els.collabDocTitleInput.value.trim() || "Untitled document";
+  doc.type = els.collabDocTypeSelect.value || "Research Brief";
+  doc.status = els.collabDocStatusSelect.value || "Draft";
+  doc.owner = els.collabDocOwnerInput.value.trim() || state.currentUser?.username || "local";
+  doc.contentHtml = sanitizeDocHtml(els.collabDocEditor.innerHTML || "");
+  doc.updatedAt = new Date().toISOString();
+  persistArchive();
+  if (!silent) {
+    els.collabImportStatus.textContent = `Saved "${doc.title}" at ${new Date(doc.updatedAt).toLocaleTimeString()}.`;
+    renderCollabDocs();
+    renderAgent();
+  }
+  return true;
+}
+
+function runDocCommand(commandSpec) {
+  if (!ensureCanWrite("format collaboration documents")) return;
+  if (!els.collabDocEditor) return;
+  const [command, value] = String(commandSpec || "").split(":");
+  els.collabDocEditor.focus();
+  document.execCommand(command, false, value || null);
+}
+
+function insertBrowserLeadIntoDoc() {
+  if (!ensureCanWrite("insert browser leads into documents")) return;
+  const context = getBrowserContext();
+  const preview = context.preview;
+  const url = preview?.url || context.currentUrl;
+  const title = preview?.title || domainFromUrl(url) || url;
+  const summary = preview?.summary || `Current in-app browser target: ${url}`;
+  const leadHtml = `
+    <blockquote>
+      <strong>${escapeHtml(title)}</strong><br>
+      ${url ? `<a href="${escapeHtml(url)}">${escapeHtml(url)}</a><br>` : ""}
+      ${escapeHtml(summary)}
+    </blockquote>
+  `;
+  insertHtmlAtEditorCursor(leadHtml);
+  saveActiveCollabDoc({ silent: true });
+  els.collabImportStatus.textContent = "Inserted the active in-app browser lead into the draft.";
+}
+
+function insertHtmlAtEditorCursor(html) {
+  els.collabDocEditor.focus();
+  if (document.queryCommandSupported?.("insertHTML")) {
+    document.execCommand("insertHTML", false, sanitizeDocHtml(html));
+    return;
+  }
+  els.collabDocEditor.insertAdjacentHTML("beforeend", sanitizeDocHtml(html));
+}
+
+async function handleCollabImport(event) {
+  if (!ensureCanWrite("import collaboration documents")) return;
+  const files = [...(event.target.files || [])];
+  if (!files.length) return;
+  const imported = [];
+  for (const file of files) {
+    const doc = await collabDocFromFile(file);
+    state.archive.collabDocs.unshift(doc);
+    imported.push(doc.title);
+  }
+  state.activeCollabDocId = state.archive.collabDocs[0]?.id || state.activeCollabDocId;
+  event.target.value = "";
+  persistArchive();
+  els.collabImportStatus.textContent = `Imported ${imported.length} document${imported.length === 1 ? "" : "s"}: ${imported.join(", ")}.`;
+  renderCollabDocs();
+  renderAgent();
+}
+
+async function collabDocFromFile(file) {
+  const now = new Date().toISOString();
+  const name = file.name || "Imported document";
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  let contentHtml = "";
+  let type = "Research Brief";
+  if (ext === "json") {
+    const parsed = parseMaybeJson(await file.text());
+    const incoming = Array.isArray(parsed) ? parsed[0] : parsed?.collabDocs?.[0] || parsed;
+    if (incoming?.title || incoming?.contentHtml || incoming?.content) {
+      return {
+        id: `doc-import-${Date.now()}-${Math.round(Math.random() * 999)}`,
+        title: incoming.title || name,
+        type: incoming.type || "Research Brief",
+        status: incoming.status || "Draft",
+        owner: incoming.owner || state.currentUser?.username || "local",
+        createdAt: incoming.createdAt || now,
+        updatedAt: now,
+        contentHtml: sanitizeDocHtml(incoming.contentHtml || textToDocHtml(incoming.content || incoming.text || "")),
+      };
+    }
+    contentHtml = textToDocHtml(JSON.stringify(parsed || {}, null, 2));
+    type = "Source Review";
+  } else if (["html", "htm"].includes(ext)) {
+    contentHtml = sanitizeDocHtml(await file.text());
+    type = "PDF Draft";
+  } else if (["txt", "md", "py", "js", "css"].includes(ext) || file.type.startsWith("text/")) {
+    contentHtml = textToDocHtml(await file.text(), ext);
+    type = ext === "md" ? "Grimoire Chapter" : "Research Brief";
+  } else {
+    contentHtml = `
+      <h2>Imported File Metadata</h2>
+      <p><strong>File:</strong> ${escapeHtml(name)}</p>
+      <p><strong>Type:</strong> ${escapeHtml(file.type || ext || "unknown")}</p>
+      <p><strong>Size:</strong> ${escapeHtml(String(file.size))} bytes</p>
+      <p>This browser-only workspace saved the file metadata. Add a backend parser for full DOC, DOCX, and PDF text extraction.</p>
+    `;
+    type = ext === "pdf" ? "PDF Draft" : "Source Review";
+  }
+  return {
+    id: `doc-import-${Date.now()}-${Math.round(Math.random() * 999)}`,
+    title: name.replace(/\.[^.]+$/, "") || name,
+    type,
+    status: "Draft",
+    owner: state.currentUser?.username || "local",
+    createdAt: now,
+    updatedAt: now,
+    contentHtml,
+  };
+}
+
+function textToDocHtml(text, ext = "") {
+  const raw = String(text || "").trim();
+  if (!raw) return "<p>No text content found.</p>";
+  if (ext === "md") {
+    return sanitizeDocHtml(
+      raw
+        .split(/\n{2,}/)
+        .map((block) => {
+          const line = block.trim();
+          if (line.startsWith("### ")) return `<h3>${escapeHtml(line.slice(4))}</h3>`;
+          if (line.startsWith("## ")) return `<h2>${escapeHtml(line.slice(3))}</h2>`;
+          if (line.startsWith("# ")) return `<h2>${escapeHtml(line.slice(2))}</h2>`;
+          return `<p>${escapeHtml(line).replace(/\n/g, "<br>")}</p>`;
+        })
+        .join("")
+    );
+  }
+  const codeLike = ["py", "js", "css"].includes(ext);
+  if (codeLike) return `<pre>${escapeHtml(raw)}</pre>`;
+  return raw
+    .split(/\n{2,}/)
+    .map((block) => `<p>${escapeHtml(block.trim()).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+function sanitizeDocHtml(html) {
+  const template = document.createElement("template");
+  template.innerHTML = String(html || "");
+  template.content.querySelectorAll("script, style, iframe, object, embed, form, input, button").forEach((node) => node.remove());
+  template.content.querySelectorAll("*").forEach((node) => {
+    [...node.attributes].forEach((attr) => {
+      const name = attr.name.toLowerCase();
+      const value = attr.value || "";
+      if (name.startsWith("on") || value.trim().toLowerCase().startsWith("javascript:")) {
+        node.removeAttribute(attr.name);
+      }
+    });
+  });
+  return template.innerHTML.trim() || "<p>Start drafting here.</p>";
+}
+
+function exportCollabLibrary() {
+  if (!ensureCanWrite("export collaboration documents")) return;
+  download("core-collaboration-docs.json", "application/json", JSON.stringify(getCollabDocs(), null, 2));
+}
+
+function exportActiveCollabDoc(format) {
+  if (!ensureCanWrite("export collaboration documents")) return;
+  const doc = getActiveCollabDoc();
+  if (!doc) return;
+  saveActiveCollabDoc({ silent: true });
+  const slug = slugify(doc.title || "core-doc");
+  if (format === "json") {
+    download(`${slug}.json`, "application/json", JSON.stringify(doc, null, 2));
+    return;
+  }
+  if (format === "html") {
+    download(`${slug}.html`, "text/html", renderCollabDocHtml(doc));
+    return;
+  }
+  download(`${slug}.txt`, "text/plain", collabDocToText(doc));
+}
+
+function printActiveCollabDoc() {
+  if (!ensureCanWrite("print collaboration documents")) return;
+  const doc = getActiveCollabDoc();
+  if (!doc) return;
+  saveActiveCollabDoc({ silent: true });
+  const printWindow = window.open("", "_blank", "noopener,noreferrer");
+  if (!printWindow) {
+    download(`${slugify(doc.title || "core-doc")}.html`, "text/html", renderCollabDocHtml(doc));
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(renderCollabDocHtml(doc));
+  printWindow.document.close();
+  printWindow.focus();
+  window.setTimeout(() => printWindow.print(), 250);
+}
+
+function addActiveCollabDocToSources() {
+  if (!ensureCanWrite("add collaboration documents to Sources")) return;
+  const doc = getActiveCollabDoc();
+  if (!doc || !saveActiveCollabDoc({ silent: true })) return;
+  const source = {
+    id: `src-doc-${Date.now()}`,
+    title: `Collaboration doc: ${doc.title}`,
+    category: "Documents",
+    species: "Cross-form",
+    domain: "Metaphysics",
+    sourceType: "Documentation",
+    url: `local-collab-doc://${doc.id}`,
+    evidenceTier: "Speculative framework",
+    citationStatus: "Needs verification",
+    tradition: `Team document / ${doc.owner || state.currentUser?.username || "local"}`,
+    terms: extractKeywords(`${doc.title} ${collabDocToText(doc)}`).slice(0, 8),
+    notes: `Promoted from Collaboration Docs. Status: ${doc.status}. Summary: ${clampText(collabDocToText(doc), 500)}`,
+    coreLinks: ["Core Manifestation Template", "Safety and Epistemic Notes"],
+  };
+  state.archive.sources.unshift(source);
+  state.selectedId = source.id;
+  persistArchive();
+  els.collabImportStatus.textContent = `Added "${doc.title}" to Sources.`;
+  render();
+}
+
+function collabDocToText(doc) {
+  return [
+    doc.title || "Untitled document",
+    `${doc.type || "Document"} / ${doc.status || "Draft"} / ${doc.owner || "Unassigned"}`,
+    "",
+    stripHtml(doc.contentHtml || ""),
+  ]
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function renderCollabDocHtml(doc) {
+  return `<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(doc.title || "CORE document")}</title>
+<style>
+body{font-family:Inter,Arial,sans-serif;margin:32px;line-height:1.55;color:#101010;background:#fff}
+main{max-width:850px;margin:auto}
+h1{font-size:30px;margin:0 0 6px}small{color:#666}a{color:#111}blockquote{border-left:4px solid #222;margin:16px 0;padding:10px 14px;background:#f3f3f3}
+pre{white-space:pre-wrap;background:#f5f5f5;padding:12px;border:1px solid #ddd}
+</style>
+<main>
+<h1>${escapeHtml(doc.title || "Untitled document")}</h1>
+<small>${escapeHtml(doc.type || "Document")} / ${escapeHtml(doc.status || "Draft")} / ${escapeHtml(doc.owner || "Unassigned")} / updated ${escapeHtml(new Date(doc.updatedAt || Date.now()).toLocaleString())}</small>
+${sanitizeDocHtml(doc.contentHtml || "")}
+</main>
+</html>`;
+}
+
+function slugify(value) {
+  return String(value || "core-doc")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 70) || "core-doc";
+}
+
 function renderProfiles() {
   els.profileTabs.innerHTML = state.archive.profiles
     .map(
@@ -4750,6 +5242,7 @@ function renderProfiles() {
     button.addEventListener("click", () => {
       state.activeProfileUsername = button.dataset.profile;
       renderProfiles();
+      renderPermissionState();
     });
   });
 
@@ -4772,6 +5265,7 @@ function renderProfiles() {
   }).join("");
 
   els.profileIntegrationSummary.textContent = buildProfileIntegrationSummary();
+  renderPermissionState();
 }
 
 function handleSaveProfile(event) {
@@ -4942,6 +5436,13 @@ function normalizeArchive(input) {
   archive.parallelExtractRuns = archive.parallelExtractRuns || [];
   archive.webScrapeRuns = archive.webScrapeRuns || [];
   archive.teamMessages = archive.teamMessages || [];
+  archive.collabDocs = mergeById(DEFAULT_COLLAB_DOCS, archive.collabDocs || []).map((doc) => ({
+    type: "Research Brief",
+    status: "Draft",
+    owner: "Unassigned",
+    contentHtml: "<p>Start drafting here.</p>",
+    ...doc,
+  }));
   archive.agentMessages = archive.agentMessages?.length ? archive.agentMessages : clone(SEED_DATA.agentMessages);
   return archive;
 }
@@ -5075,6 +5576,10 @@ function buildTextDigest(archive) {
     `${(archive.teamMessages || []).filter((item) => item.type === "recommendation" && item.status !== "rejected").length} open recommendations`,
     ...((archive.teamMessages || []).slice(0, 8).map((item) => `- ${item.type}: ${item.title || item.text} (${item.status || "posted"})${item.url ? ` - ${item.url}` : ""}`)),
     "",
+    "Collaboration Documents:",
+    `${archive.collabDocs?.length || 0} draft documents stored`,
+    ...((archive.collabDocs || []).slice(0, 8).map((doc) => `- ${doc.title} (${doc.type}; ${doc.status}; ${doc.owner})`)),
+    "",
     "NVIDIA AIQ Research:",
     `Backend URL: ${aiqApi.backendUrl}`,
     `Status: ${aiqApi.status}`,
@@ -5173,6 +5678,19 @@ function buildHtmlDigest(archive) {
       )
     )
     .join("");
+  const docRows = (archive.collabDocs || [])
+    .map(
+      (doc) => `
+        <tr>
+          <td>${escapeHtml(doc.title)}</td>
+          <td>${escapeHtml(doc.type || "Document")}</td>
+          <td>${escapeHtml(doc.status || "Draft")}</td>
+          <td>${escapeHtml(doc.owner || "Unassigned")}</td>
+          <td>${escapeHtml(clampText(stripHtml(doc.contentHtml || ""), 220))}</td>
+        </tr>
+      `
+    )
+    .join("");
 
   return `<!doctype html>
 <html lang="en">
@@ -5205,6 +5723,11 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 <p>${escapeHtml(String(archive.browserHistory?.length || 0))} captured browser targets. Latest: ${escapeHtml(archive.browserHistory?.[0]?.url || "none")}.</p>
 <h2>Team Chat and Recommendations</h2>
 <p>${escapeHtml(String(archive.teamMessages?.length || 0))} team posts stored; ${escapeHtml(String((archive.teamMessages || []).filter((item) => item.type === "recommendation" && item.status !== "rejected").length))} open recommendations.</p>
+<h2>Collaboration Documents</h2>
+<table>
+<thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Owner</th><th>Preview</th></tr></thead>
+<tbody>${docRows || '<tr><td colspan="5">No collaboration documents yet.</td></tr>'}</tbody>
+</table>
 <h2>NVIDIA AIQ Research</h2>
 <p>Backend URL: ${escapeHtml(aiqApi.backendUrl)}. Status: ${escapeHtml(aiqApi.status)}.</p>
 <h2>Extraction Results</h2>

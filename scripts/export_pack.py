@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -18,6 +19,13 @@ SEED_PATH = ROOT / "data" / "research_seed.json"
 GATEWAY_PATH = ROOT / "data" / "internal_model_gateway.json"
 REFERENCE_INGEST_PATH = ROOT / "data" / "reference_ingest.json"
 DIST = ROOT / "dist"
+
+
+def strip_html(value: str) -> str:
+    text = re.sub(r"<(script|style)[\s\S]*?</\1>", " ", str(value or ""), flags=re.IGNORECASE)
+    text = re.sub(r"<br\s*/?>|</p>|</h[1-6]>|</li>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return html.unescape(re.sub(r"\s+", " ", text)).strip()
 
 
 def load_seed() -> dict:
@@ -122,13 +130,25 @@ def write_txt(seed: dict) -> None:
         f"Team posts stored: {len(seed.get('teamMessages', []))}",
         f"Open recommendations: {len([item for item in seed.get('teamMessages', []) if item.get('type') == 'recommendation' and item.get('status') != 'rejected'])}",
         "",
+        "Collaboration Documents:",
+        f"Draft documents stored: {len(seed.get('collabDocs', []))}",
+    ]
+    for doc in seed.get("collabDocs", [])[:8]:
+        lines.append(
+            f"- {doc.get('title', '')} "
+            f"({doc.get('type', 'Document')}; {doc.get('status', 'Draft')}; {doc.get('owner', 'Unassigned')})"
+        )
+    lines.extend(
+        [
+            "",
         "NVIDIA AIQ Research:",
         f"Backend URL: {aiq_api.get('backendUrl', 'http://localhost:8000')}",
         f"Status: {aiq_api.get('status', 'Optional local/self-hosted research backend')}",
         f"Capabilities: {', '.join(aiq_api.get('capabilities', []))}",
         "",
         "Extraction results:",
-    ]
+        ]
+    )
     results = seed.get("extractionResults", [])
     if results:
         for result in results:
@@ -252,6 +272,17 @@ def write_html(seed: dict) -> None:
                 f"<td>{html.escape(item.get('summary', ''))}</td>"
                 "</tr>"
             )
+    doc_rows = []
+    for doc in seed.get("collabDocs", []):
+        doc_rows.append(
+            "<tr>"
+            f"<td>{html.escape(doc.get('title', ''))}</td>"
+            f"<td>{html.escape(doc.get('type', 'Document'))}</td>"
+            f"<td>{html.escape(doc.get('status', 'Draft'))}</td>"
+            f"<td>{html.escape(doc.get('owner', 'Unassigned'))}</td>"
+            f"<td>{html.escape(strip_html(doc.get('contentHtml', ''))[:220])}</td>"
+            "</tr>"
+        )
     document = f"""<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -285,6 +316,11 @@ th{{background:#edf1ed}}
 <p>{html.escape(str(len(seed.get("browserHistory", []))))} captured browser targets.</p>
 <h2>Team Chat and Recommendations</h2>
 <p>{html.escape(str(len(seed.get("teamMessages", []))))} team posts stored; {html.escape(str(len([item for item in seed.get("teamMessages", []) if item.get("type") == "recommendation" and item.get("status") != "rejected"])))} open recommendations.</p>
+<h2>Collaboration Documents</h2>
+<table>
+<thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Owner</th><th>Preview</th></tr></thead>
+<tbody>{''.join(doc_rows) or '<tr><td colspan="5">No collaboration documents yet.</td></tr>'}</tbody>
+</table>
 <h2>NVIDIA AIQ Research</h2>
 <p>Backend URL: {html.escape(aiq_api.get("backendUrl", "http://localhost:8000"))}. Status: {html.escape(aiq_api.get("status", "Optional local/self-hosted research backend"))}.</p>
 <h2>Extraction Results</h2>

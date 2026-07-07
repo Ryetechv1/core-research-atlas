@@ -40,6 +40,14 @@ def configured_model() -> str:
     return os.environ.get("OPENAI_AGENT_MODEL", DEFAULT_AGENT_MODEL).strip() or DEFAULT_AGENT_MODEL
 
 
+def configured_reasoning_effort() -> str:
+    return os.environ.get("OPENAI_AGENT_REASONING_EFFORT", "low").strip() or "low"
+
+
+def web_search_enabled() -> bool:
+    return os.environ.get("OPENAI_AGENT_WEB_SEARCH", "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
 def create_research_answer(payload: dict[str, Any]) -> dict[str, Any]:
     prompt = str(payload.get("prompt", "")).strip()
     if not prompt:
@@ -52,8 +60,12 @@ def create_research_answer(payload: dict[str, Any]) -> dict[str, Any]:
         "model": model,
         "instructions": instructions,
         "input": input_text,
+        "reasoning": {"effort": configured_reasoning_effort()},
         "max_output_tokens": int(payload.get("max_output_tokens") or 1800),
     }
+    if web_search_enabled():
+        request_body["tools"] = [{"type": "web_search"}]
+        request_body["tool_choice"] = "auto"
     request = Request(
         OPENAI_RESPONSES_ENDPOINT,
         method="POST",
@@ -70,7 +82,7 @@ def create_research_answer(payload: dict[str, Any]) -> dict[str, Any]:
             data = json.loads(raw or "{}")
     except HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")[:1600]
-        raise OpenAIAgentApiError(f"OpenAI Responses API HTTP {error.code}: {detail}") from error
+        raise OpenAIAgentApiError(format_openai_error(error.code, detail)) from error
     except URLError as error:
         raise OpenAIAgentApiError(f"OpenAI Responses API request failed: {error.reason}") from error
     except json.JSONDecodeError as error:
@@ -86,6 +98,8 @@ def create_research_answer(payload: dict[str, Any]) -> dict[str, Any]:
         "output_text": output_text,
         "response_id": data.get("id", ""),
         "usage": data.get("usage", {}),
+        "web_search_enabled": web_search_enabled(),
+        "citations": extract_response_citations(data),
     }
 
 
@@ -93,7 +107,7 @@ def build_agent_instructions() -> str:
     return (
         "You are the CORE ChatGPT Pro Research Agent for a collaborative research web app. "
         "Answer from the supplied web result cards, scraped site previews, app archive records, "
-        "active browser context, team posts, profiles, and uploaded-reference metadata. "
+        "active browser context, team posts, collaboration documents, profiles, and uploaded-reference metadata. "
         "Keep URLs visible for citation follow-up. Separate historical, cultural, occult, "
         "metaphysical, psychological, and biological-analogy claims. Do not present supernatural "
         "or physical shapeshifting claims as established biology. When evidence is weak, say so "
@@ -111,6 +125,7 @@ def build_agent_input(payload: dict[str, Any]) -> str:
         "webRecord": payload.get("webRecord"),
         "sourceMatches": payload.get("sourceMatches"),
         "references": payload.get("references"),
+        "collabDocs": payload.get("collabDocs"),
         "teamMessages": payload.get("teamMessages"),
         "recentExtractions": payload.get("recentExtractions"),
         "activeProfile": payload.get("activeProfile"),
@@ -141,3 +156,34 @@ def extract_output_text(data: dict[str, Any]) -> str:
             elif isinstance(text, dict) and isinstance(text.get("value"), str):
                 parts.append(text["value"])
     return "\n".join(part.strip() for part in parts if part and part.strip()).strip()
+
+
+def extract_response_citations(data: dict[str, Any]) -> list[dict[str, Any]]:
+    citations: list[dict[str, Any]] = []
+    for item in data.get("output") or []:
+        if not isinstance(item, dict):
+            continue
+        for content in item.get("content") or []:
+            if not isinstance(content, dict):
+                continue
+            for annotation in content.get("annotations") or []:
+                if isinstance(annotation, dict) and (annotation.get("url") or annotation.get("title")):
+                    citations.append(
+                        {
+                            "title": annotation.get("title") or annotation.get("url") or "",
+                            "url": annotation.get("url") or "",
+                            "type": annotation.get("type") or "citation",
+                        }
+                    )
+    return citations[:12]
+
+
+def format_openai_error(status_code: int, detail: str) -> str:
+    try:
+        payload = json.loads(detail or "{}")
+        error = payload.get("error") or payload
+        message = error.get("message") or detail
+        code = error.get("code") or error.get("type") or "unknown_error"
+        return f"OpenAI Responses API HTTP {status_code} ({code}): {message}"
+    except Exception:
+        return f"OpenAI Responses API HTTP {status_code}: {detail}"

@@ -1167,6 +1167,142 @@ input[type="range"] {
   font-weight: 760;
 }
 
+.collab-docs-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.82fr) minmax(0, 1.55fr);
+  gap: 16px;
+}
+
+.docs-library-panel,
+.docs-editor-panel {
+  align-content: start;
+}
+
+.collab-doc-list {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.collab-doc-item {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  text-align: left;
+  color: #fff;
+  background:
+    linear-gradient(145deg, #2c2c2c 0%, #121212 68%, #030303 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.collab-doc-item.is-active {
+  background:
+    linear-gradient(145deg, #f5f5f5 0%, #888 42%, #1d1d1d 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.collab-doc-item strong {
+  font-size: 13px;
+}
+
+.collab-doc-item span,
+.collab-doc-item small {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.doc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.doc-toolbar .ghost-button {
+  min-height: 34px;
+  min-width: 42px;
+  padding: 0 10px;
+}
+
+.collab-doc-editor {
+  min-height: 420px;
+  max-height: 660px;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, #ffffff 0%, #d8d8d8 60%, #adadad 100%) padding-box,
+    var(--border-gradient) border-box;
+  color: #0b0b0b;
+  font-family: var(--font-doc);
+  font-size: 16px;
+  line-height: 1.58;
+  outline: none;
+}
+
+.collab-doc-editor:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.collab-doc-editor.is-read-only {
+  background:
+    linear-gradient(145deg, #dadada 0%, #9b9b9b 60%, #555 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.collab-doc-editor h2,
+.collab-doc-editor h3,
+.collab-doc-editor p,
+.collab-doc-editor li,
+.collab-doc-editor blockquote,
+.collab-doc-editor pre {
+  color: #0b0b0b;
+}
+
+.collab-doc-editor h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.collab-doc-editor h3 {
+  margin: 18px 0 8px;
+  font-size: 18px;
+}
+
+.collab-doc-editor p {
+  margin: 0 0 12px;
+}
+
+.collab-doc-editor blockquote {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-left: 4px solid #111;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.collab-doc-editor pre {
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #888;
+  border-radius: 8px;
+  background: #eeeeee;
+  font-family: Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+}
+
+.collab-doc-editor a {
+  color: #000;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
 .agent-side h2,
 .integration-panel h2 {
   margin: 0 0 12px;
@@ -1997,7 +2133,8 @@ a,
 
   .content-grid,
   .hero-panel,
-  .agent-layout {
+  .agent-layout,
+  .collab-docs-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2091,8 +2228,11 @@ a,
   .toolbar-panel,
   .source-panel,
   .agent-layout,
+  .collab-docs-grid,
   .agent-main,
   .agent-side,
+  .docs-library-panel,
+  .docs-editor-panel,
   .codex-grid article,
   .inspector-card,
   .diagram-card {
