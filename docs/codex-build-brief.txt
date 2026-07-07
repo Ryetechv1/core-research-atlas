@@ -15,8 +15,9 @@ Current internal-app additions
   outsourcing, scraping, PDF extraction, archive search, image/OCR, and citation
   gathering.
 - Connector-ready ChatGPT 5.5 Pro agent UI that locally synthesizes archive,
-  profile, and extraction state. It does not perform live model calls or global
-  web fetching until a backend/API connector is added.
+  profile, extraction state, team recommendations, and active in-app browser
+  context. It does not perform live model calls or global web fetching until a
+  backend/API connector is added.
 - Uploaded Internal Core System Gateway JSON installed as the local model
   profile for the agent. This is a connector-ready configuration layer, not a
   created or hosted OpenAI model.
@@ -33,6 +34,9 @@ Current internal-app additions
 - Local web scraping extraction installed through /api/scrape. It uses
   dependency-free Python HTML/text extraction, blocks private/local targets by
   default, caps fetch size, and does not execute JavaScript.
+- Team chat and recommendation review installed through /api/team-chat. The
+  Team panel supports messages, updates, links, rejectable recommendations, and
+  promotion of approved recommendations into Sources.
 - Deployment artifacts now include Render web service config, Vercel Python API
   handlers, and a Cloudflare Workers / Agents scaffold. Catalyst by Zoho is
   blocked until catalyst init creates .catalystrc and catalyst.json.
@@ -52,7 +56,7 @@ Core categories
 - Occult Data
 - Mechanics
 - Theoretical Concepts
-- Simulations
+- Team Chat and Recommendations
 
 Required source fields
 - id
@@ -80,10 +84,10 @@ Expansion priorities
 6. Add a graph view linking terms such as lycanthropy, alopecanthropy,
    dracanthrope, therianthropy, kitsune-tsuki, phantom shift, mental shift,
    animal aura, morphogenetic field, and holographic blueprint.
-7. Add team collaboration fields for the two other members: owner, reviewer,
-   status, comments, and change history.
-8. Add richer simulation notebooks that keep every output labeled as
-   speculative, symbolic, analogical, or evidence-backed.
+7. Replace browser-local team chat storage with durable authenticated records:
+   owner, reviewer, status, comments, votes, and change history.
+8. Expand browser-context extraction so source cards can preserve screenshots,
+   archive URLs, and citation review decisions.
 
 Plugin/toolchain notes
 - Browser and Chrome: visual QA, screenshots, responsive checks.

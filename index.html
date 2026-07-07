@@ -83,8 +83,8 @@
             <span>Maps claims into CORE concepts.</span>
           </div>
           <div class="role-card">
-            <strong>Simulation Steward</strong>
-            <span>Keeps models labeled as speculative.</span>
+            <strong>Source Steward</strong>
+            <span>Turns team leads into reviewed source records.</span>
           </div>
         </div>
       </aside>
@@ -124,8 +124,8 @@
                 <button class="segment" type="button" data-panel="browserPanel">Browser</button>
                 <button class="segment" type="button" data-panel="extractionPanel">Extract</button>
                 <button class="segment" type="button" data-panel="agentPanel">Agent</button>
+                <button class="segment" type="button" data-panel="teamPanel">Team</button>
                 <button class="segment" type="button" data-panel="profilesPanel">Profiles</button>
-                <button class="segment" type="button" data-panel="simulationPanel">Sim</button>
                 <button class="segment" type="button" data-panel="codexPanel">Codex</button>
               </div>
               <div class="toolbar-actions">
@@ -394,7 +394,7 @@
                 <div class="panel-heading">
                   <div>
                     <h2>Global Web Extraction Console</h2>
-                    <p>Build search, scraping, archive, PDF, image, and documentation extraction jobs for a future backend or connector run.</p>
+                    <p>Build search, scraping, archive, PDF, image, and documentation jobs using the current in-app browser context.</p>
                   </div>
                   <button class="ghost-button" id="copyExtractionQueueButton" type="button">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -613,7 +613,7 @@
                   <div class="panel-heading">
                     <div>
                       <h2>ChatGPT 5.5 Pro Research Agent</h2>
-                      <p>Connector-ready local synthesis console. It uses the same extraction parameters and current archive/profile context.</p>
+                      <p>Connector-ready local synthesis console. It uses archive, profile, extraction, and in-app browser context.</p>
                     </div>
                     <button class="ghost-button" id="clearAgentButton" type="button">Clear Chat</button>
                   </div>
@@ -707,6 +707,62 @@
               </div>
             </section>
 
+            <section id="teamPanel" class="panel-view">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Team Chat and Recommendations</h2>
+                    <p>All three users can post messages, updates, links, and source recommendations for review.</p>
+                  </div>
+                  <div class="panel-heading-actions">
+                    <span class="detail-chip" id="teamChatStatus">Sync idle</span>
+                    <button class="ghost-button" id="refreshTeamChatButton" type="button">Refresh</button>
+                  </div>
+                </div>
+
+                <form id="teamChatForm" class="team-chat-form api-panel">
+                  <div class="form-grid">
+                    <label>
+                      Post type
+                      <select name="type">
+                        <option value="message">Message</option>
+                        <option value="update">Update</option>
+                        <option value="recommendation">Recommendation</option>
+                        <option value="link">Link</option>
+                      </select>
+                    </label>
+                    <label>
+                      Title
+                      <input name="title" placeholder="Short title for links or recommendations">
+                    </label>
+                    <label>
+                      URL
+                      <input name="url" placeholder="https://source, archive, PDF, or browser lead">
+                    </label>
+                  </div>
+                  <label>
+                    Message
+                    <textarea name="text" rows="4" required placeholder="Post a finding, team update, question, recommendation, or source lead."></textarea>
+                  </label>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">Post to Team</button>
+                    <button class="ghost-button" id="useBrowserForTeamPostButton" type="button">Use Browser URL</button>
+                  </div>
+                </form>
+
+                <section class="results-panel" aria-labelledby="teamChatTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="teamChatTitle">Live Team Feed</h2>
+                      <p>Recommendations can be rejected or added to Sources. Links can be opened, copied into the browser, or promoted.</p>
+                    </div>
+                    <span class="detail-chip">3 users</span>
+                  </div>
+                  <div id="teamChatFeed" class="team-chat-feed" aria-live="polite"></div>
+                </section>
+              </div>
+            </section>
+
             <section id="profilesPanel" class="panel-view">
               <div class="source-panel">
                 <div class="panel-heading">
@@ -754,28 +810,6 @@
               </div>
             </section>
 
-            <section id="simulationPanel" class="panel-view">
-              <div class="simulation-layout">
-                <div class="sim-copy">
-                  <h2>Theoretical Mechanism Sandbox</h2>
-                  <p>
-                    This model is a narrative reasoning tool for comparing concepts. It is not a biological,
-                    medical, or experimental protocol.
-                  </p>
-                </div>
-                <div class="sim-controls" id="simControls"></div>
-                <div class="sim-output">
-                  <div class="output-ring" aria-hidden="true">
-                    <span id="simScore">0</span>
-                  </div>
-                  <div>
-                    <h3 id="simLabel">Speculative baseline</h3>
-                    <p id="simInterpretation"></p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
             <section id="codexPanel" class="panel-view">
               <div class="codex-grid">
                 <article>
@@ -783,7 +817,7 @@
                   <p>
                     Use this app as the source-of-truth scaffold. Future Codex work can add
                     real crawling, citation extraction, collaborative sync, richer graph views,
-                    or simulation notebooks.
+                    and database-backed team review.
                   </p>
                   <button class="primary-button" id="copyBriefButton" type="button">
                     <svg viewBox="0 0 24 24" aria-hidden="true">

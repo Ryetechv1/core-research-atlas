@@ -4,7 +4,7 @@ A self-contained static research web app for building a collaborative archive ar
 
 The app treats supernatural and metaphysical material as research artifacts with evidence labels. It does not present physical shapeshifting as established biomedical fact.
 
-This build includes a local gated sign-in modal for the three project users, editable profile pages, source-type listings, file import, an in-app research browser, an extraction queue builder, a connector-ready AI synthesis console, an uploaded Internal Core System Gateway model profile, an ErydirCeisiwr backend mechanics scaffold, a metadata-only uploaded PDF reference layer, and Python-backed extraction endpoints for Parallel, local HTML/text scraping, and uploaded-file parsing.
+This build includes a local gated sign-in modal for the three project users, editable profile pages, source-type listings, file import, an in-app research browser, an extraction queue builder, a connector-ready AI synthesis console, team chat with recommendation review, an uploaded Internal Core System Gateway model profile, an ErydirCeisiwr backend mechanics scaffold, a metadata-only uploaded PDF reference layer, and Python-backed endpoints for Parallel, local HTML/text scraping, uploaded-file parsing, and team messages.
 
 ## Open The App
 
@@ -26,8 +26,8 @@ The static UI can still be opened directly with `index.html`, but `/api/extract`
 
 - `index.html` - app shell and semantic UI.
 - `styles.css` - responsive dashboard styling.
-- `app.js` - local state, filters, add-source flow, simulation controls, and browser exports.
-- `server.py` - local Python static server, `/api/extract` proxy for Parallel, `/api/scrape` local scraper, and `/api/import-file` parser.
+- `app.js` - local state, filters, add-source flow, browser-context synthesis, team chat, and browser exports.
+- `server.py` - local Python static server, `/api/extract` proxy for Parallel, `/api/scrape` local scraper, `/api/import-file` parser, and `/api/team-chat` runtime message endpoint.
 - `render.yaml` - Render Web Service blueprint with health check and server-side secret wiring.
 - `vercel.json` - static routing plus Vercel Python API function routing.
 - `manifest.webmanifest` - installable web-app metadata for future hosted/mobile use.
@@ -152,6 +152,12 @@ The Browser panel also provides a sandboxed iframe fallback for quick research n
 
 It accepts a full URL, a domain, or keywords. Browser-panel keyword input opens the Google CSE public URL with `gsc.q=<encoded keywords>`. Some sites block iframe embedding with browser security headers such as `X-Frame-Options: SAMEORIGIN`; when that happens, use the external-open button and still capture the URL as a source lead.
 
+The Extract Console and ChatGPT 5.5 agent console now attach the active in-app browser URL, recent browser history, captured browser source leads, and browser search text to generated extraction jobs and local synthesis responses.
+
+## Team Chat
+
+The Team panel lets the three project users post messages, updates, links, and recommendations. Recommendations can be rejected or promoted directly into Sources. When `server.py` is running, messages sync through `/api/team-chat`; the app also keeps a local fallback in browser storage.
+
 ## Automated AI Research Bot
 
 The Extract panel includes an opt-in automated research bot. It rotates through content sections, builds a focused keyword query, runs at most one scrape attempt per minute, and pauses when it finds a useful source card. The user must answer "Yes" before the finding is added to a source section. "No" opens a short feedback prompt and uses that feedback on the next recursive search.
@@ -179,4 +185,4 @@ Then open `http://YOUR-LAN-IP:5177/` from the phone. `127.0.0.1` and `localhost`
 - Team ownership fields for the two additional contributors.
 - Graph view for terms, traditions, entities, species forms, and CORE framework links.
 - Database-backed collaboration when a backend is chosen.
-- Deeper simulation notebooks with explicit speculative/evidence labels.
+- Durable team chat storage with authenticated review history.

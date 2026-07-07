@@ -19,6 +19,10 @@
       "dest": "/api/import_file.py"
     },
     {
+      "src": "/api/team-chat",
+      "dest": "/api/team_chat.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }

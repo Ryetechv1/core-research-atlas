@@ -1,11 +1,11 @@
 CORE Shapeshifting Research Atlas
-Version: 0.4.0
+Version: 0.5.0
 
 Epistemic policy:
 Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.
 
 AI/search connector note:
-The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this static build it performs local synthesis from archive, profile, uploaded reference metadata, and extraction-job state; true web fetching or OpenAI model execution requires a backend/API connector.
+The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this build it performs local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state; true OpenAI model execution requires a secure backend/API connector.
 
 Internal model core:
 ChatGPT 5.5 Pro Internal Core - Local internal model profile / connector-ready
@@ -47,6 +47,10 @@ Created source records: 0
 
 In-App Browser:
 Captured browser targets: 0
+
+Team Chat and Recommendations:
+Team posts stored: 0
+Open recommendations: 0
 
 NVIDIA AIQ Research:
 Backend URL: http://localhost:8000
@@ -95,7 +99,7 @@ User profiles:
   Identity: Contributor profile for fox, kitsune, folklore, cultural data, and phantom-shift terminology.
 - UserKhiimori: Cross-form researcher
   Spirits: Unassigned
-  Identity: Contributor profile for cross-form synthesis, occult mechanics, and simulation interpretation.
+  Identity: Contributor profile for cross-form synthesis, occult mechanics, and source recommendation review.
 
 Extraction jobs:
 - No queued extraction jobs in seed.
@@ -202,15 +206,15 @@ Terms: morphogenesis, regeneration, patterning, plasticity
 Notes: Use only as analogy for form generation and tissue patterning. Do not imply macro-scale human-animal transformation is biologically demonstrated.
 
 ## Energy budget constraint note for physical shifting
-Category: Simulations
+Category: Theoretical Concepts
 Form: Cross-form
-Domain: Simulation
-Source type: Dataset
+Domain: Theoretical Biology
+Source type: Documentation
 Evidence: Speculative framework
 Citation: Citation missing
 Locator: None yet
 Terms: energy budget, mass conservation, tissue remodeling, shift potential
-Notes: Simulation variable file for modeling how extreme transformation claims would face energy, heat, mass, and tissue continuity constraints.
+Notes: Constraint note for reasoning about how extreme transformation claims would face energy, heat, mass, and tissue continuity barriers.
 
 ## Therianthropy community terminology map
 Category: Cultural Data

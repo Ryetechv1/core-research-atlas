@@ -112,6 +112,10 @@ def write_txt(seed: dict) -> None:
         "In-App Browser:",
         f"Captured browser targets: {len(seed.get('browserHistory', []))}",
         "",
+        "Team Chat and Recommendations:",
+        f"Team posts stored: {len(seed.get('teamMessages', []))}",
+        f"Open recommendations: {len([item for item in seed.get('teamMessages', []) if item.get('type') == 'recommendation' and item.get('status') != 'rejected'])}",
+        "",
         "NVIDIA AIQ Research:",
         f"Backend URL: {aiq_api.get('backendUrl', 'http://localhost:8000')}",
         f"Status: {aiq_api.get('status', 'Optional local/self-hosted research backend')}",
@@ -270,6 +274,8 @@ th{{background:#edf1ed}}
 <p>{html.escape(str(len(seed.get("importedFiles", []))))} imported file logs; {html.escape(str(sum(item.get("recordsCreated", 0) for item in seed.get("importedFiles", []))))} source records created from uploaded files.</p>
 <h2>In-App Browser</h2>
 <p>{html.escape(str(len(seed.get("browserHistory", []))))} captured browser targets.</p>
+<h2>Team Chat and Recommendations</h2>
+<p>{html.escape(str(len(seed.get("teamMessages", []))))} team posts stored; {html.escape(str(len([item for item in seed.get("teamMessages", []) if item.get("type") == "recommendation" and item.get("status") != "rejected"])))} open recommendations.</p>
 <h2>NVIDIA AIQ Research</h2>
 <p>Backend URL: {html.escape(aiq_api.get("backendUrl", "http://localhost:8000"))}. Status: {html.escape(aiq_api.get("status", "Optional local/self-hosted research backend"))}.</p>
 <h2>Extraction Results</h2>

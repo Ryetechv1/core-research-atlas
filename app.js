@@ -8,6 +8,7 @@ const GOOGLE_CSE_SCRIPT_URL = `https://cse.google.com/cse.js?cx=${GOOGLE_CSE_ID}
 const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gsc.tab=0`;
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
 const AUTO_BOT_INTERVAL_MS = 60_000;
+const TEAM_CHAT_POLL_MS = 5_000;
 
 const AUTH_USERS = [
   { username: "UserSeth", password: "User1password", role: "ADMIN" },
@@ -149,7 +150,7 @@ const BACKEND_CORE = {
   sourceReferenceId: "ref-upload-erydir-core",
   summary:
     "Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.",
-  operatingMode: "Local static simulation with connector-ready OpenAI and web-extraction hooks.",
+  operatingMode: "Local static archive with connector-ready OpenAI, team chat, and web-extraction hooks.",
   stages: [
     "Intent intake",
     "Profile context merge",
@@ -211,12 +212,12 @@ const DEFAULT_PROFILES = [
     role: "Member",
     animalForm: "Cross-form researcher",
     animalSpirits: "Unassigned",
-    identityStatement: "Contributor profile for cross-form synthesis, occult mechanics, and simulation interpretation.",
+    identityStatement: "Contributor profile for cross-form synthesis, occult mechanics, and source recommendation review.",
     extended: [
       "Maps shared terms across wolf, fox, kitsune, and dragon traditions.",
       "Reviews energy, phantom body, animal aura, and morphogenetic-field concepts.",
       "Connects metaphysical claims to source lineage and uncertainty notes.",
-      "Supports simulation parameter design and interpretation.",
+      "Supports source recommendation review and cross-form interpretation.",
       "Profile data may guide agent output toward cross-form integration.",
     ],
   },
@@ -225,13 +226,13 @@ const DEFAULT_PROFILES = [
 const SEED_DATA = {
   project: {
     name: "CORE Shapeshifting Research Atlas",
-    version: "0.4.0",
+    version: "0.5.0",
     epistemicPolicy:
       "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     corePrompt:
       "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
     aiConnectorNote:
-      "The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this static build it performs local synthesis from archive, profile, uploaded reference metadata, and extraction-job state; true web fetching or OpenAI model execution requires a backend/API connector.",
+      "The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this build it performs local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state; true OpenAI model execution requires a secure backend/API connector.",
   },
   internalModel: {
     displayName: "ChatGPT 5.5 Pro Internal Core",
@@ -246,7 +247,8 @@ const SEED_DATA = {
       "Queued extraction jobs",
       "Uploaded PDF reference metadata",
       "Three-user profile context",
-      "CORE framework and simulation controls",
+      "In-app browser state and captured browser leads",
+      "Team chat and recommendation review state",
     ],
   },
   backendCore: BACKEND_CORE,
@@ -298,7 +300,6 @@ const SEED_DATA = {
     "Occult Data",
     "Mechanics",
     "Theoretical Concepts",
-    "Simulations",
   ],
   species: ["Wolf", "Fox", "Kitsune", "Dragon", "Cross-form"],
   domains: [
@@ -309,7 +310,6 @@ const SEED_DATA = {
     "Theoretical Biology",
     "Physiology",
     "Psychology",
-    "Simulation",
   ],
   sourceTypes: SOURCE_TYPES,
   evidenceTiers: [
@@ -379,6 +379,7 @@ const SEED_DATA = {
   browserHistory: [],
   parallelExtractRuns: [],
   webScrapeRuns: [],
+  teamMessages: [],
   agentMessages: [
     {
       role: "assistant",
@@ -536,17 +537,17 @@ const SEED_DATA = {
     {
       id: "src-energy-budget",
       title: "Energy budget constraint note for physical shifting",
-      category: "Simulations",
+      category: "Theoretical Concepts",
       species: "Cross-form",
-      domain: "Simulation",
-      sourceType: "Dataset",
+      domain: "Theoretical Biology",
+      sourceType: "Documentation",
       url: "",
       evidenceTier: "Speculative framework",
       citationStatus: "Citation missing",
       tradition: "Project model",
       terms: ["energy budget", "mass conservation", "tissue remodeling", "shift potential"],
       notes:
-        "Simulation variable file for modeling how extreme transformation claims would face energy, heat, mass, and tissue continuity constraints.",
+        "Constraint note for reasoning about how extreme transformation claims would face energy, heat, mass, and tissue continuity barriers.",
       coreLinks: ["Physiological Hypothesis", "Safety and Epistemic Notes"],
     },
     {
@@ -652,40 +653,6 @@ const SEED_DATA = {
   ],
 };
 
-const SIM_CONTROLS = [
-  {
-    id: "morphologicalGap",
-    label: "Morphological gap",
-    description: "Distance between human anatomy and target-form anatomy.",
-    value: 86,
-    invert: true,
-  },
-  {
-    id: "tissuePlasticity",
-    label: "Tissue plasticity",
-    description: "Speculative ability to remodel tissue while preserving function.",
-    value: 18,
-  },
-  {
-    id: "energyBudget",
-    label: "Energy budget",
-    description: "Available energy after mass, heat, and repair constraints.",
-    value: 12,
-  },
-  {
-    id: "neuralIntegration",
-    label: "Neural integration",
-    description: "Continuity of senses, motor control, memory, and selfhood.",
-    value: 34,
-  },
-  {
-    id: "fieldCoherence",
-    label: "Field coherence",
-    description: "Metaphysical claim coherence inside the CORE framework.",
-    value: 52,
-  },
-];
-
 const state = {
   archive: loadArchive(),
   activeCategory: "All",
@@ -697,7 +664,7 @@ const state = {
   selectedId: null,
   currentBrowserUrl: BROWSER_DEFAULT_URL,
   importBusy: false,
-  sim: Object.fromEntries(SIM_CONTROLS.map((control) => [control.id, control.value])),
+  teamChatPollTimer: null,
   pendingSearchChoice: null,
   autoBot: {
     active: false,
@@ -721,6 +688,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderSourceTypeCheckboxes(els.agentSourceTypes, "agent", ["Documentation", "PDF", "URL", "Archive", "Forum / Community"]);
   initAuth();
   render();
+  startTeamChatPolling();
 });
 
 function cacheElements() {
@@ -784,15 +752,16 @@ function cacheElements() {
   els.agentTranscript = document.getElementById("agentTranscript");
   els.agentContextSummary = document.getElementById("agentContextSummary");
   els.clearAgentButton = document.getElementById("clearAgentButton");
+  els.teamChatForm = document.getElementById("teamChatForm");
+  els.teamChatFeed = document.getElementById("teamChatFeed");
+  els.teamChatStatus = document.getElementById("teamChatStatus");
+  els.refreshTeamChatButton = document.getElementById("refreshTeamChatButton");
+  els.useBrowserForTeamPostButton = document.getElementById("useBrowserForTeamPostButton");
   els.profileTabs = document.getElementById("profileTabs");
   els.profileForm = document.getElementById("profileForm");
   els.profileExtendedSections = document.getElementById("profileExtendedSections");
   els.profileIntegrationSummary = document.getElementById("profileIntegrationSummary");
   els.exportProfilesButton = document.getElementById("exportProfilesButton");
-  els.simControls = document.getElementById("simControls");
-  els.simScore = document.getElementById("simScore");
-  els.simLabel = document.getElementById("simLabel");
-  els.simInterpretation = document.getElementById("simInterpretation");
   els.modelCoreSummary = document.getElementById("modelCoreSummary");
   els.referenceLibrary = document.getElementById("referenceLibrary");
   els.searchChoiceOverlay = document.getElementById("searchChoiceOverlay");
@@ -855,6 +824,9 @@ function wireEvents() {
   els.agentForm.addEventListener("submit", handleAgentPrompt);
   els.agentScrapeForm.addEventListener("submit", (event) => handleKeywordSearch(event, "agent"));
   els.clearAgentButton.addEventListener("click", clearAgentChat);
+  els.teamChatForm.addEventListener("submit", handleTeamChatSubmit);
+  els.refreshTeamChatButton.addEventListener("click", () => syncTeamChat({ renderAfter: true }));
+  els.useBrowserForTeamPostButton.addEventListener("click", useBrowserUrlForTeamPost);
   els.searchChoiceInternalButton.addEventListener("click", () => resolveSearchChoice("internal"));
   els.searchChoiceExternalButton.addEventListener("click", () => resolveSearchChoice("external"));
   els.searchChoiceCancelButton.addEventListener("click", () => resolveSearchChoice("cancel"));
@@ -991,14 +963,15 @@ function render() {
   renderExtractionJobs();
   renderAutoBotStatus();
   renderAgent();
+  renderTeamChat();
   renderProfiles();
-  renderSimulation();
   renderModelCore();
   renderMetrics();
 }
 
 function renderNavigation() {
   const categories = ["All", ...state.archive.categories];
+  if (!categories.includes(state.activeCategory)) state.activeCategory = "All";
   const counts = countBy(state.archive.sources, "category");
   els.categoryNav.innerHTML = "";
   categories.forEach((category) => {
@@ -1774,6 +1747,53 @@ function dedupeBrowserHistory(history) {
   });
 }
 
+function getBrowserContext() {
+  const history = state.archive.browserHistory || [];
+  const currentUrl = state.currentBrowserUrl || history[0]?.url || BROWSER_DEFAULT_URL;
+  const browserSources = (state.archive.sources || [])
+    .filter((source) => source.id?.startsWith("src-browser-") || String(source.tradition || "").includes("In-app browser"))
+    .slice(0, 5);
+  const teamBrowserLeads = (state.archive.teamMessages || [])
+    .filter((item) => ["recommendation", "link"].includes(item.type) && item.url && item.status !== "rejected")
+    .slice(0, 5);
+  return {
+    currentUrl,
+    currentDomain: domainFromUrl(currentUrl) || "cse.google.com",
+    csePublicUrl: GOOGLE_CSE_PUBLIC_URL,
+    history: history.slice(0, 6),
+    browserSources,
+    teamBrowserLeads,
+    searchText: [
+      currentUrl,
+      ...history.slice(0, 6).flatMap((entry) => [entry.label, entry.url]),
+      ...browserSources.flatMap((source) => [source.title, source.url, source.notes, ...(source.terms || [])]),
+      ...teamBrowserLeads.flatMap((item) => [item.title, item.url, item.text]),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  };
+}
+
+function browserContextSummary(context = getBrowserContext()) {
+  const historyLines = context.history.map((entry) => `- ${entry.label || entry.url}: ${entry.url}`).join("\n");
+  const sourceLines = context.browserSources.map((source) => `- ${source.title}: ${source.url || "no URL"}`).join("\n");
+  const teamLines = context.teamBrowserLeads.map((item) => `- ${item.title || item.type}: ${item.url}`).join("\n");
+  return [
+    `Current browser URL: ${context.currentUrl}`,
+    `Current browser domain: ${context.currentDomain}`,
+    `Google CSE URL: ${context.csePublicUrl}`,
+    context.history.length ? `Recent browser history:\n${historyLines}` : "Recent browser history: none yet",
+    context.browserSources.length ? `Browser source leads:\n${sourceLines}` : "Browser source leads: none promoted yet",
+    context.teamBrowserLeads.length ? `Team browser leads:\n${teamLines}` : "Team browser leads: none yet",
+  ].join("\n");
+}
+
+function withBrowserContext(prompt, heading = "In-app browser context") {
+  const text = String(prompt || "").trim();
+  if (text.includes("In-app browser context:")) return text;
+  return `${text || "Browser-informed research run"}\n\n${heading}:\n${browserContextSummary()}`;
+}
+
 function parseMaybeJson(text) {
   try {
     return JSON.parse(text);
@@ -1841,7 +1861,7 @@ function summarizeImportText(text) {
 
 function inferImportCategory(text, fallback) {
   const lower = String(text || "").toLowerCase();
-  if (/(simulation|sandbox|model|parameter)/.test(lower)) return "Simulations";
+  if (/(sandbox|model|parameter|constraint)/.test(lower)) return "Theoretical Concepts";
   if (/(physiology|molecular|tissue|neural|body schema|morphogenesis|mechanism|energy budget)/.test(lower)) return "Mechanics";
   if (/(theory|hypothesis|concept|framework|template|blueprint)/.test(lower)) return "Theoretical Concepts";
   if (/(occult|magick|ritual|esoteric|alchemy|spiritual|aura)/.test(lower)) return "Occult Data";
@@ -1921,7 +1941,7 @@ function renderSourceTypeCheckboxes(container, prefix, selectedTypes) {
 function handleQueueExtraction(event) {
   event.preventDefault();
   const formData = new FormData(els.extractionForm);
-  const prompt = String(formData.get("prompt")).trim();
+  const prompt = withBrowserContext(String(formData.get("prompt")).trim(), "In-app browser context");
   const job = createExtractionJob({
     prompt,
     mode: String(formData.get("mode")),
@@ -1989,18 +2009,20 @@ function buildSearchUrl(query) {
 function getContextPrompt(context, query) {
   if (context === "agent") {
     const agentPrompt = els.agentForm?.elements?.prompt?.value?.trim();
-    if (agentPrompt) return agentPrompt;
+    if (agentPrompt) return withBrowserContext(agentPrompt, "In-app browser context");
     const latestUserMessage = [...(state.archive.agentMessages || [])].reverse().find((message) => message.role === "user");
-    if (latestUserMessage?.content) return latestUserMessage.content;
+    if (latestUserMessage?.content) return withBrowserContext(latestUserMessage.content, "In-app browser context");
   }
   return getActiveExtractionPrompt(`Keyword search: ${query}`);
 }
 
 async function runKeywordScrape({ query, fullContent = false, includeLinks = true, context = "extract", sourcePrompt, categoryTarget = "" }) {
   const searchUrl = buildSearchUrl(query);
+  const objective = withBrowserContext(sourcePrompt || `Keyword search: ${query}`, "In-app browser context");
   const payload = {
     urls: [searchUrl],
-    objective: sourcePrompt || `Keyword search: ${query}`,
+    objective,
+    browser_context: getBrowserContext(),
     search_query: query,
     search_base_url: GOOGLE_SEARCH_BASE_URL,
     advanced_settings: {
@@ -2145,6 +2167,7 @@ async function handleParallelExtract(event) {
   const payload = {
     urls,
     objective: sourcePrompt,
+    browser_context: getBrowserContext(),
     advanced_settings: {
       full_content: fullContent,
     },
@@ -2226,6 +2249,7 @@ async function handleWebScrape(event) {
     search_query: query,
     search_base_url: query ? GOOGLE_SEARCH_BASE_URL : "",
     objective: sourcePrompt,
+    browser_context: getBrowserContext(),
     advanced_settings: {
       full_content: fullContent,
       include_links: includeLinks,
@@ -2293,11 +2317,11 @@ async function handleWebScrape(event) {
 
 function getActiveExtractionPrompt(fallback = "Direct URL extraction run") {
   const prompt = els.extractionForm?.elements?.prompt?.value?.trim();
-  if (prompt) return prompt;
+  if (prompt) return withBrowserContext(prompt, "In-app browser context");
   const queued = state.archive.extractionJobs?.[0]?.prompt;
-  if (queued) return queued;
+  if (queued) return withBrowserContext(queued, "In-app browser context");
   const latestUserMessage = [...(state.archive.agentMessages || [])].reverse().find((message) => message.role === "user");
-  return latestUserMessage?.content || fallback;
+  return withBrowserContext(latestUserMessage?.content || fallback, "In-app browser context");
 }
 
 function appendExtractionResult(record) {
@@ -2487,11 +2511,14 @@ function parseUrlList(value) {
 function createExtractionJob({ prompt, mode, depth, maxLeads, sourceTypes, owner }) {
   const keywords = extractKeywords(prompt);
   const queryBase = keywords.length ? keywords.join(" ") : prompt.slice(0, 90);
+  const browserContext = getBrowserContext();
+  const browserQueryTerms = extractKeywords(browserContext.searchText).join(" ");
   return {
     id: `job-${Date.now()}-${Math.round(Math.random() * 999)}`,
     owner,
     status: "Queued",
     prompt,
+    browserContext,
     mode,
     depth,
     maxLeads,
@@ -2502,13 +2529,14 @@ function createExtractionJob({ prompt, mode, depth, maxLeads, sourceTypes, owner
       `${queryBase} lycanthropy therianthropy phantom shift documentation`,
       `${queryBase} morphogenesis physiology body schema PDF archive`,
       `${queryBase} occult metaphysical transformation grimoire source`,
+      `${queryBase} ${browserQueryTerms} current browser lead`,
     ],
     extractionTargets: sourceTypes.map((type) => ({
       type,
       action: type.includes("PDF") ? "download metadata and extract citations" : "discover, quote, summarize, and cite",
     })),
     integrationNotes:
-      "Backend connector should fetch results, preserve URLs/archive IDs, extract short quotes, assign evidence tiers, and avoid treating speculative claims as proven biology.",
+      "Backend connector should fetch results, preserve URLs/archive IDs, extract short quotes, assign evidence tiers, include current in-app browser context, and avoid treating speculative claims as proven biology.",
   };
 }
 
@@ -2840,7 +2868,6 @@ function inferDomainFromCategory(category) {
     "Occult Data": "Occult / Esoteric",
     Mechanics: "Physiology",
     "Theoretical Concepts": "Theoretical Biology",
-    Simulations: "Simulation",
   };
   return map[category] || "Metaphysics";
 }
@@ -2934,6 +2961,7 @@ function handleAgentPrompt(event) {
     depth: String(formData.get("depth")),
     queueExtraction: String(formData.get("queueExtraction")) === "yes",
     sourceTypes,
+    browserContext: getBrowserContext(),
   };
 
   state.archive.agentMessages.push({
@@ -2946,7 +2974,7 @@ function handleAgentPrompt(event) {
   if (options.queueExtraction) {
     state.archive.extractionJobs.unshift(
       createExtractionJob({
-        prompt,
+        prompt: withBrowserContext(prompt, "In-app browser context"),
         mode: options.mode,
         depth: options.depth,
         maxLeads: options.depth === "Exhaustive" ? 150 : 60,
@@ -3014,7 +3042,9 @@ function rankReferences(prompt) {
 }
 
 function generateAgentResponse(prompt, options) {
-  const matches = rankSources(prompt).slice(0, 5);
+  const browserContext = options.browserContext || getBrowserContext();
+  const teamMessages = state.archive.teamMessages || [];
+  const matches = rankSources(`${prompt} ${browserContext.searchText}`).slice(0, 5);
   const references = rankReferences(prompt).slice(0, 3);
   const activeProfile = getProfile(state.currentUser?.username || state.activeProfileUsername);
   const model = getInternalModel();
@@ -3027,6 +3057,7 @@ function generateAgentResponse(prompt, options) {
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
   const browserHistory = state.archive.browserHistory || [];
+  const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected").slice(0, 3);
   const operation = getGatewayOperation(model);
   const targetParam = model?.targetParameter || "target_id";
   const profileLine = activeProfile
@@ -3058,7 +3089,8 @@ function generateAgentResponse(prompt, options) {
     `Local scraping path: ${scraperApi.localEndpoint} performs dependency-free HTML/text extraction with private-network target safeguards. Keyword search mode invisibly builds ${GOOGLE_SEARCH_BASE_URL}{keywords}.`,
     `Google Programmable Search: CSE ${cseApi.searchEngineId} is embedded in the Browser panel with public URL ${cseApi.publicUrl}.`,
     `File import layer: ${importedFiles.length} imported file logs are available; latest import ${importedFiles[0]?.fileName || "none"} created ${importedFiles[0]?.recordsCreated || 0} source records.`,
-    `In-app browser layer: ${browserHistory.length} captured browser targets; latest target ${browserHistory[0]?.url || "none"}.`,
+    `In-app browser layer: ${browserHistory.length} captured browser targets; active target ${browserContext.currentUrl}. The agent and Extract console use this browser context when building searches and source cards.`,
+    `Team collaboration layer: ${teamMessages.length} posts stored; ${openRecommendations.length} open source recommendation(s) can be rejected or promoted into Sources.`,
     `Automated research bot: ${botFindings.length} persisted findings; it rotates through content sections once per minute only after the user starts it and asks before adding sources.`,
     `NVIDIA AIQ research path: ${aiqApi.backendUrl} is registered as an optional deep-research backend. Use it only after a trusted AI-Q server is reachable and health-checked.`,
     `Backend core route: ${core.title}; active stages include ${core.stages.slice(0, 4).join(", ")} before extraction/export logging.`,
@@ -3066,6 +3098,7 @@ function generateAgentResponse(prompt, options) {
     `Local archive synthesis: ${sourceLine}`,
     `Uploaded reference layer: ${referenceLine}`,
     `Latest extraction source cards: ${extractionLine}`,
+    `Current browser context summary: ${browserContext.currentDomain}; recent lead ${browserContext.history[0]?.url || "none"}.`,
     `Recommended next pass: search documentation, PDFs, URLs, archives, and image/OCR leads for primary-source anchors; extract citation metadata; separate folklore, occult testimony, metaphysical theory, and biological analogy into distinct evidence tiers.`,
     `Epistemic constraint: physical shapeshifting claims remain speculative unless independently verified. The agent can synthesize large research plans here, but live global-web fetching needs an external scraper/search/API connector.`,
   ].join("\n\n");
@@ -3098,6 +3131,9 @@ function renderAgent() {
   const botFindings = state.archive.autoBotFindings || [];
   const importedFiles = state.archive.importedFiles || [];
   const browserHistory = state.archive.browserHistory || [];
+  const browserContext = getBrowserContext();
+  const teamMessages = state.archive.teamMessages || [];
+  const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected");
   els.agentContextSummary.innerHTML = `
     <article><strong>Model Surface</strong><span>${escapeHtml(model.displayName)}; ${escapeHtml(model.status)}.</span></article>
     <article><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))} via ${escapeHtml(getGatewayPath(model))}; static local profile only.</span></article>
@@ -3109,7 +3145,9 @@ function renderAgent() {
     <article><strong>Keyword Search</strong><span>${escapeHtml(GOOGLE_SEARCH_BASE_URL)} + user keywords; modal chooses internal window or external link.</span></article>
     <article><strong>Google CSE</strong><span>${escapeHtml(cseApi.searchEngineId)} / ${escapeHtml(cseApi.publicUrl)}.</span></article>
     <article><strong>File Import</strong><span>${importedFiles.length} imported file logs; ${importedFiles.reduce((sum, item) => sum + (item.recordsCreated || 0), 0)} sources created from uploads.</span></article>
-    <article><strong>In-App Browser</strong><span>${browserHistory.length} captured targets; latest ${escapeHtml(browserHistory[0]?.url || "none")}.</span></article>
+    <article><strong>In-App Browser</strong><span>${browserHistory.length} captured targets; active ${escapeHtml(browserContext.currentUrl)}.</span></article>
+    <article><strong>Browser Pull</strong><span>Agent, keyword scraper, Parallel Extract, and Extract jobs include current browser URL, CSE URL, history, and browser source leads.</span></article>
+    <article><strong>Team Feed</strong><span>${teamMessages.length} posts; ${openRecommendations.length} open recommendations available for source review.</span></article>
     <article><strong>Auto Bot</strong><span>${botFindings.length} findings logged; ${botFindings.filter((entry) => entry.accepted).length} accepted into source sections.</span></article>
     <article><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} / ${escapeHtml(aiqApi.status)}.</span></article>
     <article><strong>References</strong><span>${references.length} uploaded PDF references loaded for background and routing.</span></article>
@@ -3160,6 +3198,215 @@ function clearAgentChat() {
   state.archive.agentMessages = clone(SEED_DATA.agentMessages);
   persistArchive();
   renderAgent();
+}
+
+function startTeamChatPolling() {
+  syncTeamChat({ renderAfter: true });
+  if (state.teamChatPollTimer) window.clearInterval(state.teamChatPollTimer);
+  state.teamChatPollTimer = window.setInterval(() => syncTeamChat({ renderAfter: true }), TEAM_CHAT_POLL_MS);
+}
+
+function setTeamChatStatus(text) {
+  if (els.teamChatStatus) els.teamChatStatus.textContent = text;
+}
+
+async function syncTeamChat({ renderAfter = false } = {}) {
+  if (!els.teamChatFeed) return;
+  try {
+    const response = await fetch("/api/team-chat", { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (Array.isArray(data.messages)) {
+      state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], data.messages).slice(0, 200);
+      persistArchive();
+    }
+    setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    setTeamChatStatus("Local-only chat");
+  }
+  if (renderAfter) renderTeamChat();
+}
+
+function mergeTeamMessages(localMessages = [], remoteMessages = []) {
+  const map = new Map();
+  [...remoteMessages, ...localMessages].forEach((item) => {
+    if (!item?.id) return;
+    map.set(item.id, { ...(map.get(item.id) || {}), ...item });
+  });
+  return [...map.values()].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+}
+
+async function postTeamChatPayload(payload) {
+  try {
+    const response = await fetch("/api/team-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (Array.isArray(data.messages)) {
+      state.archive.teamMessages = data.messages;
+      persistArchive();
+      renderTeamChat();
+    }
+    setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    setTeamChatStatus("Local-only chat");
+  }
+}
+
+function handleTeamChatSubmit(event) {
+  event.preventDefault();
+  const formData = new FormData(els.teamChatForm);
+  const type = String(formData.get("type") || "message");
+  const rawUrl = String(formData.get("url") || "").trim();
+  const url = rawUrl ? normalizeBrowserTarget(rawUrl) : "";
+  const text = String(formData.get("text") || "").trim();
+  const title = String(formData.get("title") || "").trim() || (url ? `Team lead: ${domainFromUrl(url) || url}` : `${type} from ${state.currentUser?.username || "local"}`);
+  if (!text) return;
+
+  const item = {
+    id: `team-${Date.now()}-${Math.round(Math.random() * 999)}`,
+    type,
+    owner: state.currentUser?.username || "local",
+    title,
+    text,
+    url,
+    status: type === "recommendation" ? "open" : "posted",
+    votes: {},
+    createdAt: new Date().toISOString(),
+  };
+
+  state.archive.teamMessages = mergeTeamMessages([item], state.archive.teamMessages || []).slice(0, 200);
+  persistArchive();
+  els.teamChatForm.reset();
+  renderTeamChat();
+  postTeamChatPayload({ action: "post", item });
+}
+
+function useBrowserUrlForTeamPost() {
+  const context = getBrowserContext();
+  els.teamChatForm.elements.url.value = context.currentUrl;
+  if (!els.teamChatForm.elements.title.value) {
+    els.teamChatForm.elements.title.value = `Browser lead: ${context.currentDomain}`;
+  }
+  if (!els.teamChatForm.elements.text.value) {
+    els.teamChatForm.elements.text.value = `Review this in-app browser lead for the source archive: ${context.currentUrl}`;
+  }
+}
+
+function renderTeamChat() {
+  if (!els.teamChatFeed) return;
+  const messages = [...(state.archive.teamMessages || [])].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  if (!messages.length) {
+    els.teamChatFeed.innerHTML = '<div class="empty-state">No team posts yet. Share a message, update, link, or source recommendation.</div>';
+    return;
+  }
+
+  els.teamChatFeed.innerHTML = messages
+    .map((item) => {
+      const votes = item.votes || {};
+      const addVotes = Object.values(votes).filter((vote) => vote === "add").length;
+      const rejectVotes = Object.values(votes).filter((vote) => vote === "reject").length;
+      const isRecommendation = item.type === "recommendation";
+      const isLink = item.type === "link" || Boolean(item.url);
+      return `
+        <article class="team-post ${escapeHtml(item.type || "message")}">
+          <header>
+            <div>
+              <strong>${escapeHtml(item.title || item.type || "Team post")}</strong>
+              <small>${escapeHtml(item.owner || "local")} / ${escapeHtml(item.type || "message")} / ${new Date(item.createdAt).toLocaleString()}</small>
+            </div>
+            <span class="detail-chip">${escapeHtml(item.status || "posted")}</span>
+          </header>
+          <p>${escapeHtml(item.text || "")}</p>
+          ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>` : ""}
+          ${
+            isRecommendation
+              ? `<div class="vote-row"><span>${addVotes} add</span><span>${rejectVotes} reject</span></div>`
+              : ""
+          }
+          <div class="form-actions">
+            ${
+              isLink
+                ? `<button class="ghost-button iconless" type="button" data-team-browser="${escapeHtml(item.id)}">Open in Browser</button>`
+                : ""
+            }
+            ${
+              isLink || isRecommendation
+                ? `<button class="primary-button iconless" type="button" data-team-add="${escapeHtml(item.id)}">Add to Sources</button>`
+                : ""
+            }
+            ${
+              isRecommendation
+                ? `<button class="ghost-button iconless" type="button" data-team-reject="${escapeHtml(item.id)}">Reject</button>`
+                : ""
+            }
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  els.teamChatFeed.querySelectorAll("[data-team-browser]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = findTeamMessage(button.dataset.teamBrowser);
+      if (item?.url) openInAppBrowser(item.url, item.title || item.url);
+    });
+  });
+  els.teamChatFeed.querySelectorAll("[data-team-add]").forEach((button) => {
+    button.addEventListener("click", () => addTeamItemToSources(button.dataset.teamAdd));
+  });
+  els.teamChatFeed.querySelectorAll("[data-team-reject]").forEach((button) => {
+    button.addEventListener("click", () => rejectTeamRecommendation(button.dataset.teamReject));
+  });
+}
+
+function findTeamMessage(id) {
+  return (state.archive.teamMessages || []).find((item) => item.id === id);
+}
+
+function updateTeamMessage(id, update) {
+  state.archive.teamMessages = (state.archive.teamMessages || []).map((item) =>
+    item.id === id ? { ...item, ...update, updatedAt: new Date().toISOString() } : item
+  );
+  persistArchive();
+  renderTeamChat();
+}
+
+function addTeamItemToSources(id) {
+  const item = findTeamMessage(id);
+  if (!item) return;
+  const source = {
+    id: `src-team-${Date.now()}`,
+    title: item.title || `Team source lead from ${item.owner || "local"}`,
+    category: "Documents",
+    species: "Cross-form",
+    domain: "Metaphysics",
+    sourceType: inferSourceType(item.url),
+    url: item.url || "",
+    evidenceTier: "Speculative framework",
+    citationStatus: "Needs verification",
+    tradition: `Team recommendation / ${item.owner || "local"}`,
+    terms: extractKeywords(`${item.title} ${item.text} ${item.url}`).slice(0, 8),
+    notes: `Promoted from team ${item.type || "post"} by ${state.currentUser?.username || "local"}. ${item.text || ""}`,
+    coreLinks: ["Safety and Epistemic Notes", "Core Manifestation Template"],
+  };
+  state.archive.sources.unshift(source);
+  state.selectedId = source.id;
+  const votes = { ...(item.votes || {}), [state.currentUser?.username || "local"]: "add" };
+  updateTeamMessage(id, { status: "added to sources", sourceId: source.id, votes });
+  postTeamChatPayload({ action: "promote", id, sourceId: source.id, user: state.currentUser?.username || "local" });
+  render();
+}
+
+function rejectTeamRecommendation(id) {
+  const item = findTeamMessage(id);
+  if (!item) return;
+  const votes = { ...(item.votes || {}), [state.currentUser?.username || "local"]: "reject" };
+  updateTeamMessage(id, { status: "rejected", votes });
+  postTeamChatPayload({ action: "vote", id, decision: "reject", user: state.currentUser?.username || "local" });
 }
 
 function renderProfiles() {
@@ -3225,59 +3472,6 @@ function buildProfileIntegrationSummary() {
   return state.archive.profiles
     .map((profile) => `${profile.username}: ${profile.animalForm || "form unset"}; ${profile.identityStatement || "identity statement unset"}`)
     .join(" ");
-}
-
-function renderSimulation() {
-  els.simControls.innerHTML = "";
-  SIM_CONTROLS.forEach((control) => {
-    const wrapper = document.createElement("label");
-    wrapper.className = "sim-control";
-    wrapper.innerHTML = `
-      <span class="sim-control-header">
-        <span>${escapeHtml(control.label)}</span>
-        <output>${state.sim[control.id]}</output>
-      </span>
-      <input type="range" min="0" max="100" value="${state.sim[control.id]}" data-control="${control.id}">
-      <small>${escapeHtml(control.description)}</small>
-    `;
-    wrapper.querySelector("input").addEventListener("input", (event) => {
-      state.sim[control.id] = Number(event.target.value);
-      wrapper.querySelector("output").textContent = event.target.value;
-      updateSimulationOutput();
-    });
-    els.simControls.append(wrapper);
-  });
-  updateSimulationOutput();
-}
-
-function updateSimulationOutput() {
-  const values = SIM_CONTROLS.map((control) => {
-    const raw = state.sim[control.id];
-    return control.invert ? 100 - raw : raw;
-  });
-  const weighted =
-    values[0] * 0.18 +
-    values[1] * 0.22 +
-    values[2] * 0.22 +
-    values[3] * 0.2 +
-    values[4] * 0.18;
-  const score = Math.max(0, Math.min(100, Math.round(weighted)));
-  els.simScore.textContent = score;
-  document.documentElement.style.setProperty("--score-angle", `${score * 3.6}deg`);
-
-  if (score < 25) {
-    els.simLabel.textContent = "Extreme contradiction zone";
-    els.simInterpretation.textContent =
-      "The speculative model is dominated by biological constraint. Treat physical shifting claims as unsupported until source and mechanism gaps are addressed.";
-  } else if (score < 55) {
-    els.simLabel.textContent = "Symbolic or phantom-shift range";
-    els.simInterpretation.textContent =
-      "The model is more coherent for mental, phantom, aura, identity, or ritual framing than for literal anatomical conversion.";
-  } else {
-    els.simLabel.textContent = "Metaphysical coherence range";
-    els.simInterpretation.textContent =
-      "The CORE vocabulary can describe the claim internally, but this still remains speculative without independent biological evidence.";
-  }
 }
 
 function getFilteredSources() {
@@ -3390,6 +3584,8 @@ function normalizeArchive(input) {
       .map((term) => (typeof term === "string" ? term : term.term))
       .filter(Boolean),
   }));
+  archive.categories = (archive.categories?.length ? archive.categories : base.categories).filter((category) => category !== "Simulations");
+  archive.domains = (archive.domains?.length ? archive.domains : base.domains).filter((domain) => domain !== "Simulation");
   archive.sourceTypes = archive.sourceTypes?.length ? archive.sourceTypes : SOURCE_TYPES;
   archive.sources = mergeById(base.sources, archive.sources || []).map((source) => ({
     sourceType: "URL",
@@ -3397,6 +3593,8 @@ function normalizeArchive(input) {
     terms: [],
     coreLinks: [],
     ...source,
+    category: source.category === "Simulations" ? "Theoretical Concepts" : source.category,
+    domain: source.domain === "Simulation" ? "Theoretical Biology" : source.domain,
   }));
   archive.profiles = DEFAULT_PROFILES.map((profile) => ({
     ...profile,
@@ -3409,6 +3607,7 @@ function normalizeArchive(input) {
   archive.browserHistory = archive.browserHistory || [];
   archive.parallelExtractRuns = archive.parallelExtractRuns || [];
   archive.webScrapeRuns = archive.webScrapeRuns || [];
+  archive.teamMessages = archive.teamMessages || [];
   archive.agentMessages = archive.agentMessages?.length ? archive.agentMessages : clone(SEED_DATA.agentMessages);
   return archive;
 }
@@ -3527,6 +3726,11 @@ function buildTextDigest(archive) {
     "In-App Browser:",
     `${archive.browserHistory?.length || 0} captured browser targets`,
     ...((archive.browserHistory || []).slice(0, 8).map((entry) => `- ${entry.url}`)),
+    "",
+    "Team Chat and Recommendations:",
+    `${archive.teamMessages?.length || 0} team posts stored`,
+    `${(archive.teamMessages || []).filter((item) => item.type === "recommendation" && item.status !== "rejected").length} open recommendations`,
+    ...((archive.teamMessages || []).slice(0, 8).map((item) => `- ${item.type}: ${item.title || item.text} (${item.status || "posted"})${item.url ? ` - ${item.url}` : ""}`)),
     "",
     "NVIDIA AIQ Research:",
     `Backend URL: ${aiqApi.backendUrl}`,
@@ -3653,6 +3857,8 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 <p>${escapeHtml(String(archive.importedFiles?.length || 0))} imported file logs; ${escapeHtml(String((archive.importedFiles || []).reduce((sum, item) => sum + (item.recordsCreated || 0), 0)))} source records created from uploaded files.</p>
 <h2>In-App Browser</h2>
 <p>${escapeHtml(String(archive.browserHistory?.length || 0))} captured browser targets. Latest: ${escapeHtml(archive.browserHistory?.[0]?.url || "none")}.</p>
+<h2>Team Chat and Recommendations</h2>
+<p>${escapeHtml(String(archive.teamMessages?.length || 0))} team posts stored; ${escapeHtml(String((archive.teamMessages || []).filter((item) => item.type === "recommendation" && item.status !== "rejected").length))} open recommendations.</p>
 <h2>NVIDIA AIQ Research</h2>
 <p>Backend URL: ${escapeHtml(aiqApi.backendUrl)}. Status: ${escapeHtml(aiqApi.status)}.</p>
 <h2>Extraction Results</h2>

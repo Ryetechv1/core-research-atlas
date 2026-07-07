@@ -15,6 +15,6 @@ class handler(BaseHTTPRequestHandler):
                 "service": "CORE Research Atlas",
                 "platform": "vercel",
                 "parallelConfigured": bool(os.environ.get("PARALLEL_API_KEY")),
-                "routes": ["/api/health", "/api/extract", "/api/scrape", "/api/import-file"],
+                "routes": ["/api/health", "/api/extract", "/api/scrape", "/api/import-file", "/api/team-chat"],
             },
         )

@@ -5,6 +5,7 @@ __pycache__/
 server.log
 server.err.log
 *.log
+data/team_chat_runtime.json
 
 # Local QA/browser runtime state
 qa/chrome-*/

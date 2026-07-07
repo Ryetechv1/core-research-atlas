@@ -1,10 +1,11 @@
 # Web Scraping Extraction Deployment
 
-This project now exposes three extraction APIs:
+This project now exposes three extraction APIs plus one collaboration endpoint:
 
 - `POST /api/extract` proxies Parallel Extract with `PARALLEL_API_KEY`.
 - `POST /api/scrape` runs the local dependency-free HTML/text scraper.
 - `POST /api/import-file` parses uploaded research files for source import.
+- `GET/POST /api/team-chat` syncs runtime team messages, updates, links, recommendations, votes, rejects, and promote-to-source actions.
 
 Both accept:
 
@@ -65,6 +66,8 @@ Each keyword search opens a choice modal:
 
 This keeps links visible and lets the user choose between browser-native search and in-app source-card review.
 
+Extraction jobs and agent replies include the active Browser panel URL, recent browser history, captured browser source leads, and browser search text as context. Production storage should persist that browser context alongside each extraction result so links remain auditable later.
+
 ## Automated AI Research Bot
 
 The bot is opt-in and review-gated:
@@ -96,6 +99,10 @@ The Browser panel embeds Google Programmable Search Engine `56f7592d1993141c3`:
 ```
 
 Its public fallback URL is `https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0`. The panel also uses a sandboxed iframe for fallback viewing and records history in `archive.browserHistory`. Some websites block iframe embedding; use the external-open action for those pages.
+
+## Team Chat and Recommendation Review
+
+The Team panel posts to `/api/team-chat` when the Python server or Vercel handler is available. Each recommendation can be rejected or promoted into Sources. Local static use still works through browser storage, but production should replace the runtime JSON/serverless memory layer with a database-backed collaboration table.
 
 ## NVIDIA AIQ Research Component
 

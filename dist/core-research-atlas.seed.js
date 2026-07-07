@@ -1,10 +1,10 @@
 window.CORE_RESEARCH_SEED = {
   "project": {
     "name": "CORE Shapeshifting Research Atlas",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "epistemicPolicy": "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     "corePrompt": "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
-    "aiConnectorNote": "The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this static build it performs local synthesis from archive, profile, uploaded reference metadata, and extraction-job state; true web fetching or OpenAI model execution requires a backend/API connector."
+    "aiConnectorNote": "The ChatGPT 5.5 Pro console uses the uploaded Internal Core System Gateway as a local model profile. In this build it performs local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, and extraction-job state; true OpenAI model execution requires a secure backend/API connector."
   },
   "categories": [
     "Documents",
@@ -12,8 +12,7 @@ window.CORE_RESEARCH_SEED = {
     "Cultural Data",
     "Occult Data",
     "Mechanics",
-    "Theoretical Concepts",
-    "Simulations"
+    "Theoretical Concepts"
   ],
   "species": [
     "Wolf",
@@ -29,8 +28,7 @@ window.CORE_RESEARCH_SEED = {
     "Metaphysics",
     "Theoretical Biology",
     "Physiology",
-    "Psychology",
-    "Simulation"
+    "Psychology"
   ],
   "sourceTypes": [
     "Documentation",
@@ -139,12 +137,12 @@ window.CORE_RESEARCH_SEED = {
       "role": "Member",
       "animalForm": "Cross-form researcher",
       "animalSpirits": "Unassigned",
-      "identityStatement": "Contributor profile for cross-form synthesis, occult mechanics, and simulation interpretation.",
+      "identityStatement": "Contributor profile for cross-form synthesis, occult mechanics, and source recommendation review.",
       "extended": [
         "Maps shared terms across wolf, fox, kitsune, and dragon traditions.",
         "Reviews energy, phantom body, animal aura, and morphogenetic-field concepts.",
         "Connects metaphysical claims to source lineage and uncertainty notes.",
-        "Supports simulation parameter design and interpretation.",
+        "Supports source recommendation review and cross-form interpretation.",
         "Profile data may guide agent output toward cross-form integration."
       ]
     }
@@ -187,7 +185,7 @@ window.CORE_RESEARCH_SEED = {
       "reliabilityScore",
       "teamOwner",
       "reviewNotes",
-      "simulationVariables"
+      "browserContext"
     ]
   },
   "sources": [
@@ -400,10 +398,10 @@ window.CORE_RESEARCH_SEED = {
     {
       "id": "src-energy-budget",
       "title": "Energy budget constraint note for physical shifting",
-      "category": "Simulations",
+      "category": "Theoretical Concepts",
       "species": "Cross-form",
-      "domain": "Simulation",
-      "sourceType": "Dataset",
+      "domain": "Theoretical Biology",
+      "sourceType": "Documentation",
       "url": "",
       "evidenceTier": "Speculative framework",
       "citationStatus": "Citation missing",
@@ -414,7 +412,7 @@ window.CORE_RESEARCH_SEED = {
         "tissue remodeling",
         "shift potential"
       ],
-      "notes": "Simulation variable file for modeling how extreme transformation claims would face energy, heat, mass, and tissue continuity constraints.",
+      "notes": "Constraint note for reasoning about how extreme transformation claims would face energy, heat, mass, and tissue continuity barriers.",
       "coreLinks": [
         "Physiological Hypothesis",
         "Safety and Epistemic Notes"
@@ -573,13 +571,6 @@ window.CORE_RESEARCH_SEED = {
       "referenceId": "ref-upload-learning-to-shift"
     }
   ],
-  "simulationDefaults": {
-    "morphologicalGap": 86,
-    "tissuePlasticity": 18,
-    "energyBudget": 12,
-    "neuralIntegration": 34,
-    "fieldCoherence": 52
-  },
   "internalModel": {
     "displayName": "ChatGPT 5.5 Pro Internal Core",
     "status": "Local internal model profile / connector-ready",
@@ -644,7 +635,8 @@ window.CORE_RESEARCH_SEED = {
       "Queued extraction jobs",
       "Uploaded PDF reference metadata",
       "Three-user profile context",
-      "CORE framework and simulation controls"
+      "In-app browser state and captured browser leads",
+      "Team chat and recommendation review state"
     ]
   },
   "backendCore": {
@@ -652,7 +644,7 @@ window.CORE_RESEARCH_SEED = {
     "title": "ErydirCeisiwr Backend Mechanics Core",
     "sourceReferenceId": "ref-upload-erydir-core",
     "summary": "Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.",
-    "operatingMode": "Local static simulation with connector-ready OpenAI and web-extraction hooks.",
+    "operatingMode": "Local static archive with connector-ready OpenAI, team chat, and web-extraction hooks.",
     "stages": [
       "Intent intake",
       "Profile context merge",
@@ -819,5 +811,6 @@ window.CORE_RESEARCH_SEED = {
     }
   },
   "parallelExtractRuns": [],
-  "webScrapeRuns": []
+  "webScrapeRuns": [],
+  "teamMessages": []
 };

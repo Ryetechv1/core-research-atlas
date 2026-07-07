@@ -445,7 +445,6 @@ svg {
 
 .toolbar-panel,
 .source-panel,
-.simulation-layout,
 .codex-grid article,
 .inspector-card,
 .diagram-card {
@@ -502,8 +501,7 @@ svg {
   display: block;
 }
 
-.source-panel,
-.simulation-layout {
+.source-panel {
   padding: 16px;
 }
 
@@ -531,7 +529,6 @@ svg {
 }
 
 .panel-heading h2,
-.simulation-layout h2,
 .codex-grid h2,
 .inspector-card h2 {
   margin: 0;
@@ -540,7 +537,6 @@ svg {
 }
 
 .panel-heading p,
-.sim-copy p,
 .codex-grid p {
   margin: 5px 0 0;
   color: var(--muted);
@@ -717,97 +713,10 @@ textarea:focus {
   background: var(--red-soft);
 }
 
-.simulation-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(270px, 360px);
-  gap: 18px;
-}
-
-.sim-copy {
-  grid-column: 1 / -1;
-}
-
-.sim-controls {
-  display: grid;
-  gap: 12px;
-}
-
-.sim-control {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-}
-
-.sim-control-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 760;
-}
-
-.sim-control small {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 input[type="range"] {
   height: 24px;
   padding: 0;
   accent-color: var(--teal);
-}
-
-.sim-output {
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.12), transparent),
-    #1c1c1c;
-  text-align: center;
-}
-
-.output-ring {
-  display: grid;
-  place-items: center;
-  width: 142px;
-  height: 142px;
-  border-radius: 50%;
-  background: conic-gradient(var(--teal) var(--score-angle, 0deg), #3a3a3a 0deg);
-}
-
-.output-ring span {
-  display: grid;
-  place-items: center;
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--teal-dark);
-  font-family: var(--font-doc);
-  font-size: 38px;
-}
-
-.sim-output h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.sim-output p {
-  margin: 8px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
 }
 
 .codex-grid {
@@ -1172,6 +1081,74 @@ input[type="range"] {
   color: rgba(255, 255, 255, 0.76);
 }
 
+.team-chat-form {
+  margin-top: 0;
+}
+
+.team-chat-feed {
+  display: grid;
+  gap: 10px;
+}
+
+.team-post {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, #f2f2f2 0%, #8f8f8f 54%, #222 100%) padding-box,
+    var(--border-gradient) border-box;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.team-post header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-post strong,
+.team-post p,
+.team-post a {
+  color: #fff;
+}
+
+.team-post small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+}
+
+.team-post p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.team-post a {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.team-post.recommendation {
+  background:
+    linear-gradient(145deg, #e7e7e7 0%, #696969 50%, #050505 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.vote-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 760;
+}
+
 .agent-side h2,
 .integration-panel h2 {
   margin: 0 0 12px;
@@ -1466,7 +1443,6 @@ input[type="range"] {
 .status-row,
 .checkbox-panel,
 .check-tile,
-.sim-output,
 .diagram-card,
 .source-row,
 .profile-tab,
@@ -1569,7 +1545,6 @@ a,
 .result-url,
 .mini-stack span,
 .integration-panel p,
-.sim-output p,
 .auth-card p,
 .choice-card p {
   color: var(--muted);
@@ -1577,7 +1552,6 @@ a,
 
 .role-card,
 .add-form,
-.sim-control,
 .segmented-control,
 .job-card,
 .checkbox-panel,
@@ -1589,7 +1563,6 @@ a,
 .result-item,
 .result-summary-bar span,
 .result-links a,
-.output-ring span,
 .diagram-card,
 .api-output,
 .empty-state {
@@ -1600,7 +1573,6 @@ a,
     var(--border-gradient) border-box;
 }
 
-.sim-output,
 .embedded-search-window,
 .embedded-result-item,
 .bot-status,
@@ -1616,7 +1588,6 @@ a,
 
 .source-main small,
 .role-card span,
-.sim-control small,
 .job-card p,
 .job-card li,
 .result-card p,
@@ -1888,7 +1859,6 @@ a,
 
   .content-grid,
   .hero-panel,
-  .simulation-layout,
   .agent-layout {
     grid-template-columns: 1fr;
   }
@@ -1967,7 +1937,6 @@ a,
   .content-grid,
   .toolbar-panel,
   .source-panel,
-  .simulation-layout,
   .agent-layout,
   .agent-main,
   .agent-side,
