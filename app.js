@@ -723,6 +723,7 @@ const state = {
   fileClipboard: null,
   fileManagerSaveTimer: null,
   fileManagerStatusMessage: "",
+  fileManagerRecentNodeId: "",
   filePreviewObjectUrls: [],
   backendCapabilities: {
     checked: false,
@@ -5205,6 +5206,30 @@ function renderFileExplorerList(selected, openFolder = null) {
   const folder = openFolder?.kind === "folder" ? openFolder : getFileNode(manager.currentFolderId) || getFileNode(manager.rootId);
   const children = folder ? getFileChildren(folder.id) : [];
   const clipboardNode = state.fileClipboard?.id ? getFileNode(state.fileClipboard.id) : null;
+  const recentNode = state.fileManagerRecentNodeId ? getFileNode(state.fileManagerRecentNodeId) : null;
+  const visibleRecentNode = recentNode && recentNode.parentId === folder?.id ? recentNode : null;
+  const breadcrumb = fileManagerBreadcrumb(folder?.id || manager.rootId);
+  const parentFolder = folder?.parentId ? getFileNode(folder.parentId) : null;
+  const paneNavigation = `
+    <div class="file-pane-navigation" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}">
+      <div class="file-pane-breadcrumb" aria-label="Current folder path">
+        ${breadcrumb
+          .map(
+            (part, index) =>
+              `<button class="file-crumb${index === breadcrumb.length - 1 ? " is-current" : ""}" type="button" data-file-crumb-id="${escapeHtml(part.id)}">${escapeHtml(part.name)}</button>`
+          )
+          .join('<span class="file-crumb-separator">/</span>')}
+      </div>
+      <div class="file-pane-actions">
+        ${
+          parentFolder
+            ? `<button class="ghost-button iconless file-pane-action" type="button" data-file-open-folder="${escapeHtml(parentFolder.id)}">Up to ${escapeHtml(parentFolder.name)}</button>`
+            : ""
+        }
+        <span>${children.length} item${children.length === 1 ? "" : "s"}</span>
+      </div>
+    </div>
+  `;
   const statusBanner =
     state.fileManagerStatusMessage || clipboardNode
       ? `<div class="file-manager-activity" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}">
@@ -5213,12 +5238,21 @@ function renderFileExplorerList(selected, openFolder = null) {
         </div>`
       : "";
   if (els.fileExplorerFolderName) els.fileExplorerFolderName.textContent = folder?.name || "CORE Atlas";
+  const recentHtml = visibleRecentNode
+    ? `<button class="file-created-card ${visibleRecentNode.kind === "folder" ? "is-folder" : "is-file"}" type="button" data-file-created-id="${escapeHtml(visibleRecentNode.id)}" draggable="true" data-drop-folder-id="${escapeHtml(visibleRecentNode.kind === "folder" ? visibleRecentNode.id : folder.id)}">
+        <span class="file-node-icon" aria-hidden="true"></span>
+        <span>
+          <strong>${escapeHtml(visibleRecentNode.name)}</strong>
+          <small>${escapeHtml(visibleRecentNode.kind === "folder" ? "New folder is visible in this Contents pane. Tap to open it." : "New TXT/file is visible in this Contents pane. Tap to preview it.")}</small>
+        </span>
+      </button>`
+    : "";
   const childrenHtml = children.length
     ? children
         .map((child) => {
           const active = child.id === selected?.id;
           return `
-            <button class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}" type="button" draggable="true" data-file-list-id="${escapeHtml(child.id)}" data-drop-folder-id="${escapeHtml(child.kind === "folder" ? child.id : folder.id)}">
+            <button class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}${child.id === state.fileManagerRecentNodeId ? " is-recent" : ""}" type="button" draggable="true" data-file-list-id="${escapeHtml(child.id)}" data-drop-folder-id="${escapeHtml(child.kind === "folder" ? child.id : folder.id)}">
               <span class="file-node-icon" aria-hidden="true"></span>
               <strong>${escapeHtml(child.name)}</strong>
               <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
@@ -5229,7 +5263,17 @@ function renderFileExplorerList(selected, openFolder = null) {
         })
         .join("")
     : `<div class="file-preview-unavailable file-drop-empty" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}"><strong>This folder is empty.</strong><span>Import files, create a folder, create a TXT note, or drop an item here.</span></div>`;
-  els.fileManagerFolderView.innerHTML = `${statusBanner}${childrenHtml}`;
+  els.fileManagerFolderView.innerHTML = `${paneNavigation}${statusBanner}${recentHtml}${childrenHtml}`;
+  els.fileManagerFolderView.querySelectorAll("[data-file-crumb-id], [data-file-open-folder]").forEach((button) => {
+    button.addEventListener("click", () => openFileManagerFolder(button.dataset.fileCrumbId || button.dataset.fileOpenFolder));
+  });
+  els.fileManagerFolderView.querySelectorAll("[data-file-created-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const node = getFileNode(button.dataset.fileCreatedId);
+      if (node?.kind === "folder") openFileManagerFolder(node.id);
+      if (node?.kind === "file") openFileManagerFile(node.id);
+    });
+  });
   els.fileManagerFolderView.querySelectorAll("[data-file-list-id]").forEach((button) => {
     button.addEventListener("click", () => {
       const node = getFileNode(button.dataset.fileListId);
@@ -5349,6 +5393,9 @@ function openFileManagerFolder(id) {
   if (!node || node.kind !== "folder") return;
   manager.selectedId = node.id;
   manager.currentFolderId = node.id;
+  if (state.fileManagerRecentNodeId && getFileNode(state.fileManagerRecentNodeId)?.parentId !== node.id) {
+    state.fileManagerRecentNodeId = "";
+  }
   state.fileManagerStatusMessage = `Opened ${node.name}`;
   persistArchive("Opened virtual folder");
   renderFileManager();
@@ -5374,9 +5421,9 @@ function setFileManagerStatus(message) {
 function wireFileManagerDragAndDrop() {
   if (!els.fileManagerFolderView || !els.fileManagerTree) return;
   const manager = getFileManager();
-  const draggableItems = document.querySelectorAll("[data-file-list-id], .file-tree-item[data-file-id]");
+  const draggableItems = document.querySelectorAll("[data-file-list-id], [data-file-created-id], .file-tree-item[data-file-id]");
   draggableItems.forEach((item) => {
-    const id = item.dataset.fileListId || item.dataset.fileId;
+    const id = item.dataset.fileListId || item.dataset.fileCreatedId || item.dataset.fileId;
     const node = getFileNode(id);
     item.draggable = Boolean(node && node.id !== manager.rootId && !isGuestUser());
     item.addEventListener("dragstart", (event) => {
@@ -5449,6 +5496,7 @@ function moveFileManagerNodeToFolder(nodeId, targetFolderId) {
   node.updatedAt = new Date().toISOString();
   manager.selectedId = node.id;
   manager.currentFolderId = target.id;
+  state.fileManagerRecentNodeId = node.id;
   state.fileManagerStatusMessage = `Moved ${node.name} to ${target.name}`;
   persistFileManager("Drag moved virtual file node");
   return true;
@@ -5492,6 +5540,18 @@ function fileManagerPath(nodeId) {
   return `/${names.join("/")}`;
 }
 
+function fileManagerBreadcrumb(nodeId) {
+  const parts = [];
+  let cursor = getFileNode(nodeId);
+  const seen = new Set();
+  while (cursor && !seen.has(cursor.id)) {
+    seen.add(cursor.id);
+    parts.unshift({ id: cursor.id, name: cursor.name });
+    cursor = getFileNode(cursor.parentId);
+  }
+  return parts.length ? parts : [{ id: getFileManager().rootId, name: "CORE Atlas" }];
+}
+
 function persistFileManager(reason = "File manager update") {
   getFileManager();
   persistArchive(reason);
@@ -5514,6 +5574,7 @@ function createFileManagerFolder() {
   manager.nodes.push(node);
   manager.selectedId = node.id;
   manager.currentFolderId = parentId;
+  state.fileManagerRecentNodeId = node.id;
   state.fileManagerStatusMessage = `Created ${node.name}`;
   persistFileManager("Created virtual folder");
 }
@@ -5540,6 +5601,7 @@ function createFileManagerTextFile() {
   manager.nodes.push(node);
   manager.selectedId = node.id;
   manager.currentFolderId = parentId;
+  state.fileManagerRecentNodeId = node.id;
   state.fileManagerStatusMessage = `Created ${node.name}`;
   persistFileManager("Created virtual text file");
 }
@@ -5572,6 +5634,7 @@ function renameFileManagerNode() {
   if (!name) return;
   node.name = name.trim();
   node.updatedAt = new Date().toISOString();
+  state.fileManagerRecentNodeId = node.id;
   state.fileManagerStatusMessage = `Renamed to ${node.name}`;
   persistFileManager("Renamed virtual file node");
 }
@@ -5603,9 +5666,11 @@ function pasteFileManagerNode() {
   if (clipboard.mode === "move") {
     node.parentId = targetFolderId;
     node.updatedAt = new Date().toISOString();
+    state.fileManagerRecentNodeId = node.id;
     state.fileClipboard = null;
   } else {
-    cloneFileNodeTree(node.id, targetFolderId);
+    const cloned = cloneFileNodeTree(node.id, targetFolderId);
+    if (cloned) state.fileManagerRecentNodeId = cloned.id;
   }
   state.fileManagerStatusMessage = `${clipboard.mode === "move" ? "Moved" : "Pasted"} ${node.name}`;
   persistFileManager(`${clipboard.mode === "move" ? "Moved" : "Copied"} virtual file node`);
@@ -5654,6 +5719,7 @@ function deleteFileManagerNode() {
   manager.nodes = manager.nodes.filter((item) => !ids.has(item.id));
   manager.selectedId = node.parentId || manager.rootId;
   manager.currentFolderId = node.parentId || manager.rootId;
+  state.fileManagerRecentNodeId = "";
   state.fileManagerStatusMessage = `Deleted ${node.name}`;
   persistFileManager("Deleted virtual file node");
 }
@@ -5668,6 +5734,7 @@ async function handleFileManagerImport(event) {
   manager.nodes.push(...nodes);
   manager.selectedId = nodes[0]?.id || manager.selectedId;
   manager.currentFolderId = parentId;
+  state.fileManagerRecentNodeId = nodes[0]?.id || "";
   event.target.value = "";
   state.fileManagerStatusMessage = `Imported ${nodes.length} file${nodes.length === 1 ? "" : "s"}`;
   persistFileManager(`Imported ${nodes.length} virtual file${nodes.length === 1 ? "" : "s"}`);

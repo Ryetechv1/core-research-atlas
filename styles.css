@@ -1938,6 +1938,68 @@ input[type="range"] {
   padding: 8px;
 }
 
+.file-pane-navigation {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #252525, #111);
+}
+
+.file-pane-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.file-crumb {
+  width: auto;
+  min-height: 28px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid #050505;
+  border-radius: 999px;
+  color: #111;
+  background: linear-gradient(145deg, #fff, #c8c8c8);
+  font-size: 11px;
+  font-weight: 780;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.file-crumb.is-current {
+  color: #fff;
+  background: linear-gradient(145deg, #484848, #050505);
+}
+
+.file-crumb-separator {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+}
+
+.file-pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-pane-action {
+  width: auto;
+  min-height: 30px;
+}
+
+.file-pane-actions span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
 .file-manager-activity {
   display: grid;
   gap: 4px;
@@ -1955,6 +2017,44 @@ input[type="range"] {
 .file-manager-activity strong,
 .file-manager-activity span {
   color: #111;
+}
+
+.file-created-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  min-height: 70px;
+  padding: 12px;
+  border: 2px solid #fff;
+  border-radius: 8px;
+  color: #111;
+  background:
+    linear-gradient(145deg, #ffffff 0%, #d8d8d8 58%, #9a9a9a 100%) padding-box,
+    var(--border-gradient) border-box;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
+}
+
+.file-created-card strong,
+.file-created-card small {
+  display: block;
+  min-width: 0;
+  color: #111;
+  overflow-wrap: anywhere;
+}
+
+.file-created-card strong {
+  font-size: 13px;
+}
+
+.file-created-card small {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .file-explorer-row {
@@ -1994,14 +2094,22 @@ input[type="range"] {
   box-shadow: inset 0 0 0 1px #fff, 0 0 0 2px rgba(255, 255, 255, 0.18);
 }
 
+.file-explorer-row.is-recent {
+  border-color: #fff;
+  box-shadow: inset 0 0 0 1px #fff, 0 0 0 3px rgba(255, 255, 255, 0.2);
+}
+
 .file-tree-item.is-dragging,
-.file-explorer-row.is-dragging {
+.file-explorer-row.is-dragging,
+.file-created-card.is-dragging {
   opacity: 0.58;
 }
 
 .file-tree-item.is-drop-target,
 .file-explorer-row.is-drop-target,
 .file-manager-activity.is-drop-target,
+.file-pane-navigation.is-drop-target,
+.file-created-card.is-drop-target,
 .file-drop-empty.is-drop-target {
   border-color: #fff;
   background:
@@ -2016,6 +2124,8 @@ input[type="range"] {
 .file-explorer-row.is-drop-target strong,
 .file-explorer-row.is-drop-target span,
 .file-explorer-row.is-drop-target small,
+.file-created-card.is-drop-target strong,
+.file-created-card.is-drop-target small,
 .file-drop-empty.is-drop-target strong,
 .file-drop-empty.is-drop-target span {
   color: #111;
