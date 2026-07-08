@@ -2,7 +2,9 @@
 
 const TEAM_CHAT_KEY = "core-team-chat/messages";
 const TEAM_CHAT_LIMIT = 200;
-const MAX_BODY_BYTES = 128 * 1024;
+const MAX_BODY_BYTES = 3 * 1024 * 1024;
+const TEAM_SOURCE_APPROVAL_THRESHOLD = 2;
+const TEAM_USER_COUNT = 3;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -100,7 +102,7 @@ function applyVote(messages, body) {
   if (!message) return;
   message.votes = isPlainObject(message.votes) ? message.votes : {};
   message.votes[user] = decision;
-  if (decision === "reject") message.status = "rejected";
+  message.status = teamVoteStatus(message.votes, decision, String(message.status || "review"));
 }
 
 function applyPromote(messages, body) {
@@ -132,8 +134,44 @@ function sanitizeMessage(raw) {
     url: String(raw.url || "").trim().slice(0, 1200),
     status: String(raw.status || (type === "recommendation" ? "open" : "posted")).trim().slice(0, 80),
     votes: isPlainObject(raw.votes) ? raw.votes : {},
+    fileAttachment: sanitizeFileAttachment(raw.fileAttachment),
     createdAt: String(raw.createdAt || new Date().toISOString()).trim().slice(0, 80),
   };
+}
+
+function sanitizeFileAttachment(raw) {
+  if (!isPlainObject(raw)) return null;
+  let dataUrl = String(raw.dataUrl || "").trim();
+  if (dataUrl.length > 2_200_000) dataUrl = "";
+  const keywords = Array.isArray(raw.keywords) ? raw.keywords.map((item) => String(item).slice(0, 80)).slice(0, 16) : [];
+  const warnings = Array.isArray(raw.warnings) ? raw.warnings.map((item) => String(item).slice(0, 220)).slice(0, 8) : [];
+  return {
+    id: String(raw.id || "").trim().slice(0, 96),
+    fileName: String(raw.fileName || "").trim().slice(0, 220),
+    extension: String(raw.extension || "").trim().slice(0, 24),
+    mimeType: String(raw.mimeType || "").trim().slice(0, 120),
+    size: Number(raw.size || 0),
+    previewKind: String(raw.previewKind || "data").trim().slice(0, 40),
+    summary: String(raw.summary || "").trim().slice(0, 1000),
+    keywords,
+    textExcerpt: String(raw.textExcerpt || "").trim().slice(0, 100000),
+    dataUrl,
+    storedPreview: Boolean(dataUrl),
+    warnings,
+    createdAt: String(raw.createdAt || "").trim().slice(0, 80),
+  };
+}
+
+function teamVoteStatus(votes, latestDecision, currentStatus = "review") {
+  const values = Object.values(isPlainObject(votes) ? votes : {});
+  const addVotes = values.filter((vote) => vote === "add").length;
+  const rejectVotes = values.filter((vote) => vote === "reject").length;
+  if (addVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD) {
+    return currentStatus === "added to sources" ? "added to sources" : "approved for sources";
+  }
+  if (rejectVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD) return "rejected";
+  if (latestDecision === "add") return `review: ${addVotes}/${TEAM_USER_COUNT} add votes`;
+  return `review: ${rejectVotes}/${TEAM_USER_COUNT} reject votes`;
 }
 
 function dedupe(messages) {

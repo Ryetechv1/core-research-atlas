@@ -27,6 +27,8 @@ from scripts.openai_chat import OpenAIChatApiError, OpenAIChatConfigError, opena
 ROOT = Path(__file__).resolve().parent
 TEAM_CHAT_PATH = ROOT / "data" / "team_chat_runtime.json"
 TEAM_CHAT_LIMIT = 200
+TEAM_SOURCE_APPROVAL_THRESHOLD = 2
+TEAM_USER_COUNT = 3
 
 
 def load_env_file(path: Path) -> None:
@@ -250,7 +252,7 @@ def apply_team_chat_action(body: dict[str, Any]) -> list[dict[str, Any]]:
                 votes = message.setdefault("votes", {})
                 if isinstance(votes, dict):
                     votes[user] = decision
-                message["status"] = "rejected" if decision == "reject" else message.get("status", "open")
+                    message["status"] = team_vote_status(votes, decision, str(message.get("status", "review")))
                 break
     elif action == "promote":
         item_id = str(body.get("id", "")).strip()
@@ -292,8 +294,44 @@ def sanitize_team_message(raw: Any) -> dict[str, Any]:
         "url": str(raw.get("url", "")).strip()[:1200],
         "status": str(raw.get("status", "open" if item_type == "recommendation" else "posted")).strip()[:80],
         "votes": raw.get("votes") if isinstance(raw.get("votes"), dict) else {},
+        "fileAttachment": sanitize_file_attachment(raw.get("fileAttachment")),
         "createdAt": str(raw.get("createdAt", "")).strip()[:80],
     }
+
+
+def sanitize_file_attachment(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    data_url = str(raw.get("dataUrl", "")).strip()
+    if len(data_url) > 2_200_000:
+        data_url = ""
+    return {
+        "id": str(raw.get("id", "")).strip()[:96],
+        "fileName": str(raw.get("fileName", "")).strip()[:220],
+        "extension": str(raw.get("extension", "")).strip()[:24],
+        "mimeType": str(raw.get("mimeType", "")).strip()[:120],
+        "size": int(raw.get("size", 0) or 0),
+        "previewKind": str(raw.get("previewKind", "data")).strip()[:40],
+        "summary": str(raw.get("summary", "")).strip()[:1000],
+        "keywords": raw.get("keywords") if isinstance(raw.get("keywords"), list) else [],
+        "textExcerpt": str(raw.get("textExcerpt", "")).strip()[:100000],
+        "dataUrl": data_url,
+        "storedPreview": bool(data_url),
+        "warnings": raw.get("warnings") if isinstance(raw.get("warnings"), list) else [],
+        "createdAt": str(raw.get("createdAt", "")).strip()[:80],
+    }
+
+
+def team_vote_status(votes: dict[str, Any], latest_decision: str, current_status: str = "review") -> str:
+    add_votes = sum(1 for vote in votes.values() if vote == "add")
+    reject_votes = sum(1 for vote in votes.values() if vote == "reject")
+    if add_votes >= TEAM_SOURCE_APPROVAL_THRESHOLD:
+        return "added to sources" if current_status == "added to sources" else "approved for sources"
+    if reject_votes >= TEAM_SOURCE_APPROVAL_THRESHOLD:
+        return "rejected"
+    if latest_decision == "add":
+        return f"review: {add_votes}/{TEAM_USER_COUNT} add votes"
+    return f"review: {reject_votes}/{TEAM_USER_COUNT} reject votes"
 
 
 def dedupe_team_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:

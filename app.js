@@ -4,6 +4,7 @@ const STORAGE_KEY = "core-shapeshifting-research-atlas";
 const MEMORY_BANK_KEY = `${STORAGE_KEY}:memory-bank`;
 const STORAGE_BACKUP_KEY = `${STORAGE_KEY}:last-good-backup`;
 const SESSION_KEY = "core-shapeshifting-active-user";
+const USER_LOCATION_KEY = `${STORAGE_KEY}:user-location`;
 const GOOGLE_SEARCH_BASE_URL = "https://www.google.com/search?q=";
 const GOOGLE_CSE_ID = "56f7592d1993141c3";
 const GOOGLE_CSE_SCRIPT_URL = `https://cse.google.com/cse.js?cx=${GOOGLE_CSE_ID}`;
@@ -18,6 +19,10 @@ const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
 const TEAM_SYNC_URL_KEY = `${STORAGE_KEY}:team-sync-url`;
 const TEAM_SYNC_QUERY_KEYS = ["sync", "teamSync", "teamSyncUrl"];
 const TEAM_CHAT_POLL_MS = 5_000;
+const TEAM_SOURCE_APPROVAL_THRESHOLD = 2;
+const IMPORT_TEXT_SLICE_BYTES = 650_000;
+const MAX_STORED_FILE_BYTES = 1_500_000;
+const PREVIEW_TEXT_LIMIT = 80_000;
 const GUEST_SESSION_VALUE = "Guest";
 const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
 
@@ -615,6 +620,7 @@ const state = {
   activeCategory: "All",
   activeSpecies: "All",
   activeSourceType: "All",
+  activePanel: "sourcePanel",
   activeProfileUsername: window.localStorage.getItem(SESSION_KEY) || "UserSeth",
   activeCollabDocId: "",
   currentUser: null,
@@ -701,6 +707,7 @@ function cacheElements() {
   els.openAiChatStatus = document.getElementById("openAiChatStatus");
   els.openAiClearButton = document.getElementById("openAiClearButton");
   els.teamChatForm = document.getElementById("teamChatForm");
+  els.teamFileInput = document.getElementById("teamFileInput");
   els.teamChatFeed = document.getElementById("teamChatFeed");
   els.teamChatStatus = document.getElementById("teamChatStatus");
   els.teamSyncForm = document.getElementById("teamSyncForm");
@@ -743,6 +750,11 @@ function cacheElements() {
   els.searchChoiceInternalButton = document.getElementById("searchChoiceInternalButton");
   els.searchChoiceExternalButton = document.getElementById("searchChoiceExternalButton");
   els.searchChoiceCancelButton = document.getElementById("searchChoiceCancelButton");
+  els.filePreviewOverlay = document.getElementById("filePreviewOverlay");
+  els.filePreviewTitle = document.getElementById("filePreviewTitle");
+  els.filePreviewMeta = document.getElementById("filePreviewMeta");
+  els.filePreviewBody = document.getElementById("filePreviewBody");
+  els.filePreviewCloseButton = document.getElementById("filePreviewCloseButton");
 }
 
 function wireEvents() {
@@ -783,7 +795,7 @@ function wireEvents() {
   window.addEventListener("core-cse-search-start", handleCseSearchStart);
   window.addEventListener("core-cse-results-ready", handleCseResultsReady);
   els.googleCsePublicLink?.addEventListener("click", () => {
-    openInAppBrowser(GOOGLE_CSE_PUBLIC_URL, "Google CSE public URL", { query: extractBrowserQuery("Google CSE public URL", GOOGLE_CSE_PUBLIC_URL) });
+    openExternalUrl(GOOGLE_CSE_PUBLIC_URL);
   });
   els.browserExternalButton.addEventListener("click", openCurrentBrowserTargetExternal);
   els.browserAddSourceButton.addEventListener("click", addCurrentBrowserPageToSources);
@@ -792,6 +804,13 @@ function wireEvents() {
   els.teamSyncForm.addEventListener("submit", handleTeamSyncSubmit);
   els.clearTeamSyncButton.addEventListener("click", clearTeamSyncServer);
   els.teamChatForm.addEventListener("submit", handleTeamChatSubmit);
+  els.filePreviewCloseButton.addEventListener("click", closeFilePreviewDialog);
+  els.filePreviewOverlay.addEventListener("click", (event) => {
+    if (event.target === els.filePreviewOverlay) closeFilePreviewDialog();
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.filePreviewOverlay.hidden) closeFilePreviewDialog();
+  });
   els.refreshTeamChatButton.addEventListener("click", () => syncTeamChat({ renderAfter: true }));
   els.useBrowserForTeamPostButton.addEventListener("click", useBrowserUrlForTeamPost);
   els.newCollabDocButton.addEventListener("click", createCollabDoc);
@@ -847,12 +866,11 @@ function wireEvents() {
 
   document.querySelectorAll(".segment").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll(".segment").forEach((segment) => segment.classList.remove("is-active"));
-      document.querySelectorAll(".panel-view").forEach((panel) => panel.classList.remove("is-active"));
-      button.classList.add("is-active");
-      document.getElementById(button.dataset.panel).classList.add("is-active");
+      setActivePanel(button.dataset.panel, { save: true });
     });
   });
+  window.addEventListener("beforeunload", saveCurrentUserLocation);
+  window.addEventListener("pagehide", saveCurrentUserLocation);
 }
 
 function initAuth() {
@@ -863,6 +881,7 @@ function initAuth() {
     return;
   }
   state.activeProfileUsername = isGuestUser() ? state.archive.profiles[0]?.username || "UserSeth" : state.currentUser.username;
+  restoreUserLocation();
   showAuth(false);
   renderAuthState();
 }
@@ -882,6 +901,7 @@ function handleSignIn(event) {
   state.currentUser = user;
   state.activeProfileUsername = user.username;
   window.localStorage.setItem(SESSION_KEY, user.username);
+  restoreUserLocation();
   els.authForm.reset();
   els.authError.textContent = "";
   showAuth(false);
@@ -895,6 +915,7 @@ function handleGuestLogin() {
   state.guestBrowserSearchResults = [];
   state.guestBrowserPreview = null;
   window.localStorage.setItem(SESSION_KEY, GUEST_SESSION_VALUE);
+  restoreUserLocation();
   els.authForm.reset();
   els.authError.textContent = "";
   showAuth(false);
@@ -928,6 +949,61 @@ function renderAuthState() {
 
 function isGuestUser() {
   return Boolean(state.currentUser?.readOnly);
+}
+
+function currentLocationStorageKey() {
+  return `${USER_LOCATION_KEY}:${state.currentUser?.username || window.localStorage.getItem(SESSION_KEY) || "anonymous"}`;
+}
+
+function restoreUserLocation() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(currentLocationStorageKey()) || "{}");
+    if (saved.panel) state.activePanel = saved.panel;
+    if (saved.selectedId) state.selectedId = saved.selectedId;
+    if (saved.currentBrowserUrl) state.currentBrowserUrl = saved.currentBrowserUrl;
+    if (saved.activeProfileUsername) state.activeProfileUsername = saved.activeProfileUsername;
+    if (saved.activeCollabDocId) state.activeCollabDocId = saved.activeCollabDocId;
+    window.setTimeout(() => {
+      if (Number.isFinite(saved.scrollY)) window.scrollTo({ top: saved.scrollY, behavior: "auto" });
+    }, 0);
+  } catch {
+    window.localStorage.removeItem(currentLocationStorageKey());
+  }
+}
+
+function saveUserLocation(update = {}) {
+  if (!state.currentUser) return;
+  const payload = {
+    panel: state.activePanel || "sourcePanel",
+    selectedId: state.selectedId || "",
+    currentBrowserUrl: state.currentBrowserUrl || "",
+    activeProfileUsername: state.activeProfileUsername || "",
+    activeCollabDocId: state.activeCollabDocId || "",
+    scrollY: window.scrollY || 0,
+    updatedAt: new Date().toISOString(),
+    ...update,
+  };
+  try {
+    window.localStorage.setItem(currentLocationStorageKey(), JSON.stringify(payload));
+  } catch {
+    // Location restore is best-effort only.
+  }
+}
+
+function saveCurrentUserLocation() {
+  saveUserLocation();
+}
+
+function setActivePanel(panelId, { save = false } = {}) {
+  const targetPanel = document.getElementById(panelId) ? panelId : "sourcePanel";
+  state.activePanel = targetPanel;
+  document.querySelectorAll(".segment").forEach((segment) => {
+    segment.classList.toggle("is-active", segment.dataset.panel === targetPanel);
+  });
+  document.querySelectorAll(".panel-view").forEach((panel) => {
+    panel.classList.toggle("is-active", panel.id === targetPanel);
+  });
+  if (save) saveUserLocation({ panel: targetPanel });
 }
 
 function ensureCanWrite(action = "change the atlas") {
@@ -1021,6 +1097,7 @@ function setOptions(select, values) {
 
 function render() {
   renderAuthState();
+  setActivePanel(state.activePanel || "sourcePanel");
   populateFormOptions();
   renderNavigation();
   renderSources();
@@ -1104,6 +1181,7 @@ function renderSources() {
     row.querySelector(".status-chip").textContent = source.citationStatus;
     row.addEventListener("click", () => {
       state.selectedId = source.id;
+      saveUserLocation({ selectedId: state.selectedId, panel: "sourcePanel" });
       renderSources();
     });
     els.sourceList.append(row);
@@ -1144,7 +1222,7 @@ function renderSelected(source) {
       <pre class="source-log-pre">${escapeHtml(formatSourceLog(source))}</pre>
     </details>
     <div class="form-actions">
-      ${source.url ? `<button class="primary-button iconless" type="button" data-source-open="${escapeHtml(source.id)}">Open In Browser</button>` : ""}
+      ${source.url || source.importId || source.fileAttachment ? `<button class="primary-button iconless" type="button" data-source-open="${escapeHtml(source.id)}">${source.importId || source.fileAttachment ? "Preview File" : "Open External"}</button>` : ""}
       <button class="ghost-button iconless" type="button" data-source-preview="${escapeHtml(source.id)}">Full Source Info</button>
     </div>
   `;
@@ -1157,7 +1235,9 @@ function renderSelected(source) {
 }
 
 function sourceLogLocator(source) {
+  if (source.fileAttachment) return `team-file://${source.teamMessageId || source.id}/${source.fileAttachment.fileName || "file"}`;
   if (source.referenceId) return `data/reference_ingest.json#${source.referenceId}`;
+  if (source.importId) return `import://${source.importId}/${source.fileRef?.fileName || source.title}`;
   if (source.url?.startsWith("local-collab-doc://")) return source.url;
   return `data/research_seed.json#${source.id}`;
 }
@@ -1179,6 +1259,9 @@ function formatSourceLog(source) {
       terms: source.terms || [],
       coreLinks: source.coreLinks || [],
       notes: source.notes || "",
+      importId: source.importId || "",
+      teamMessageId: source.teamMessageId || "",
+      fileRef: source.fileRef || source.fileAttachment || null,
       fullRecord: source,
     },
     null,
@@ -1190,7 +1273,11 @@ function openSourceInBrowser(sourceId) {
   const source = state.archive.sources.find((item) => item.id === sourceId);
   if (!source) return;
   previewSourceInBrowser(sourceId);
-  if (source.url) openInAppBrowser(source.url, source.title, { preview: sourceToBrowserPreview(source) });
+  if (source.url?.startsWith("import://") || source.importId || source.fileAttachment) {
+    openSourceFilePreview(sourceId);
+    return;
+  }
+  if (source.url) openExternalUrl(source.url);
 }
 
 function previewSourceInBrowser(sourceId) {
@@ -1209,6 +1296,102 @@ function sourceToBrowserPreview(source) {
     sourceInfo: `${source.category} / ${source.domain} / ${source.evidenceTier} / ${source.citationStatus}`,
     details: JSON.stringify(source, null, 2),
   };
+}
+
+function findImportedFile(importId) {
+  return (state.archive.importedFiles || []).find((item) => item.id === importId);
+}
+
+function openSourceFilePreview(sourceId) {
+  const source = state.archive.sources.find((item) => item.id === sourceId);
+  if (!source) return;
+  if (source.fileAttachment) {
+    openFilePreviewDialog(source.fileAttachment, { title: source.title, origin: "Team source log", url: source.url });
+    return;
+  }
+  if (source.importId) {
+    const imported = findImportedFile(source.importId);
+    if (imported) {
+      openFilePreviewDialog(imported, { title: source.title, origin: "Imported source log", url: source.url });
+      return;
+    }
+  }
+  if (source.url && /^https?:\/\//i.test(source.url)) {
+    openFilePreviewDialog({ fileName: source.title, url: source.url, previewKind: "web", summary: source.notes }, { title: source.title, origin: "Web source" });
+  }
+}
+
+function openTeamFilePreview(messageId) {
+  const item = findTeamMessage(messageId);
+  if (!item?.fileAttachment) return;
+  openFilePreviewDialog(item.fileAttachment, { title: item.title, origin: `Team post / ${item.owner || "local"}` });
+}
+
+function openFilePreviewDialog(file, context = {}) {
+  if (!els.filePreviewOverlay || !file) return;
+  const title = context.title || file.fileName || "File Preview";
+  els.filePreviewTitle.textContent = title;
+  els.filePreviewMeta.textContent = [context.origin, file.fileName, file.mimeType || file.extension, formatBytes(file.size || 0)]
+    .filter(Boolean)
+    .join(" / ");
+  els.filePreviewBody.innerHTML = renderFilePreviewContent(file, context);
+  els.filePreviewOverlay.hidden = false;
+  document.body.classList.add("is-modal-open");
+  els.filePreviewCloseButton.focus();
+  els.filePreviewBody.querySelectorAll("[data-preview-external]").forEach((button) => {
+    button.addEventListener("click", () => openExternalUrl(button.dataset.previewExternal));
+  });
+}
+
+function closeFilePreviewDialog() {
+  if (!els.filePreviewOverlay) return;
+  els.filePreviewOverlay.hidden = true;
+  document.body.classList.remove("is-modal-open");
+  els.filePreviewBody.innerHTML = "";
+}
+
+function renderFilePreviewContent(file = {}, context = {}) {
+  const kind = file.previewKind || previewKindForFile(file);
+  const dataUrl = file.dataUrl || "";
+  const text = file.textExcerpt || "";
+  const summary = file.summary || "No summary stored.";
+  const warnings = Array.isArray(file.warnings) ? file.warnings : [];
+  const url = context.url || file.url || "";
+  const warningHtml = warnings.length ? `<ul>${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : "";
+  const meta = `
+    <div class="file-preview-meta-grid">
+      <span><strong>Name:</strong> ${escapeHtml(file.fileName || context.title || "Untitled")}</span>
+      <span><strong>Type:</strong> ${escapeHtml(file.mimeType || file.extension || kind)}</span>
+      <span><strong>Size:</strong> ${escapeHtml(formatBytes(file.size || 0))}</span>
+      <span><strong>Stored preview:</strong> ${file.storedPreview || dataUrl ? "Yes" : "Metadata only"}</span>
+    </div>
+    <p>${escapeHtml(summary)}</p>
+    ${warningHtml}
+  `;
+  if (kind === "web" && url) {
+    return `${meta}<button class="primary-button iconless" type="button" data-preview-external="${escapeHtml(url)}">Open External</button>`;
+  }
+  if (dataUrl && kind === "image") return `${meta}<img class="file-preview-media" src="${escapeHtml(dataUrl)}" alt="${escapeHtml(file.fileName || "Image preview")}">`;
+  if (dataUrl && kind === "video") return `${meta}<video class="file-preview-media" controls src="${escapeHtml(dataUrl)}"></video>`;
+  if (dataUrl && kind === "audio") return `${meta}<audio class="file-preview-audio" controls src="${escapeHtml(dataUrl)}"></audio>`;
+  if (dataUrl && kind === "pdf") return `${meta}<iframe class="file-preview-document" title="${escapeHtml(file.fileName || "PDF preview")}" src="${escapeHtml(dataUrl)}"></iframe>`;
+  if (dataUrl && kind === "text") {
+    const decoded = decodeDataUrlText(dataUrl) || text;
+    return `${meta}<pre class="file-preview-text">${escapeHtml(clampText(decoded, PREVIEW_TEXT_LIMIT))}</pre>`;
+  }
+  return `${meta}<pre class="file-preview-text">${escapeHtml(text || JSON.stringify(file, null, 2))}</pre>`;
+}
+
+function decodeDataUrlText(dataUrl) {
+  try {
+    const comma = String(dataUrl || "").indexOf(",");
+    if (comma < 0) return "";
+    const meta = dataUrl.slice(0, comma);
+    const payload = dataUrl.slice(comma + 1);
+    return meta.includes(";base64") ? atob(payload) : decodeURIComponent(payload);
+  } catch {
+    return "";
+  }
 }
 
 function handleAddSource(event) {
@@ -1253,20 +1436,21 @@ async function handleFileImport(event) {
   state.importBusy = true;
   renderImportPanel(`Analyzing ${files.length} file${files.length === 1 ? "" : "s"}...`);
 
-  const results = [];
-  for (const file of files) {
-    try {
-      const analyzed = await analyzeUploadedFile(file);
-      results.push(integrateImportedFile(analyzed, options));
-    } catch (error) {
-      results.push({
-        fileName: file.name,
-        ok: false,
-        warning: error.message,
-        recordsCreated: 0,
-      });
-    }
-  }
+  const results = await Promise.all(
+    files.map(async (file) => {
+      try {
+        const analyzed = await analyzeUploadedFile(file);
+        return integrateImportedFile(analyzed, options);
+      } catch (error) {
+        return {
+          fileName: file.name,
+          ok: false,
+          warning: error.message,
+          recordsCreated: 0,
+        };
+      }
+    })
+  );
 
   state.importBusy = false;
   els.fileImportInput.value = "";
@@ -1292,6 +1476,16 @@ function getImportOptions() {
 }
 
 async function analyzeUploadedFile(file) {
+  const extension = extensionFromFileName(file.name);
+  if (!shouldUseServerImport(file, extension)) {
+    return analyzeFileInBrowser(file);
+  }
+
+  const capabilities = await ensureBackendCapabilities();
+  if (!hasBackendRoute("/api/import-file", capabilities)) {
+    return analyzeFileInBrowser(file);
+  }
+
   const payload = new FormData();
   payload.append("file", file, file.name);
 
@@ -1315,13 +1509,22 @@ async function analyzeUploadedFile(file) {
   }
 }
 
+function shouldUseServerImport(file, extension = extensionFromFileName(file.name)) {
+  if (isKnownStaticHost()) return false;
+  return [".pdf", ".doc", ".docx", ".zip"].includes(extension) && file.size <= 18_000_000;
+}
+
 async function analyzeFileInBrowser(file) {
   const extension = extensionFromFileName(file.name);
   let text = "";
   const warnings = [];
+  const previewKind = previewKindForFile({ extension, mimeType: file.type, fileName: file.name });
+  const canStorePreview = file.size <= MAX_STORED_FILE_BYTES;
+  let dataUrl = "";
 
   if ([".txt", ".json", ".py", ".js", ".css", ".md", ".markdown", ".html", ".htm", ".csv", ".xml", ".yaml", ".yml"].includes(extension)) {
-    text = await file.text();
+    text = await readFileTextSlice(file, IMPORT_TEXT_SLICE_BYTES);
+    if (file.size > IMPORT_TEXT_SLICE_BYTES) warnings.push(`Only the first ${Math.round(IMPORT_TEXT_SLICE_BYTES / 1024)} KB was analyzed for speed.`);
     if (extension === ".html" || extension === ".htm") text = stripHtml(text);
     if (extension === ".json") {
       try {
@@ -1330,10 +1533,19 @@ async function analyzeFileInBrowser(file) {
         warnings.push("JSON parse failed in browser; imported as raw text.");
       }
     }
+    if (canStorePreview) dataUrl = await readFileAsDataUrl(file);
+  } else if (["image", "audio", "video"].includes(previewKind)) {
+    text = `${file.name}\n${file.type || "application/octet-stream"}\n${formatBytes(file.size)} ${previewKind} upload.`;
+    if (canStorePreview) {
+      dataUrl = await readFileAsDataUrl(file);
+    } else {
+      warnings.push(`File is larger than ${formatBytes(MAX_STORED_FILE_BYTES)}; only metadata was stored for the preview.`);
+    }
   } else {
-    const buffer = await file.arrayBuffer();
+    const buffer = await file.slice(0, Math.min(file.size, 220_000)).arrayBuffer();
     text = printableBinaryText(new Uint8Array(buffer));
-    warnings.push(`${extension || "This file"} used browser-side best-effort text recovery. Run the Python server for richer PDF/DOCX parsing.`);
+    warnings.push(`${extension || "This file"} used browser-side metadata/best-effort preview. Run the Python server for richer PDF/DOCX parsing.`);
+    if (canStorePreview && [".pdf"].includes(extension)) dataUrl = await readFileAsDataUrl(file);
   }
 
   const clean = clampText(text.replace(/\s+\n/g, "\n").trim(), 240000);
@@ -1349,6 +1561,9 @@ async function analyzeFileInBrowser(file) {
     keywords: extractKeywords(clean),
     children: [],
     warnings,
+    previewKind,
+    dataUrl,
+    storedPreview: Boolean(dataUrl),
   };
 }
 
@@ -1393,6 +1608,9 @@ function integrateImportedFile(fileData, options) {
     strategy: mode,
     createdAt,
     owner: state.currentUser?.username || "local",
+    previewKind: fileData.previewKind || previewKindForFile(fileData),
+    dataUrl: fileData.dataUrl || "",
+    storedPreview: Boolean(fileData.dataUrl),
     keywords: fileData.keywords || extractKeywords(fileData.text),
     summary: fileData.summary || summarizeImportText(fileData.text),
     textLength: String(fileData.text || "").length,
@@ -1572,6 +1790,13 @@ function importItemToSource(item, fileData, importId, index, options) {
     notes: clampText(item.notes || item.summary || fileData.summary, 1400),
     coreLinks: item.coreLinks?.length ? item.coreLinks : ["Safety and Epistemic Notes"],
     importId,
+    fileRef: {
+      importId,
+      fileName: fileData.fileName,
+      extension: fileData.extension,
+      mimeType: fileData.mimeType,
+      previewKind: fileData.previewKind || previewKindForFile(fileData),
+    },
   };
 }
 
@@ -1660,6 +1885,7 @@ function renderImportPanel(message = "") {
 function previewImportedFile(importId) {
   const item = (state.archive.importedFiles || []).find((record) => record.id === importId);
   if (!item) return;
+  openFilePreviewDialog(item, { title: item.fileName, origin: "Import log" });
   setBrowserPreview(importedFileToBrowserPreview(item));
   renderBrowserPreview();
 }
@@ -1766,6 +1992,7 @@ function openInAppBrowser(url, label = url, options = {}) {
   const normalizedUrl = normalizeBrowserTarget(url);
   const query = options.query || extractBrowserQuery(label, normalizedUrl);
   state.currentBrowserUrl = normalizedUrl;
+  saveUserLocation({ currentBrowserUrl: normalizedUrl, panel: state.activePanel || "browserPanel" });
   const history = getBrowserHistory();
   history.unshift({
     id: `browser-${Date.now()}`,
@@ -1878,7 +2105,7 @@ function renderBrowserPanel() {
                 <small>${escapeHtml(entry.url)} / ${new Date(entry.createdAt).toLocaleString()}</small>
               </div>
               <div class="form-actions">
-                <button class="ghost-button iconless" type="button" data-browser-open="${escapeHtml(entry.url)}">Open</button>
+                <button class="ghost-button iconless" type="button" data-browser-open="${escapeHtml(entry.url)}">Open External</button>
                 <button class="ghost-button iconless" type="button" data-browser-preview="${escapeHtml(entry.id)}">Preview</button>
                 <button class="ghost-button iconless" type="button" data-browser-source="${escapeHtml(entry.url)}"${writeDisabledAttr()}>Add Source</button>
               </div>
@@ -1889,7 +2116,7 @@ function renderBrowserPanel() {
     : '<div class="empty-state">No in-app browser history yet.</div>';
 
   els.browserHistory.querySelectorAll("[data-browser-open]").forEach((button) => {
-    button.addEventListener("click", () => openInAppBrowser(button.dataset.browserOpen, button.dataset.browserOpen));
+    button.addEventListener("click", () => openExternalUrl(button.dataset.browserOpen));
   });
   els.browserHistory.querySelectorAll("[data-browser-preview]").forEach((button) => {
     button.addEventListener("click", () => previewBrowserHistoryItem(button.dataset.browserPreview));
@@ -1919,13 +2146,13 @@ function renderBrowserPreview() {
       ${preview.summary ? `<p>${escapeHtml(preview.summary)}</p>` : ""}
       ${preview.details ? `<pre class="browser-preview-details">${escapeHtml(preview.details)}</pre>` : ""}
       <div class="form-actions">
-        ${preview.url ? `<button class="primary-button iconless" type="button" data-preview-open="${escapeHtml(preview.url)}">Open In App</button>` : ""}
+        ${preview.url ? `<button class="primary-button iconless" type="button" data-preview-open="${escapeHtml(preview.url)}">Open External</button>` : ""}
         ${preview.url ? `<button class="ghost-button iconless" type="button" data-preview-source="${escapeHtml(preview.url)}"${writeDisabledAttr()}>Add to Sources</button>` : ""}
       </div>
     </article>
   `;
   els.browserPreview.querySelectorAll("[data-preview-open]").forEach((button) => {
-    button.addEventListener("click", () => openInAppBrowser(button.dataset.previewOpen, preview.title || button.dataset.previewOpen, { preview }));
+    button.addEventListener("click", () => openExternalUrl(button.dataset.previewOpen));
   });
   els.browserPreview.querySelectorAll("[data-preview-source]").forEach((button) => {
     button.addEventListener("click", () => addBrowserUrlToSources(button.dataset.previewSource));
@@ -2025,7 +2252,7 @@ function renderBrowserSearchResults() {
             <p>${escapeHtml(item.summary || "No preview summary available.")}</p>
             ${renderBrowserCardLinks(item)}
             <div class="form-actions">
-              ${item.url ? `<button class="primary-button iconless" type="button" data-browser-result-open="${escapeHtml(item.id)}">Open In App</button>` : ""}
+              ${item.url ? `<button class="primary-button iconless" type="button" data-browser-result-open="${escapeHtml(item.id)}">Open External</button>` : ""}
               <button class="ghost-button iconless" type="button" data-browser-result-preview="${escapeHtml(item.id)}">Full Info</button>
               ${item.url ? `<button class="ghost-button iconless" type="button" data-browser-result-source="${escapeHtml(item.id)}"${writeDisabledAttr()}>Add Source</button>` : ""}
             </div>
@@ -2047,7 +2274,7 @@ function renderBrowserSearchResults() {
     });
   });
   els.browserSearchResults.querySelectorAll("[data-open-browser-url]").forEach((button) => {
-    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, button.textContent.trim() || button.dataset.openBrowserUrl));
+    button.addEventListener("click", () => openExternalUrl(button.dataset.openBrowserUrl));
   });
 }
 
@@ -2123,7 +2350,7 @@ function renderOpenAiChat(statusText = "") {
         .join("")
     : '<div class="empty-state">No OpenAI chat messages yet. Ask a question after running the Python backend with OPENAI_API_KEY configured.</div>';
   els.openAiChatTranscript.querySelectorAll("[data-open-ai-url]").forEach((button) => {
-    button.addEventListener("click", () => openInAppBrowser(button.dataset.openAiUrl, button.textContent.trim() || button.dataset.openAiUrl));
+    button.addEventListener("click", () => openExternalUrl(button.dataset.openAiUrl));
   });
 }
 
@@ -2511,7 +2738,7 @@ function handleCseResultsReady(event) {
     title: `Google CSE results: ${query}`,
     url: searchUrl,
     type: "Google Programmable Search result set",
-    summary: `${googleCards.length} Google result card(s) and ${Math.max(cards.length - googleCards.length, 0)} local archive lead(s) are available below. Open In App keeps navigation inside the research browser when the target allows iframe embedding.`,
+    summary: `${googleCards.length} Google result card(s) and ${Math.max(cards.length - googleCards.length, 0)} local archive lead(s) are available below. External open buttons launch the target outside the atlas while preview cards stay available here.`,
     sourceInfo: `Google CSE ${GOOGLE_CSE_ID}`,
     details: JSON.stringify(
       {
@@ -2773,7 +3000,7 @@ function openBrowserResult(id) {
   const result = findBrowserResult(id);
   if (!result) return;
   previewBrowserResult(id);
-  if (result.url) openInAppBrowser(result.url, result.title, { preview: result });
+  if (result.url) openExternalUrl(result.url);
 }
 
 function previewBrowserResult(id) {
@@ -2815,7 +3042,19 @@ function openCurrentBrowserTargetExternal() {
     window.alert("Enter a URL or search query first.");
     return;
   }
-  window.open(url, "_blank", "noopener,noreferrer");
+  openExternalUrl(url);
+}
+
+function openExternalUrl(url) {
+  const target = String(url || "").trim();
+  if (!target) return;
+  saveCurrentUserLocation();
+  if (/^import:\/\//i.test(target) || /^team-file:\/\//i.test(target) || /^local-collab-doc:\/\//i.test(target)) {
+    window.alert("This is an internal atlas locator. Use Preview File or Full Source Info to inspect it.");
+    return;
+  }
+  const normalized = normalizeBrowserTarget(target);
+  window.open(normalized, "_blank", "noopener,noreferrer");
 }
 
 function addCurrentBrowserPageToSources() {
@@ -3031,12 +3270,46 @@ function extensionFromFileName(name) {
   return match ? match[0] : "";
 }
 
+function readFileTextSlice(file, bytes = IMPORT_TEXT_SLICE_BYTES) {
+  return file.slice(0, Math.min(file.size, bytes)).text();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error || new Error("File preview read failed.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function previewKindForFile(fileData = {}) {
+  const mime = String(fileData.mimeType || fileData.type || "").toLowerCase();
+  const extension = fileData.extension || extensionFromFileName(fileData.fileName);
+  if (mime.startsWith("image/") || [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp", ".avif"].includes(extension)) return "image";
+  if (mime.startsWith("video/") || [".mp4", ".webm", ".mov", ".avi", ".mkv"].includes(extension)) return "video";
+  if (mime.startsWith("audio/") || [".mp3", ".wav", ".ogg", ".m4a", ".flac"].includes(extension)) return "audio";
+  if (mime.includes("pdf") || extension === ".pdf") return "pdf";
+  if ([".txt", ".json", ".py", ".js", ".css", ".md", ".markdown", ".html", ".htm", ".csv", ".xml", ".yaml", ".yml"].includes(extension)) return "text";
+  if ([".zip", ".doc", ".docx"].includes(extension)) return "document";
+  if (/^https?:\/\//i.test(fileData.url || "")) return "web";
+  return "data";
+}
+
+function formatBytes(bytes = 0) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function sourceTypeForFile(fileData) {
   const extension = fileData.extension || extensionFromFileName(fileData.fileName);
   if (extension === ".pdf") return "PDF";
   if ([".html", ".htm"].includes(extension)) return "Documentation";
   if ([".zip", ".json"].includes(extension)) return "Archive";
-  if ([".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(extension)) return "WebP / Image";
+  if ([".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp", ".avif"].includes(extension)) return "WebP / Image";
+  if ([".mp4", ".webm", ".mov", ".avi", ".mkv", ".mp3", ".wav", ".ogg", ".m4a", ".flac"].includes(extension)) return "Video / Transcript";
   if ([".doc", ".docx", ".md", ".txt"].includes(extension)) return "Documentation";
   return "Documentation";
 }
@@ -3434,6 +3707,7 @@ async function syncTeamChat({ renderAfter = false } = {}) {
     const data = await readJsonResponse(response);
     if (Array.isArray(data.messages)) {
       state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], data.messages).slice(0, 200);
+      applyTeamConsensusPromotions(state.archive.teamMessages);
       broadcastTeamMessages();
       persistArchive();
     }
@@ -3477,6 +3751,7 @@ async function postTeamChatPayload(payload) {
     const data = await readJsonResponse(response);
     if (Array.isArray(data.messages)) {
       state.archive.teamMessages = mergeTeamMessages(state.archive.teamMessages || [], data.messages).slice(0, 200);
+      applyTeamConsensusPromotions(state.archive.teamMessages);
       broadcastTeamMessages();
       persistArchive();
       renderTeamChat();
@@ -3491,7 +3766,7 @@ async function postTeamChatPayload(payload) {
   renderTeamSyncSettings();
 }
 
-function handleTeamChatSubmit(event) {
+async function handleTeamChatSubmit(event) {
   event.preventDefault();
   if (!ensureCanWrite("post team messages")) return;
   const formData = new FormData(els.teamChatForm);
@@ -3499,18 +3774,23 @@ function handleTeamChatSubmit(event) {
   const rawUrl = String(formData.get("url") || "").trim();
   const url = rawUrl ? normalizeBrowserTarget(rawUrl) : "";
   const text = String(formData.get("text") || "").trim();
-  const title = String(formData.get("title") || "").trim() || (url ? `Team lead: ${domainFromUrl(url) || url}` : `${type} from ${state.currentUser?.username || "local"}`);
-  if (!text) return;
+  const upload = els.teamFileInput?.files?.[0] || null;
+  const fileAttachment = upload ? await analyzeTeamFileAttachment(upload) : null;
+  const title =
+    String(formData.get("title") || "").trim() ||
+    (fileAttachment ? `File review: ${fileAttachment.fileName}` : url ? `Team lead: ${domainFromUrl(url) || url}` : `${type} from ${state.currentUser?.username || "local"}`);
+  if (!text && !fileAttachment) return;
 
   const item = {
     id: `team-${Date.now()}-${Math.round(Math.random() * 999)}`,
     type,
     owner: state.currentUser?.username || "local",
     title,
-    text,
+    text: text || (fileAttachment ? `Review uploaded file: ${fileAttachment.fileName}` : ""),
     url,
-    status: type === "recommendation" ? "open" : "posted",
+    status: type === "recommendation" || fileAttachment ? "review" : "posted",
     votes: {},
+    fileAttachment,
     createdAt: new Date().toISOString(),
   };
 
@@ -3518,8 +3798,28 @@ function handleTeamChatSubmit(event) {
   broadcastTeamMessages();
   persistArchive();
   els.teamChatForm.reset();
+  if (els.teamFileInput) els.teamFileInput.value = "";
   renderTeamChat();
   postTeamChatPayload({ action: "post", item });
+}
+
+async function analyzeTeamFileAttachment(file) {
+  const analyzed = await analyzeFileInBrowser(file);
+  return {
+    id: `team-file-${Date.now()}-${Math.round(Math.random() * 999)}`,
+    fileName: analyzed.fileName,
+    extension: analyzed.extension,
+    mimeType: analyzed.mimeType,
+    size: analyzed.size,
+    previewKind: analyzed.previewKind || previewKindForFile(analyzed),
+    summary: analyzed.summary,
+    keywords: (analyzed.keywords || []).slice(0, 12),
+    textExcerpt: clampText(analyzed.text || "", PREVIEW_TEXT_LIMIT),
+    dataUrl: analyzed.dataUrl || "",
+    storedPreview: Boolean(analyzed.dataUrl),
+    warnings: analyzed.warnings || [],
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function useBrowserUrlForTeamPost() {
@@ -3548,11 +3848,12 @@ function renderTeamChat() {
 
   els.teamChatFeed.innerHTML = messages
     .map((item) => {
-      const votes = item.votes || {};
-      const addVotes = Object.values(votes).filter((vote) => vote === "add").length;
-      const rejectVotes = Object.values(votes).filter((vote) => vote === "reject").length;
+      const { addVotes, rejectVotes } = getTeamVoteCounts(item);
       const isRecommendation = item.type === "recommendation";
       const isLink = item.type === "link" || Boolean(item.url);
+      const hasAttachment = Boolean(item.fileAttachment);
+      const isPromotable = isRecommendation || isLink || hasAttachment;
+      const userVote = item.votes?.[state.currentUser?.username || "local"] || "";
       return `
         <article class="team-post ${escapeHtml(item.type || "message")}">
           <header>
@@ -3565,24 +3866,34 @@ function renderTeamChat() {
           <p>${escapeHtml(item.text || "")}</p>
           ${item.url ? `<button class="link-button" type="button" data-team-browser="${escapeHtml(item.id)}">${escapeHtml(item.url)}</button>` : ""}
           ${
-            isRecommendation
-              ? `<div class="vote-row"><span>${addVotes} add</span><span>${rejectVotes} reject</span></div>`
+            hasAttachment
+              ? `<div class="team-file-card">
+                  <strong>${escapeHtml(item.fileAttachment.fileName || "Attached file")}</strong>
+                  <span>${escapeHtml(item.fileAttachment.mimeType || item.fileAttachment.extension || "file")} / ${escapeHtml(formatBytes(item.fileAttachment.size || 0))}</span>
+                  <p>${escapeHtml(item.fileAttachment.summary || "File attached for team review.")}</p>
+                  <button class="ghost-button iconless" type="button" data-team-file-preview="${escapeHtml(item.id)}">Preview File</button>
+                </div>`
+              : ""
+          }
+          ${
+            isPromotable
+              ? `<div class="vote-row"><span>${addVotes}/${AUTH_USERS.length} add</span><span>${rejectVotes}/${AUTH_USERS.length} reject</span><span>${escapeHtml(userVote ? `Your vote: ${userVote}` : "Your vote: none")}</span><span>${TEAM_SOURCE_APPROVAL_THRESHOLD} add votes required</span></div>`
               : ""
           }
           <div class="form-actions">
             ${
               isLink
-                ? `<button class="ghost-button iconless" type="button" data-team-browser="${escapeHtml(item.id)}">Open in Browser</button>`
+                ? `<button class="ghost-button iconless" type="button" data-team-browser="${escapeHtml(item.id)}">Open External</button>`
                 : ""
             }
             ${
-              isLink || isRecommendation
-                ? `<button class="primary-button iconless" type="button" data-team-add="${escapeHtml(item.id)}"${writeDisabledAttr()}>Add to Sources</button>`
+              isPromotable
+                ? `<button class="primary-button iconless" type="button" data-team-add="${escapeHtml(item.id)}"${writeDisabledAttr()}>Vote Add to Sources</button>`
                 : ""
             }
             ${
-              isRecommendation
-                ? `<button class="ghost-button iconless" type="button" data-team-reject="${escapeHtml(item.id)}"${writeDisabledAttr()}>Reject</button>`
+              isPromotable
+                ? `<button class="ghost-button iconless" type="button" data-team-reject="${escapeHtml(item.id)}"${writeDisabledAttr()}>Vote Reject</button>`
                 : ""
             }
           </div>
@@ -3594,7 +3905,7 @@ function renderTeamChat() {
   els.teamChatFeed.querySelectorAll("[data-team-browser]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = findTeamMessage(button.dataset.teamBrowser);
-      if (item?.url) openInAppBrowser(item.url, item.title || item.url);
+      if (item?.url) openExternalUrl(item.url);
     });
   });
   els.teamChatFeed.querySelectorAll("[data-team-add]").forEach((button) => {
@@ -3603,10 +3914,21 @@ function renderTeamChat() {
   els.teamChatFeed.querySelectorAll("[data-team-reject]").forEach((button) => {
     button.addEventListener("click", () => rejectTeamRecommendation(button.dataset.teamReject));
   });
+  els.teamChatFeed.querySelectorAll("[data-team-file-preview]").forEach((button) => {
+    button.addEventListener("click", () => openTeamFilePreview(button.dataset.teamFilePreview));
+  });
 }
 
 function findTeamMessage(id) {
   return (state.archive.teamMessages || []).find((item) => item.id === id);
+}
+
+function getTeamVoteCounts(item = {}) {
+  const votes = item.votes || {};
+  return {
+    addVotes: Object.values(votes).filter((vote) => vote === "add").length,
+    rejectVotes: Object.values(votes).filter((vote) => vote === "reject").length,
+  };
 }
 
 function updateTeamMessage(id, update) {
@@ -3619,29 +3941,25 @@ function updateTeamMessage(id, update) {
 }
 
 function addTeamItemToSources(id) {
-  if (!ensureCanWrite("add team recommendations to Sources")) return;
+  if (!ensureCanWrite("vote on team recommendations")) return;
   const item = findTeamMessage(id);
   if (!item) return;
-  const source = {
-    id: `src-team-${Date.now()}`,
-    title: item.title || `Team source lead from ${item.owner || "local"}`,
-    category: "Documents",
-    species: "Cross-form",
-    domain: "Metaphysics",
-    sourceType: inferSourceType(item.url),
-    url: item.url || "",
-    evidenceTier: "Speculative framework",
-    citationStatus: "Needs verification",
-    tradition: `Team recommendation / ${item.owner || "local"}`,
-    terms: extractKeywords(`${item.title} ${item.text} ${item.url}`).slice(0, 8),
-    notes: `Promoted from team ${item.type || "post"} by ${state.currentUser?.username || "local"}. ${item.text || ""}`,
-    coreLinks: ["Safety and Epistemic Notes", "Core Manifestation Template"],
-  };
-  state.archive.sources.unshift(source);
-  state.selectedId = source.id;
   const votes = { ...(item.votes || {}), [state.currentUser?.username || "local"]: "add" };
-  updateTeamMessage(id, { status: "added to sources", sourceId: source.id, votes });
-  postTeamChatPayload({ action: "promote", id, sourceId: source.id, user: state.currentUser?.username || "local" });
+  const nextItem = { ...item, votes };
+  const { addVotes } = getTeamVoteCounts(nextItem);
+  const update = {
+    votes,
+    status: addVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD ? "approved for sources" : `review: ${addVotes}/${AUTH_USERS.length} add votes`,
+  };
+  if (addVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD) {
+    const source = ensureTeamItemSource(nextItem);
+    update.status = "added to sources";
+    update.sourceId = source.id;
+    postTeamChatPayload({ action: "promote", id, sourceId: source.id, user: state.currentUser?.username || "local" });
+  } else {
+    postTeamChatPayload({ action: "vote", id, decision: "add", user: state.currentUser?.username || "local" });
+  }
+  updateTeamMessage(id, update);
   render();
 }
 
@@ -3650,8 +3968,61 @@ function rejectTeamRecommendation(id) {
   const item = findTeamMessage(id);
   if (!item) return;
   const votes = { ...(item.votes || {}), [state.currentUser?.username || "local"]: "reject" };
-  updateTeamMessage(id, { status: "rejected", votes });
+  const { rejectVotes } = getTeamVoteCounts({ ...item, votes });
+  updateTeamMessage(id, { status: rejectVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD ? "rejected" : `review: ${rejectVotes}/${AUTH_USERS.length} reject votes`, votes });
   postTeamChatPayload({ action: "vote", id, decision: "reject", user: state.currentUser?.username || "local" });
+}
+
+function applyTeamConsensusPromotions(messages = state.archive.teamMessages || []) {
+  let changed = false;
+  messages.forEach((item) => {
+    const { addVotes, rejectVotes } = getTeamVoteCounts(item);
+    if (addVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD) {
+      const source = ensureTeamItemSource(item);
+      item.sourceId = source.id;
+      item.status = "added to sources";
+      changed = true;
+    } else if (rejectVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD && item.status !== "rejected") {
+      item.status = "rejected";
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function ensureTeamItemSource(item) {
+  const sourceId = teamSourceId(item);
+  const existing = state.archive.sources.find((source) => source.id === sourceId);
+  if (existing) {
+    state.selectedId = existing.id;
+    return existing;
+  }
+  const attachment = item.fileAttachment || null;
+  const source = {
+    id: sourceId,
+    title: item.title || attachment?.fileName || `Team source lead from ${item.owner || "local"}`,
+    category: "Documents",
+    species: "Cross-form",
+    domain: "Metaphysics",
+    sourceType: attachment ? sourceTypeForFile(attachment) : inferSourceType(item.url),
+    url: attachment ? `team-file://${item.id}/${encodeURIComponent(attachment.fileName || "file")}` : item.url || "",
+    evidenceTier: "Speculative framework",
+    citationStatus: "Needs verification",
+    tradition: `Team consensus / ${item.owner || "local"}`,
+    terms: extractKeywords(`${item.title || ""} ${item.text || ""} ${item.url || ""} ${attachment?.fileName || ""} ${attachment?.summary || ""}`).slice(0, 10),
+    notes: `Promoted after ${TEAM_SOURCE_APPROVAL_THRESHOLD}/${AUTH_USERS.length} team add votes. ${item.text || attachment?.summary || ""}`,
+    coreLinks: ["Safety and Epistemic Notes", "Core Manifestation Template"],
+    teamMessageId: item.id,
+    fileAttachment: attachment,
+  };
+  state.archive.sources.unshift(source);
+  state.selectedId = source.id;
+  persistArchive("Team consensus source promotion");
+  return source;
+}
+
+function teamSourceId(item = {}) {
+  return `src-team-${String(item.id || Date.now()).replace(/[^a-z0-9_-]/gi, "-").slice(0, 80)}`;
 }
 
 function getCollabDocs() {
@@ -3691,6 +4062,7 @@ function renderCollabDocs() {
     button.addEventListener("click", () => {
       if (els.collabDocEditor && !isGuestUser()) saveActiveCollabDoc({ silent: true });
       state.activeCollabDocId = button.dataset.docId;
+      saveUserLocation({ activeCollabDocId: state.activeCollabDocId, panel: "collabPanel" });
       renderCollabDocs();
     });
   });
@@ -4021,6 +4393,7 @@ function renderProfiles() {
   els.profileTabs.querySelectorAll("[data-profile]").forEach((button) => {
     button.addEventListener("click", () => {
       state.activeProfileUsername = button.dataset.profile;
+      saveUserLocation({ activeProfileUsername: state.activeProfileUsername, panel: "profilesPanel" });
       renderProfiles();
       renderPermissionState();
     });

@@ -368,7 +368,7 @@
                     <input name="target" required value="https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0" placeholder="https://example.com or lycanthropy folklore archive">
                   </label>
                   <div class="form-actions">
-                    <button class="primary-button" type="submit">Open In App</button>
+                    <button class="primary-button" type="submit">Search / Capture</button>
                     <button class="ghost-button" id="browserExternalButton" type="button">Open Public CSE</button>
                     <button class="ghost-button" id="browserAddSourceButton" type="button">Add Current Page to Sources</button>
                   </div>
@@ -546,7 +546,16 @@
                   </div>
                   <label>
                     Message
-                    <textarea name="text" rows="4" required placeholder="Post a finding, team update, question, recommendation, or source lead."></textarea>
+                    <textarea name="text" rows="4" placeholder="Post a finding, team update, question, recommendation, source lead, or file note."></textarea>
+                  </label>
+                  <label>
+                    Optional file upload
+                    <input
+                      id="teamFileInput"
+                      name="teamFile"
+                      type="file"
+                      accept=".txt,.json,.py,.js,.css,.md,.html,.htm,.doc,.docx,.pdf,.csv,.xml,.yaml,.yml,.zip,.png,.jpg,.jpeg,.webp,.gif,.svg,.bmp,.tif,.tiff,.heic,.avif,.mp3,.wav,.ogg,.m4a,.mp4,.webm,.mov,.avi"
+                    >
                   </label>
                   <div class="form-actions">
                     <button class="primary-button" type="submit">Post to Team</button>
@@ -811,6 +820,19 @@
       </form>
     </div>
 
+    <div class="modal-overlay" id="filePreviewOverlay" hidden>
+      <section class="file-preview-modal" role="dialog" aria-modal="true" aria-labelledby="filePreviewTitle">
+        <header>
+          <div>
+            <h2 id="filePreviewTitle">File Preview</h2>
+            <p id="filePreviewMeta"></p>
+          </div>
+          <button class="ghost-button iconless" id="filePreviewCloseButton" type="button">Close</button>
+        </header>
+        <div id="filePreviewBody" class="file-preview-body"></div>
+      </section>
+    </div>
+
     <template id="sourceRowTemplate">
       <button class="source-row" type="button">
         <span class="species-token"></span>
@@ -824,6 +846,6 @@
       </button>
     </template>
 
-    <script src="app.js?v=20260707-cloudflare-search"></script>
+    <script src="app.js?v=20260707-team-files-layout"></script>
   </body>
 </html>
