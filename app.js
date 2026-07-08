@@ -3,6 +3,7 @@
 const STORAGE_KEY = "core-shapeshifting-research-atlas";
 const MEMORY_BANK_KEY = `${STORAGE_KEY}:memory-bank`;
 const STORAGE_BACKUP_KEY = `${STORAGE_KEY}:last-good-backup`;
+const FILE_MANAGER_STORAGE_KEY = `${STORAGE_KEY}:file-manager`;
 const SESSION_KEY = "core-shapeshifting-active-user";
 const USER_LOCATION_KEY = `${STORAGE_KEY}:user-location`;
 const GOOGLE_SEARCH_BASE_URL = "https://www.google.com/search?q=";
@@ -725,6 +726,7 @@ const state = {
   fileManagerStatusMessage: "",
   fileManagerRecentNodeId: "",
   fileManagerRenameId: "",
+  fileManagerDraftNode: null,
   filePreviewObjectUrls: [],
   backendCapabilities: {
     checked: false,
@@ -5138,7 +5140,16 @@ function slugify(value) {
 }
 
 function getFileManager() {
-  state.archive.fileManager = normalizeFileManager(state.archive.fileManager || DEFAULT_FILE_MANAGER);
+  let manager = normalizeFileManager(state.archive.fileManager || DEFAULT_FILE_MANAGER);
+  if (state.fileManagerDraftNode && !manager.nodes.some((node) => node.id === state.fileManagerDraftNode.id)) {
+    manager = normalizeFileManager({
+      ...manager,
+      nodes: [...manager.nodes, state.fileManagerDraftNode],
+      selectedId: state.fileManagerDraftNode.id,
+      currentFolderId: state.fileManagerDraftNode.parentId || manager.rootId,
+    });
+  }
+  state.archive.fileManager = manager;
   return state.archive.fileManager;
 }
 
@@ -5612,26 +5623,76 @@ function fileManagerBreadcrumb(nodeId) {
 
 function persistFileManager(reason = "File manager update") {
   getFileManager();
+  writeFileManagerState();
   persistArchive(reason);
+  if (state.fileManagerDraftNode && state.archive.fileManager?.nodes?.some((node) => node.id === state.fileManagerDraftNode.id)) {
+    state.fileManagerDraftNode = null;
+  }
   renderFileManager();
+}
+
+function readStoredFileManagerState() {
+  try {
+    const saved = window.localStorage.getItem(FILE_MANAGER_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    window.localStorage.removeItem(FILE_MANAGER_STORAGE_KEY);
+    return null;
+  }
+}
+
+function mergeStoredFileManagerState(manager) {
+  const stored = readStoredFileManagerState();
+  if (!stored) return manager;
+  return {
+    ...manager,
+    ...stored,
+    nodes: mergeById(manager?.nodes || [], stored.nodes || []),
+    selectedId: stored.selectedId || manager?.selectedId,
+    currentFolderId: stored.currentFolderId || manager?.currentFolderId,
+  };
+}
+
+function writeFileManagerState() {
+  if (isGuestUser()) return;
+  try {
+    window.localStorage.setItem(FILE_MANAGER_STORAGE_KEY, JSON.stringify(state.archive.fileManager || getFileManager()));
+  } catch (error) {
+    console.warn("File manager persistence failed", error);
+  }
+}
+
+function appendFileManagerNode(node, parentId) {
+  const manager = getFileManager();
+  const normalized = normalizeFileNode({ ...node, parentId });
+  const nodes = [...manager.nodes.filter((item) => item.id !== normalized.id), normalized];
+  state.archive.fileManager = normalizeFileManager({
+    ...manager,
+    nodes,
+    selectedId: normalized.id,
+    currentFolderId: parentId || manager.rootId,
+  });
+  state.fileManagerDraftNode = normalized;
+  const added = getFileNode(normalized.id);
+  if (!added) {
+    state.archive.fileManager.nodes = [...state.archive.fileManager.nodes, normalized];
+    state.archive.fileManager.selectedId = normalized.id;
+    state.archive.fileManager.currentFolderId = parentId || state.archive.fileManager.rootId;
+  }
+  return normalized;
 }
 
 function createFileManagerFolder() {
   if (!ensureCanWrite("create folders")) return;
   const now = new Date().toISOString();
-  const manager = getFileManager();
   const parentId = getCurrentFileManagerFolderId();
-  const node = {
+  const node = appendFileManagerNode({
     id: `file-folder-${Date.now()}-${Math.round(Math.random() * 99999)}`,
-    parentId,
     kind: "folder",
     name: nextFileManagerName(parentId, "New Folder"),
     createdAt: now,
     updatedAt: now,
-  };
-  manager.nodes.push(node);
-  manager.selectedId = node.id;
-  manager.currentFolderId = parentId;
+  }, parentId);
   state.fileManagerRecentNodeId = node.id;
   state.fileManagerRenameId = node.id;
   state.fileManagerStatusMessage = `Created ${node.name}. Rename it now.`;
@@ -5642,12 +5703,10 @@ function createFileManagerFolder() {
 function createFileManagerTextFile() {
   if (!ensureCanWrite("create text files")) return;
   const now = new Date().toISOString();
-  const manager = getFileManager();
   const parentId = getCurrentFileManagerFolderId();
   const fileName = nextFileManagerName(parentId, "New Note", ".txt");
-  const node = {
+  const node = appendFileManagerNode({
     id: `file-text-${Date.now()}-${Math.round(Math.random() * 99999)}`,
-    parentId,
     kind: "file",
     name: fileName,
     extension: ".txt",
@@ -5657,10 +5716,7 @@ function createFileManagerTextFile() {
     previewKind: "text",
     createdAt: now,
     updatedAt: now,
-  };
-  manager.nodes.push(node);
-  manager.selectedId = node.id;
-  manager.currentFolderId = parentId;
+  }, parentId);
   state.fileManagerRecentNodeId = node.id;
   state.fileManagerRenameId = node.id;
   state.fileManagerStatusMessage = `Created ${node.name}. Rename it now.`;
@@ -6273,7 +6329,7 @@ function normalizeArchive(input) {
     contentHtml: "<p>Start drafting here.</p>",
     ...doc,
   }));
-  archive.fileManager = normalizeFileManager(archive.fileManager || base.fileManager);
+  archive.fileManager = normalizeFileManager(mergeStoredFileManagerState(archive.fileManager || base.fileManager));
   return archive;
 }
 
