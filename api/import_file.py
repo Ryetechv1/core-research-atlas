@@ -3,7 +3,7 @@ from __future__ import annotations
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 
-from api._common import load_workspace_imports, write_json
+from api._common import load_workspace_imports, write_json, write_options
 
 load_workspace_imports()
 
@@ -12,6 +12,9 @@ from scripts.multipart_upload import MultipartUploadError, read_uploaded_file  #
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self) -> None:
+        write_options(self)
+
     def do_POST(self) -> None:
         try:
             filename, content_type, data = read_uploaded_file(self.headers, self.rfile)

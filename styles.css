@@ -2162,6 +2162,41 @@ a,
   margin-bottom: 14px;
 }
 
+.virtual-os-panel {
+  margin-bottom: 14px;
+}
+
+.browser-os-dock {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.browser-os-tile {
+  display: grid;
+  gap: 4px;
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid #000;
+  border-radius: 8px;
+  color: #fff;
+  text-align: left;
+  background:
+    linear-gradient(145deg, #f4f4f4 0%, #747474 48%, #080808 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.browser-os-tile strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.browser-os-tile span {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .browser-preview,
 .browser-result-list {
   display: grid;
@@ -2221,6 +2256,30 @@ a,
   font-size: 11px;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.browser-result-url-row {
+  display: grid;
+  gap: 5px;
+}
+
+.browser-result-url-row span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.result-link-button {
+  width: 100%;
+}
+
+.result-url.is-missing {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.team-sync-panel {
+  margin-top: 12px;
 }
 
 .cse-panel {

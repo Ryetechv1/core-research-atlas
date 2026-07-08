@@ -12,11 +12,27 @@ const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
 const HEALTH_API_PATH = "/api/health";
 const SEARCH_API_PATH = "/api/search";
 const OPENAI_CHAT_API_PATH = "/api/openai-chat";
+const TEAM_CHAT_API_PATH = "/api/team-chat";
 const TEAM_CHAT_STORAGE_KEY = `${STORAGE_KEY}:team-chat`;
 const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
+const TEAM_SYNC_URL_KEY = `${STORAGE_KEY}:team-sync-url`;
+const TEAM_SYNC_QUERY_KEYS = ["sync", "teamSync", "teamSyncUrl"];
 const TEAM_CHAT_POLL_MS = 5_000;
 const GUEST_SESSION_VALUE = "Guest";
 const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
+
+const GOOGLE_CAPABILITIES = [
+  { id: "web", label: "Search", description: "Google web results", kind: "google" },
+  { id: "images", label: "Images", description: "Image result mode", kind: "google" },
+  { id: "videos", label: "Videos", description: "Video result mode", kind: "google" },
+  { id: "news", label: "News", description: "News result mode", kind: "google" },
+  { id: "books", label: "Books", description: "Google Books search", kind: "google" },
+  { id: "scholar", label: "Scholar", description: "Scholar and academic leads", kind: "google" },
+  { id: "pdf", label: "PDFs", description: "Google PDF/filetype search", kind: "google" },
+  { id: "archives", label: "Archives", description: "Archive-focused search", kind: "google" },
+  { id: "patents", label: "Patents", description: "Google Patents", kind: "google" },
+  { id: "translate", label: "Translate", description: "Google Translate", kind: "google" },
+];
 
 const AUTH_USERS = [
   { username: "UserSeth", password: "User1password", role: "ADMIN", readOnly: false },
@@ -610,6 +626,7 @@ const state = {
   guestBrowserPreview: null,
   teamChatChannel: null,
   teamChatBackendAvailable: null,
+  teamSyncBaseUrl: getInitialTeamSyncBaseUrl(),
   backendCapabilities: {
     checked: false,
     checking: null,
@@ -674,6 +691,8 @@ function cacheElements() {
   els.browserExternalButton = document.getElementById("browserExternalButton");
   els.browserAddSourceButton = document.getElementById("browserAddSourceButton");
   els.googleCsePublicLink = document.getElementById("googleCsePublicLink");
+  els.browserOsDock = document.getElementById("browserOsDock");
+  els.browserOsStatus = document.getElementById("browserOsStatus");
   els.browserPreview = document.getElementById("browserPreview");
   els.browserSearchResults = document.getElementById("browserSearchResults");
   els.browserHistory = document.getElementById("browserHistory");
@@ -684,6 +703,9 @@ function cacheElements() {
   els.teamChatForm = document.getElementById("teamChatForm");
   els.teamChatFeed = document.getElementById("teamChatFeed");
   els.teamChatStatus = document.getElementById("teamChatStatus");
+  els.teamSyncForm = document.getElementById("teamSyncForm");
+  els.teamSyncStatus = document.getElementById("teamSyncStatus");
+  els.clearTeamSyncButton = document.getElementById("clearTeamSyncButton");
   els.refreshTeamChatButton = document.getElementById("refreshTeamChatButton");
   els.useBrowserForTeamPostButton = document.getElementById("useBrowserForTeamPostButton");
   els.newCollabDocButton = document.getElementById("newCollabDocButton");
@@ -767,6 +789,8 @@ function wireEvents() {
   els.browserAddSourceButton.addEventListener("click", addCurrentBrowserPageToSources);
   els.openAiChatForm.addEventListener("submit", handleOpenAiChatSubmit);
   els.openAiClearButton.addEventListener("click", clearOpenAiChat);
+  els.teamSyncForm.addEventListener("submit", handleTeamSyncSubmit);
+  els.clearTeamSyncButton.addEventListener("click", clearTeamSyncServer);
   els.teamChatForm.addEventListener("submit", handleTeamChatSubmit);
   els.refreshTeamChatButton.addEventListener("click", () => syncTeamChat({ renderAfter: true }));
   els.useBrowserForTeamPostButton.addEventListener("click", useBrowserUrlForTeamPost);
@@ -1004,6 +1028,7 @@ function render() {
   renderImportPanel();
   renderBrowserPanel();
   renderOpenAiChat();
+  renderTeamSyncSettings();
   renderTeamChat();
   renderCollabDocs();
   renderMemoryBank();
@@ -1839,6 +1864,7 @@ function renderBrowserPanel() {
     loadInAppBrowserFrame(current, getBrowserPreview());
   }
   els.inAppBrowserStatus.textContent = browserStatusMessage(current);
+  renderBrowserOsDock();
   renderBrowserPreview();
   renderBrowserSearchResults();
   els.browserHistory.innerHTML = history.length
@@ -1906,6 +1932,71 @@ function renderBrowserPreview() {
   });
 }
 
+function renderBrowserOsDock() {
+  if (!els.browserOsDock) return;
+  const query = extractBrowserQuery(els.inAppBrowserForm?.elements.target?.value || "", state.currentBrowserUrl) || "shapeshifting research";
+  if (els.browserOsStatus) {
+    els.browserOsStatus.textContent = `${GOOGLE_CAPABILITIES.length} Google modes`;
+  }
+  els.browserOsDock.innerHTML = GOOGLE_CAPABILITIES.map(
+    (capability) => `
+      <button class="browser-os-tile" type="button" data-google-mode="${escapeHtml(capability.id)}">
+        <strong>${escapeHtml(capability.label)}</strong>
+        <span>${escapeHtml(capability.description)}</span>
+      </button>
+    `
+  ).join("");
+  els.browserOsDock.querySelectorAll("[data-google-mode]").forEach((button) => {
+    button.addEventListener("click", () => openGoogleCapability(button.dataset.googleMode, query));
+  });
+}
+
+function openGoogleCapability(mode, query = "") {
+  const text = String(query || els.inAppBrowserForm?.elements.target?.value || "shapeshifting research").trim() || "shapeshifting research";
+  const capability = GOOGLE_CAPABILITIES.find((item) => item.id === mode) || GOOGLE_CAPABILITIES[0];
+  const url = buildGoogleCapabilityUrl(capability.id, text);
+  openInAppBrowser(url, `${capability.label}: ${text}`, {
+    query: text,
+    preview: {
+      id: `google-mode-${capability.id}-${Date.now()}`,
+      type: `Google ${capability.label}`,
+      title: `${capability.label}: ${text}`,
+      url,
+      summary: `${capability.description}. Opened as a virtual OS browser target with visible in-app links and source actions.`,
+      sourceInfo: `Google ${capability.label}`,
+      links: buildGoogleCapabilityLinks(text),
+      details: JSON.stringify({ mode: capability.id, query: text, url }, null, 2),
+      score: 1000,
+    },
+  });
+}
+
+function buildGoogleCapabilityUrl(mode, query) {
+  const encoded = encodeURIComponent(String(query || "").trim());
+  const pdfQuery = encodeURIComponent(`${query} filetype:pdf`);
+  const archiveQuery = encodeURIComponent(`${query} site:archive.org OR site:loc.gov OR site:archive.is`);
+  const urls = {
+    web: `https://www.google.com/search?q=${encoded}`,
+    images: `https://www.google.com/search?tbm=isch&q=${encoded}`,
+    videos: `https://www.google.com/search?tbm=vid&q=${encoded}`,
+    news: `https://news.google.com/search?q=${encoded}`,
+    books: `https://books.google.com/books?q=${encoded}`,
+    scholar: `https://scholar.google.com/scholar?q=${encoded}`,
+    pdf: `https://www.google.com/search?q=${pdfQuery}`,
+    archives: `https://www.google.com/search?q=${archiveQuery}`,
+    patents: `https://patents.google.com/?q=${encoded}`,
+    translate: `https://translate.google.com/?sl=auto&tl=en&text=${encoded}&op=translate`,
+  };
+  return urls[mode] || urls.web;
+}
+
+function buildGoogleCapabilityLinks(query) {
+  return GOOGLE_CAPABILITIES.map((capability) => ({
+    title: capability.label,
+    url: buildGoogleCapabilityUrl(capability.id, query),
+  }));
+}
+
 function renderBrowserSearchResults() {
   if (!els.browserSearchResults) return;
   const results = getBrowserSearchResults();
@@ -1930,7 +2021,7 @@ function renderBrowserSearchResults() {
               </div>
               ${item.url ? `<span class="detail-chip">${escapeHtml(domainFromUrl(item.url) || inferSourceType(item.url))}</span>` : ""}
             </header>
-            ${item.url ? `<p class="result-url">${escapeHtml(item.url)}</p>` : ""}
+            ${renderBrowserResultUrl(item)}
             <p>${escapeHtml(item.summary || "No preview summary available.")}</p>
             ${renderBrowserCardLinks(item)}
             <div class="form-actions">
@@ -1975,6 +2066,16 @@ function renderBrowserCardLinks(item) {
             `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(link.url)}">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</button>`
         )
         .join("")}
+    </div>
+  `;
+}
+
+function renderBrowserResultUrl(item) {
+  if (!item?.url) return '<p class="result-url is-missing">No direct link stored for this result yet.</p>';
+  return `
+    <div class="browser-result-url-row">
+      <span>Result link</span>
+      <button class="link-button result-link-button" type="button" data-open-browser-url="${escapeHtml(item.url)}">${escapeHtml(item.url)}</button>
     </div>
   `;
 }
@@ -2518,7 +2619,12 @@ function extractBrowserQuery(value, url = "") {
   const raw = String(value || "").trim();
   try {
     const parsed = new URL(url || raw);
-    const cseQuery = parsed.searchParams.get("gsc.q") || parsed.searchParams.get("q");
+    const hashParams = new URLSearchParams(String(parsed.hash || "").replace(/^#/, ""));
+    const cseQuery =
+      parsed.searchParams.get("gsc.q") ||
+      hashParams.get("gsc.q") ||
+      parsed.searchParams.get("q") ||
+      hashParams.get("q");
     if (cseQuery) return cseQuery;
     if (parsed.hostname.includes("google.") && parsed.pathname.includes("/search")) {
       return parsed.searchParams.get("q") || raw;
@@ -2540,6 +2646,16 @@ function buildVirtualBrowserResults(query, currentUrl = "") {
     url: currentUrl,
     summary: `Google Programmable Search query routed through the in-app research browser: ${query}.`,
     sourceInfo: `Google CSE ${GOOGLE_CSE_ID}`,
+    links: buildGoogleCapabilityLinks(query),
+    details: JSON.stringify(
+      {
+        query,
+        currentUrl,
+        googleCapabilities: buildGoogleCapabilityLinks(query),
+      },
+      null,
+      2
+    ),
     score: 999,
   });
 
@@ -2748,7 +2864,7 @@ function normalizeBrowserTarget(value) {
 function buildCseSearchUrl(query) {
   const text = String(query || "").trim();
   if (!text) return GOOGLE_CSE_PUBLIC_URL;
-  return `${GOOGLE_CSE_PUBLIC_URL}&gsc.q=${encodeURIComponent(text)}`;
+  return `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}&gsc.q=${encodeURIComponent(text)}#gsc.tab=0`;
 }
 
 function browserStatusMessage(url) {
@@ -3209,17 +3325,111 @@ function setTeamChatStatus(text) {
   if (els.teamChatStatus) els.teamChatStatus.textContent = text;
 }
 
+function renderTeamSyncSettings() {
+  if (!els.teamSyncForm) return;
+  els.teamSyncForm.elements.syncUrl.value = state.teamSyncBaseUrl || "";
+  const endpoint = getTeamChatEndpoint();
+  const mode = state.teamSyncBaseUrl ? "Shared sync server" : isKnownStaticHost() ? "Static local-only mode" : "This host backend";
+  const endpointLabel = state.teamSyncBaseUrl ? endpoint : isKnownStaticHost() ? "no shared backend configured" : endpoint;
+  if (els.teamSyncStatus) {
+    els.teamSyncStatus.textContent = `${mode}: ${endpointLabel || "no shared backend configured"}`;
+  }
+}
+
+function handleTeamSyncSubmit(event) {
+  event.preventDefault();
+  const raw = String(new FormData(els.teamSyncForm).get("syncUrl") || "").trim();
+  const normalized = normalizeTeamSyncBaseUrl(raw);
+  if (!normalized) {
+    clearTeamSyncServer();
+    return;
+  }
+  state.teamSyncBaseUrl = normalized;
+  window.localStorage.setItem(TEAM_SYNC_URL_KEY, normalized);
+  state.backendCapabilities.checked = false;
+  renderTeamSyncSettings();
+  syncTeamChat({ renderAfter: true });
+}
+
+function clearTeamSyncServer() {
+  state.teamSyncBaseUrl = "";
+  window.localStorage.removeItem(TEAM_SYNC_URL_KEY);
+  renderTeamSyncSettings();
+  syncTeamChat({ renderAfter: true });
+}
+
+function getInitialTeamSyncBaseUrl() {
+  const fromUrl = readTeamSyncUrlFromLocation();
+  const saved = window.localStorage.getItem(TEAM_SYNC_URL_KEY) || "";
+  const normalized = normalizeTeamSyncBaseUrlValue(fromUrl || saved);
+  if (fromUrl && normalized) {
+    window.localStorage.setItem(TEAM_SYNC_URL_KEY, normalized);
+  }
+  return normalized;
+}
+
+function readTeamSyncUrlFromLocation() {
+  const locations = [window.location.search, String(window.location.hash || "").replace(/^#/, "?")];
+  for (const value of locations) {
+    const params = new URLSearchParams(value);
+    for (const key of TEAM_SYNC_QUERY_KEYS) {
+      const match = params.get(key);
+      if (match) return match;
+    }
+  }
+  return "";
+}
+
+function normalizeTeamSyncBaseUrl(value) {
+  const normalized = normalizeTeamSyncBaseUrlValue(value);
+  if (!normalized && String(value || "").trim()) {
+    window.alert("Enter a valid sync server URL, for example https://your-backend.example.com");
+  }
+  return normalized;
+}
+
+function normalizeTeamSyncBaseUrlValue(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const withProtocol = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  try {
+    const parsed = new URL(withProtocol);
+    parsed.pathname = parsed.pathname.replace(/\/api\/team-chat\/?$/i, "").replace(/\/$/, "");
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function getTeamChatEndpoint() {
+  if (!state.teamSyncBaseUrl) return TEAM_CHAT_API_PATH;
+  try {
+    return new URL(TEAM_CHAT_API_PATH, `${state.teamSyncBaseUrl}/`).toString();
+  } catch {
+    return TEAM_CHAT_API_PATH;
+  }
+}
+
+function hasSameOriginTeamBackend(capabilities = state.backendCapabilities) {
+  return hasBackendRoute(TEAM_CHAT_API_PATH, capabilities);
+}
+
 async function syncTeamChat({ renderAfter = false } = {}) {
   if (!els.teamChatFeed) return;
-  const capabilities = await ensureBackendCapabilities();
-  if (!hasBackendRoute("/api/team-chat", capabilities)) {
+  const endpoint = getTeamChatEndpoint();
+  const useRemoteSync = Boolean(state.teamSyncBaseUrl);
+  const capabilities = useRemoteSync ? null : await ensureBackendCapabilities();
+  if (!useRemoteSync && !hasSameOriginTeamBackend(capabilities)) {
     state.teamChatBackendAvailable = false;
-    setTeamChatStatus("Local/cross-tab team feed on this static host. Cross-device posts need a backend with /api/team-chat.");
+    setTeamChatStatus("Local/cross-tab feed. Add a shared sync server URL for all 3 users.");
+    renderTeamSyncSettings();
     if (renderAfter) renderTeamChat();
     return;
   }
   try {
-    const response = await fetch("/api/team-chat", { cache: "no-store" });
+    const response = await fetch(endpoint, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await readJsonResponse(response);
     if (Array.isArray(data.messages)) {
@@ -3228,11 +3438,12 @@ async function syncTeamChat({ renderAfter = false } = {}) {
       persistArchive();
     }
     state.teamChatBackendAvailable = true;
-    setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}`);
+    setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}${useRemoteSync ? " / shared server" : ""}`);
   } catch (error) {
     state.teamChatBackendAvailable = false;
-    setTeamChatStatus("Local-only team feed on this host. Shared messages across devices require a backend /api/team-chat deployment.");
+    setTeamChatStatus(useRemoteSync ? `Shared sync failed: ${error.message}` : "Local-only feed. Shared messages need a backend.");
   }
+  renderTeamSyncSettings();
   if (renderAfter) renderTeamChat();
 }
 
@@ -3246,15 +3457,18 @@ function mergeTeamMessages(localMessages = [], remoteMessages = []) {
 }
 
 async function postTeamChatPayload(payload) {
-  const capabilities = await ensureBackendCapabilities();
-  if (!hasBackendRoute("/api/team-chat", capabilities)) {
+  const endpoint = getTeamChatEndpoint();
+  const useRemoteSync = Boolean(state.teamSyncBaseUrl);
+  const capabilities = useRemoteSync ? null : await ensureBackendCapabilities();
+  if (!useRemoteSync && !hasSameOriginTeamBackend(capabilities)) {
     state.teamChatBackendAvailable = false;
     broadcastTeamMessages();
-    setTeamChatStatus("Saved locally and synced across open tabs. Cross-device backend is not available on this host.");
+    setTeamChatStatus("Saved locally. Add the same shared sync server URL on all 3 devices to sync together.");
+    renderTeamSyncSettings();
     return;
   }
   try {
-    const response = await fetch("/api/team-chat", {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -3268,12 +3482,13 @@ async function postTeamChatPayload(payload) {
       renderTeamChat();
     }
     state.teamChatBackendAvailable = true;
-    setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}`);
+    setTeamChatStatus(`Synced ${new Date().toLocaleTimeString()}${useRemoteSync ? " / shared server" : ""}`);
   } catch (error) {
     state.teamChatBackendAvailable = false;
     broadcastTeamMessages();
-    setTeamChatStatus("Saved locally. Shared backend unavailable on this host.");
+    setTeamChatStatus(useRemoteSync ? `Saved locally. Shared sync failed: ${error.message}` : "Saved locally. Shared backend unavailable.");
   }
+  renderTeamSyncSettings();
 }
 
 function handleTeamChatSubmit(event) {
@@ -3325,7 +3540,7 @@ function renderTeamChat() {
   if (!messages.length) {
     const note =
       state.teamChatBackendAvailable === false
-        ? " Shared cross-device team chat needs a backend host with /api/team-chat; this GitHub Pages/static session can still save and display local posts."
+        ? " To sync all 3 users, enter the same shared team sync server URL on every device. GitHub Pages by itself is local-only."
         : "";
     els.teamChatFeed.innerHTML = `<div class="empty-state">No team posts yet. Share a message, update, link, or source recommendation.${escapeHtml(note)}</div>`;
     return;

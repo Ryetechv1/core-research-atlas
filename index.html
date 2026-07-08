@@ -374,6 +374,17 @@
                   <p id="inAppBrowserStatus" class="browser-status">No page loaded yet.</p>
                 </form>
 
+                <section class="api-panel virtual-os-panel" aria-labelledby="virtualOsTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="virtualOsTitle">Virtual Google OS</h2>
+                      <p>Search modes open as in-app browser targets with visible links, previews, and source actions.</p>
+                    </div>
+                    <span id="browserOsStatus" class="detail-chip">Ready</span>
+                  </div>
+                  <div id="browserOsDock" class="browser-os-dock" aria-label="Google capability shortcuts"></div>
+                </section>
+
                 <section class="api-panel virtual-browser-panel" aria-labelledby="virtualBrowserTitle">
                   <div class="panel-heading compact">
                     <div>
@@ -527,6 +538,18 @@
                     <button class="primary-button" type="submit">Post to Team</button>
                     <button class="ghost-button" id="useBrowserForTeamPostButton" type="button">Use Browser URL</button>
                   </div>
+                </form>
+
+                <form id="teamSyncForm" class="api-panel team-sync-panel">
+                  <label>
+                    Shared team sync server URL
+                    <input name="syncUrl" placeholder="https://your-public-backend.example.com or http://LAN-IP:5177">
+                  </label>
+                  <div class="form-actions">
+                    <button class="ghost-button" type="submit">Save Sync Server</button>
+                    <button class="ghost-button" id="clearTeamSyncButton" type="button">Use This Host</button>
+                  </div>
+                  <p id="teamSyncStatus" class="browser-status">Use the same backend URL on all three devices to share team posts. Static hosts can also be opened with ?sync=https://your-backend.example.com.</p>
                 </form>
 
                 <section class="results-panel" aria-labelledby="teamChatTitle">
@@ -787,6 +810,6 @@
       </button>
     </template>
 
-    <script src="app.js?v=20260707-openai-static-fallback"></script>
+    <script src="app.js?v=20260707-browser-team-sync"></script>
   </body>
 </html>

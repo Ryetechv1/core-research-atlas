@@ -4,7 +4,7 @@ import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 
-from api._common import load_workspace_imports, read_json, write_json
+from api._common import load_workspace_imports, read_json, write_json, write_options
 
 
 load_workspace_imports()
@@ -13,6 +13,9 @@ from scripts.openai_chat import OpenAIChatApiError, OpenAIChatConfigError, opena
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self) -> None:
+        write_options(self)
+
     def do_POST(self) -> None:
         try:
             body = read_json(self)

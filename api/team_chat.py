@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
 
-from api._common import read_json, write_json
+from api._common import read_json, write_json, write_options
 
 
 MESSAGES: list[dict[str, Any]] = []
@@ -16,6 +16,9 @@ TEAM_CHAT_PATH = Path(tempfile.gettempdir()) / "core_team_chat_runtime.json"
 
 
 class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self) -> None:
+        write_options(self)
+
     def do_GET(self) -> None:
         write_json(self, {"ok": True, "messages": read_messages()[:TEAM_CHAT_LIMIT]})
 
