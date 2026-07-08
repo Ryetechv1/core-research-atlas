@@ -6144,7 +6144,15 @@ async function handleFileManagerImport(event) {
   const files = [...(event.target.files || [])];
   if (!files.length) return;
   const parentId = getCurrentFileManagerFolderId();
-  const nodes = await Promise.all(files.map((file) => fileManagerNodeFromUpload(file, parentId)));
+  const nodes = [];
+  for (const file of files) {
+    const workspaceTreeNodes = await fileManagerNodesFromWorkspaceTreeUpload(file, parentId);
+    if (workspaceTreeNodes?.length) {
+      nodes.push(...workspaceTreeNodes);
+    } else {
+      nodes.push(await fileManagerNodeFromUpload(file, parentId));
+    }
+  }
   const manager = getFileManager();
   manager.nodes.push(...nodes);
   manager.selectedId = nodes[0]?.id || manager.selectedId;
@@ -6183,6 +6191,132 @@ async function fileManagerNodeFromUpload(file, parentId) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+}
+
+async function fileManagerNodesFromWorkspaceTreeUpload(file, parentId) {
+  if (!/\.json$/i.test(file.name || "")) return null;
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch {
+    return null;
+  }
+  const root = workspaceTreeRootFromPayload(payload, file.name);
+  if (!root) return null;
+  return workspaceTreeToFileManagerNodes(root, parentId);
+}
+
+function workspaceTreeRootFromPayload(payload, fileName = "workspace_tree.json") {
+  if (Array.isArray(payload) && payload.every((item) => typeof item === "string")) {
+    return workspaceTreeFromFlatPaths(payload, fileName);
+  }
+  if (!payload || typeof payload !== "object") return null;
+  if (payload.schema !== "core-atlas-workspace-tree-v1" && !payload.root?.children) return null;
+  return normalizeWorkspaceTreeInputNode(payload.root || payload);
+}
+
+function workspaceTreeFromFlatPaths(paths, fileName) {
+  const partLists = paths.map(workspacePathParts).filter((parts) => parts.length);
+  if (!partLists.length) return null;
+  const folderPartLists = partLists.map((parts) => parts.slice(0, -1));
+  const commonPrefix = folderPartLists.reduce((prefix, parts) => {
+    let index = 0;
+    while (index < prefix.length && prefix[index] === parts[index]) index += 1;
+    return prefix.slice(0, index);
+  }, folderPartLists[0] || []);
+  const rootName = commonPrefix.length ? commonPrefix[commonPrefix.length - 1] : "";
+  const root = {
+    name: rootName || fileName.replace(/\.json$/i, "") || "Workspace Tree",
+    type: "folder",
+    path: commonPrefix.join("/"),
+    children: [],
+  };
+  partLists.forEach((parts, index) => {
+    const relativeParts = parts.slice(commonPrefix.length);
+    if (!relativeParts.length) return;
+    insertWorkspacePath(root, relativeParts, paths[index]);
+  });
+  return root;
+}
+
+function workspacePathParts(value) {
+  return String(value || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function insertWorkspacePath(root, parts, fullPath) {
+  let folder = root;
+  parts.forEach((part, index) => {
+    const isFile = index === parts.length - 1;
+    if (isFile) {
+      folder.children.push({ name: part, type: "file", path: fullPath, children: [] });
+      return;
+    }
+    let child = folder.children.find((item) => item.type === "folder" && item.name === part);
+    if (!child) {
+      child = { name: part, type: "folder", path: "", children: [] };
+      folder.children.push(child);
+    }
+    folder = child;
+  });
+}
+
+function normalizeWorkspaceTreeInputNode(raw = {}) {
+  const pathParts = workspacePathParts(raw.path || raw.relativePath || "");
+  const fallbackName = pathParts.length ? pathParts[pathParts.length - 1] : "Workspace Tree";
+  const children = Array.isArray(raw.children) ? raw.children.map(normalizeWorkspaceTreeInputNode).filter(Boolean) : [];
+  const type = raw.type === "file" || raw.kind === "file" ? "file" : "folder";
+  return {
+    name: String(raw.name || fallbackName),
+    type,
+    path: String(raw.path || ""),
+    relativePath: String(raw.relativePath || ""),
+    size: Number(raw.size || 0),
+    modifiedAt: String(raw.modifiedAt || raw.updatedAt || raw.createdAt || ""),
+    children,
+  };
+}
+
+function workspaceTreeToFileManagerNodes(root, parentId) {
+  const nodes = [];
+  const batchId = `${Date.now()}-${Math.round(Math.random() * 99999)}`;
+  let index = 0;
+  const now = new Date().toISOString();
+
+  const walk = (workspaceNode, nodeParentId, depth) => {
+    const kind = workspaceNode.type === "file" ? "file" : "folder";
+    const name = depth === 0 && kind === "folder" ? nextFileManagerName(parentId, workspaceNode.name || "Workspace Tree") : workspaceNode.name || (kind === "folder" ? "Untitled Folder" : "Untitled.txt");
+    const extension = kind === "file" ? extensionFromFileName(name) : "";
+    const id = `file-workspace-${batchId}-${index++}-${slugify(name)}`;
+    const modifiedAt = workspaceNode.modifiedAt && !Number.isNaN(new Date(workspaceNode.modifiedAt).getTime()) ? new Date(workspaceNode.modifiedAt).toISOString() : now;
+    nodes.push({
+      id,
+      parentId: nodeParentId,
+      kind,
+      name,
+      extension,
+      mimeType: kind === "file" ? "application/octet-stream" : "",
+      size: kind === "file" ? Number(workspaceNode.size || 0) : 0,
+      text:
+        kind === "file"
+          ? [`Workspace file: ${name}`, `Path: ${workspaceNode.path || workspaceNode.relativePath || ""}`, "Original bytes are not stored. Import the file itself to preview raw content."].join("\n")
+          : "",
+      blobKey: "",
+      dataUrl: "",
+      previewKind: kind === "folder" ? "folder" : "text",
+      createdAt: modifiedAt,
+      updatedAt: modifiedAt,
+    });
+    if (kind === "folder") {
+      workspaceNode.children.forEach((child) => walk(child, id, depth + 1));
+    }
+  };
+
+  walk(root, parentId, 0);
+  return nodes;
 }
 
 function updateFileManagerTextFile(id, text) {
