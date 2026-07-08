@@ -26,6 +26,10 @@ const TEAM_SOURCE_APPROVAL_THRESHOLD = 2;
 const TEAM_VOTABLE_TYPES = new Set(["update", "link", "promote", "recommendation"]);
 const IMPORT_TEXT_SLICE_BYTES = 650_000;
 const MAX_STORED_FILE_BYTES = 1_500_000;
+const FILE_STORE_DB_NAME = "core-atlas-file-store";
+const FILE_STORE_OBJECT_STORE = "files";
+const FILE_STORE_DB_VERSION = 1;
+const FILE_STORE_MAX_BYTES = 50_000_000;
 const PREVIEW_TEXT_LIMIT = 80_000;
 const GUEST_SESSION_VALUE = "Guest";
 const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
@@ -705,6 +709,7 @@ const state = {
   sourceFeedTimer: null,
   fileClipboard: null,
   fileManagerSaveTimer: null,
+  filePreviewObjectUrls: [],
   backendCapabilities: {
     checked: false,
     checking: null,
@@ -812,6 +817,8 @@ function cacheElements() {
   els.fileManagerPath = document.getElementById("fileManagerPath");
   els.fileManagerStatus = document.getElementById("fileManagerStatus");
   els.fileManagerTree = document.getElementById("fileManagerTree");
+  els.fileManagerFolderView = document.getElementById("fileManagerFolderView");
+  els.fileExplorerFolderName = document.getElementById("fileExplorerFolderName");
   els.fileManagerDetail = document.getElementById("fileManagerDetail");
   els.fileNewFolderButton = document.getElementById("fileNewFolderButton");
   els.fileNewTextButton = document.getElementById("fileNewTextButton");
@@ -1520,12 +1527,12 @@ function formatSourceLog(source) {
   );
 }
 
-function openSourceInBrowser(sourceId) {
+async function openSourceInBrowser(sourceId) {
   const source = state.archive.sources.find((item) => item.id === sourceId);
   if (!source) return;
   previewSourceInBrowser(sourceId);
   if (isInternalSourceLocator(source)) {
-    if (!openSourceOriginalFile(source)) {
+    if (!(await openSourceOriginalFile(source))) {
       openSourceFilePreview(sourceId);
     }
     return;
@@ -1533,7 +1540,7 @@ function openSourceInBrowser(sourceId) {
   if (source.url) openExternalUrl(source.url);
 }
 
-function openSourceOriginalFile(source = {}) {
+async function openSourceOriginalFile(source = {}) {
   if (source.fileAttachment) {
     return openStoredFilePage(source.fileAttachment, { title: source.title, origin: "Team source log", url: source.url });
   }
@@ -1674,16 +1681,18 @@ function openFilePreviewDialog(file, context = {}) {
     button.addEventListener("click", () => openExternalUrl(button.dataset.previewExternal));
   });
   els.filePreviewBody.querySelectorAll("[data-preview-original]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (!openStoredFilePage(file, context)) {
-        window.alert("The original file bytes were not stored for this source. Re-import the file while it is under the stored preview size limit to open it directly.");
+    button.addEventListener("click", async () => {
+      if (!(await openStoredFilePage(file, context))) {
+        window.alert("The original file bytes are not stored for this source. Re-import the file so the app can keep the actual PDF/media/text content in its browser file store.");
       }
     });
   });
+  hydrateFilePreviewFromStore(file, context);
 }
 
 function closeFilePreviewDialog() {
   if (!els.filePreviewOverlay) return;
+  revokeFilePreviewObjectUrls();
   els.filePreviewOverlay.hidden = true;
   document.body.classList.remove("is-modal-open");
   els.filePreviewBody.innerHTML = "";
@@ -1691,44 +1700,104 @@ function closeFilePreviewDialog() {
 
 function renderFilePreviewContent(file = {}, context = {}) {
   const kind = file.previewKind || previewKindForFile(file);
-  const dataUrl = file.dataUrl || "";
+  const dataUrl = file.objectUrl || file.dataUrl || "";
   const text = file.textExcerpt || "";
   const summary = file.summary || "No summary stored.";
   const warnings = Array.isArray(file.warnings) ? file.warnings : [];
   const url = context.url || file.url || "";
-  const hasOriginal = Boolean(dataUrl || isTextOriginalFile(file, kind) || /^https?:\/\//i.test(url));
+  const hasOriginal = Boolean(dataUrl || file.blobKey || isTextOriginalFile(file, kind) || /^https?:\/\//i.test(url));
   const warningHtml = warnings.length ? `<ul>${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : "";
   const originalButton = hasOriginal
     ? `<button class="primary-button iconless" type="button" data-preview-original>Open Original File</button>`
     : "";
   const meta = `
+    <details class="file-preview-metadata">
+      <summary>File details and source metadata</summary>
     <div class="file-preview-meta-grid">
       <span><strong>Name:</strong> ${escapeHtml(file.fileName || context.title || "Untitled")}</span>
       <span><strong>Type:</strong> ${escapeHtml(file.mimeType || file.extension || kind)}</span>
       <span><strong>Size:</strong> ${escapeHtml(formatBytes(file.size || 0))}</span>
-      <span><strong>Stored preview:</strong> ${file.storedPreview || dataUrl ? "Yes" : "Metadata only"}</span>
+      <span><strong>Stored content:</strong> ${file.blobKey || file.storedPreview || dataUrl ? "Actual file available" : "Metadata only"}</span>
     </div>
     <p>${escapeHtml(summary)}</p>
     ${warningHtml}
-    ${originalButton}
+    </details>
   `;
   if (kind === "web" && url) {
-    return `${meta}<button class="primary-button iconless" type="button" data-preview-external="${escapeHtml(url)}">Open External</button>`;
+    return `<div class="file-preview-content-first"><button class="primary-button iconless" type="button" data-preview-external="${escapeHtml(url)}">Open External</button>${originalButton}</div>${meta}`;
   }
-  if (dataUrl && kind === "image") return `${meta}<img class="file-preview-media" src="${escapeHtml(dataUrl)}" alt="${escapeHtml(file.fileName || "Image preview")}">`;
-  if (dataUrl && kind === "video") return `${meta}<video class="file-preview-media" controls src="${escapeHtml(dataUrl)}"></video>`;
-  if (dataUrl && kind === "audio") return `${meta}<audio class="file-preview-audio" controls src="${escapeHtml(dataUrl)}"></audio>`;
-  if (dataUrl && kind === "pdf") return `${meta}<iframe class="file-preview-document" title="${escapeHtml(file.fileName || "PDF preview")}" src="${escapeHtml(dataUrl)}"></iframe>`;
+  if (dataUrl && kind === "image") return `<img class="file-preview-media" src="${escapeHtml(dataUrl)}" alt="${escapeHtml(file.fileName || "Image preview")}"><div class="file-preview-content-first">${originalButton}</div>${meta}`;
+  if (dataUrl && kind === "video") return `<video class="file-preview-media" controls src="${escapeHtml(dataUrl)}"></video><div class="file-preview-content-first">${originalButton}</div>${meta}`;
+  if (dataUrl && kind === "audio") return `<audio class="file-preview-audio" controls src="${escapeHtml(dataUrl)}"></audio><div class="file-preview-content-first">${originalButton}</div>${meta}`;
+  if (dataUrl && kind === "pdf") return `<iframe class="file-preview-document" title="${escapeHtml(file.fileName || "PDF preview")}" src="${escapeHtml(dataUrl)}"></iframe><div class="file-preview-content-first">${originalButton}</div>${meta}`;
   if (dataUrl && kind === "text") {
     const decoded = decodeDataUrlText(dataUrl) || text;
-    return `${meta}<pre class="file-preview-text">${escapeHtml(clampText(decoded, PREVIEW_TEXT_LIMIT))}</pre>`;
+    return `<pre class="file-preview-text">${escapeHtml(clampText(decoded, PREVIEW_TEXT_LIMIT))}</pre><div class="file-preview-content-first">${originalButton}</div>${meta}`;
   }
-  return `${meta}<pre class="file-preview-text">${escapeHtml(text || JSON.stringify(file, null, 2))}</pre>`;
+  if (file.blobKey) {
+    return `<div class="file-preview-loading">Loading actual stored file content...</div><div class="file-preview-content-first">${originalButton}</div>${meta}`;
+  }
+  if (text && isTextOriginalFile(file, kind)) {
+    return `<pre class="file-preview-text">${escapeHtml(text)}</pre><div class="file-preview-content-first">${originalButton}</div>${meta}`;
+  }
+  return `<div class="file-preview-unavailable"><strong>Actual file content is not stored for this record.</strong><span>Re-import the file to store and preview the real PDF, image, audio, video, or document content.</span></div>${meta}`;
 }
 
-function openStoredFilePage(file = {}, context = {}) {
+async function hydrateFilePreviewFromStore(file = {}, context = {}) {
+  if (!file.blobKey || file.dataUrl || file.objectUrl || !els.filePreviewBody || els.filePreviewOverlay.hidden) return;
+  try {
+    const hydrated = await hydrateStoredFile(file);
+    els.filePreviewBody.innerHTML = renderFilePreviewContent(hydrated, context);
+    els.filePreviewBody.querySelectorAll("[data-preview-original]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        if (!(await openStoredFilePage(hydrated, context))) {
+          window.alert("The original file bytes are not available in this browser store.");
+        }
+      });
+    });
+  } catch (error) {
+    els.filePreviewBody.querySelector(".file-preview-loading")?.replaceWith(fileStoreUnavailableElement(error.message));
+  }
+}
+
+function fileStoreUnavailableElement(message) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "file-preview-unavailable";
+  wrapper.innerHTML = `<strong>Stored file could not be opened.</strong><span>${escapeHtml(message || "Re-import the file to restore the actual preview.")}</span>`;
+  return wrapper;
+}
+
+async function hydrateStoredFile(file = {}) {
+  if (!file.blobKey) return file;
+  const stored = await readStoredFileBlob(file.blobKey);
+  if (!stored?.blob) throw new Error("No stored Blob found for this file key.");
+  const objectUrl = URL.createObjectURL(stored.blob);
+  state.filePreviewObjectUrls.push(objectUrl);
+  const hydrated = {
+    ...file,
+    fileName: file.fileName || stored.fileName,
+    mimeType: file.mimeType || stored.mimeType,
+    size: file.size || stored.size,
+    previewKind: file.previewKind || previewKindForFile(stored),
+    objectUrl,
+    storedPreview: true,
+  };
+  if (isTextOriginalFile(hydrated)) {
+    hydrated.textExcerpt = await stored.blob.text();
+  }
+  return hydrated;
+}
+
+function revokeFilePreviewObjectUrls() {
+  state.filePreviewObjectUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+}
+
+async function openStoredFilePage(file = {}, context = {}) {
+  if (file.blobKey && !file.objectUrl) {
+    file = await hydrateStoredFile(file);
+  }
   const kind = file.previewKind || previewKindForFile(file);
-  const dataUrl = file.dataUrl || "";
+  const dataUrl = file.objectUrl || file.dataUrl || "";
   const url = context.url || file.url || "";
   if (!dataUrl && /^https?:\/\//i.test(url)) {
     openExternalUrl(url);
@@ -1906,8 +1975,19 @@ function getImportOptions() {
 
 async function analyzeUploadedFile(file) {
   const extension = extensionFromFileName(file.name);
+  let preStoredBlobKey = "";
+  try {
+    preStoredBlobKey = await writeStoredFileBlob(file);
+  } catch {
+    preStoredBlobKey = "";
+  }
   if (!shouldUseServerImport(file, extension)) {
-    return analyzeFileInBrowser(file);
+    const fallback = await analyzeFileInBrowser(file);
+    if (!fallback.blobKey && preStoredBlobKey) {
+      fallback.blobKey = preStoredBlobKey;
+      fallback.storedPreview = true;
+    }
+    return fallback;
   }
 
   const capabilities = await ensureBackendCapabilities();
@@ -1925,7 +2005,7 @@ async function analyzeUploadedFile(file) {
     });
     const data = await readJsonResponse(response);
     if (response.ok && data.ok !== false && data.file) {
-      return { ...data.file, source: "server" };
+      return { ...data.file, source: "server", blobKey: preStoredBlobKey, storedPreview: Boolean(preStoredBlobKey || data.file.dataUrl) };
     }
     throw new Error(data.error || `Import endpoint returned HTTP ${response.status}.`);
   } catch (error) {
@@ -1950,6 +2030,16 @@ async function analyzeFileInBrowser(file) {
   const previewKind = previewKindForFile({ extension, mimeType: file.type, fileName: file.name });
   const canStorePreview = file.size <= MAX_STORED_FILE_BYTES;
   let dataUrl = "";
+  let blobKey = "";
+
+  try {
+    blobKey = await writeStoredFileBlob(file);
+  } catch (error) {
+    warnings.push(`Actual file storage failed: ${error.message}`);
+  }
+  if (!blobKey && file.size > FILE_STORE_MAX_BYTES) {
+    warnings.push(`File is larger than ${formatBytes(FILE_STORE_MAX_BYTES)}; only metadata and text excerpts can be stored.`);
+  }
 
   if ([".txt", ".json", ".py", ".js", ".css", ".md", ".markdown", ".html", ".htm", ".csv", ".xml", ".yaml", ".yml"].includes(extension)) {
     text = await readFileTextSlice(file, IMPORT_TEXT_SLICE_BYTES);
@@ -1991,8 +2081,9 @@ async function analyzeFileInBrowser(file) {
     children: [],
     warnings,
     previewKind,
+    blobKey,
     dataUrl,
-    storedPreview: Boolean(dataUrl),
+    storedPreview: Boolean(dataUrl || blobKey),
   };
 }
 
@@ -2038,8 +2129,9 @@ function integrateImportedFile(fileData, options) {
     createdAt,
     owner: state.currentUser?.username || "local",
     previewKind: fileData.previewKind || previewKindForFile(fileData),
+    blobKey: fileData.blobKey || "",
     dataUrl: fileData.dataUrl || "",
-    storedPreview: Boolean(fileData.dataUrl),
+    storedPreview: Boolean(fileData.dataUrl || fileData.blobKey),
     keywords: fileData.keywords || extractKeywords(fileData.text),
     summary: fileData.summary || summarizeImportText(fileData.text),
     textLength: String(fileData.text || "").length,
@@ -2225,6 +2317,7 @@ function importItemToSource(item, fileData, importId, index, options) {
       extension: fileData.extension,
       mimeType: fileData.mimeType,
       previewKind: fileData.previewKind || previewKindForFile(fileData),
+      blobKey: fileData.blobKey || "",
     },
   };
 }
@@ -2290,7 +2383,7 @@ function renderImportPanel(message = "") {
                   : ""
               }
               <div class="form-actions">
-                <button class="primary-button iconless" type="button" data-import-preview="${escapeHtml(item.id)}">Full File Info</button>
+                <button class="primary-button iconless" type="button" data-import-preview="${escapeHtml(item.id)}">Preview File</button>
                 ${
                   item.sourceIds?.[0]
                     ? `<button class="ghost-button iconless" type="button" data-import-source="${escapeHtml(item.sourceIds[0])}">Open First Source</button>`
@@ -2559,9 +2652,10 @@ function renderBrowserPreview() {
   if (!els.browserPreview) return;
   const preview = getBrowserPreview();
   if (!preview) {
-    els.browserPreview.innerHTML = '<div class="empty-state">Open a search result, source, file, or URL to see full preview metadata here.</div>';
+    els.browserPreview.innerHTML = '<div class="empty-state">Open a search result, source, file, or URL to see the actual preview content and links here.</div>';
     return;
   }
+  const content = preview.summary || preview.sourceInfo || preview.url || "No content preview is available for this item yet.";
   els.browserPreview.innerHTML = `
     <article class="browser-preview-card">
       <header>
@@ -2572,8 +2666,12 @@ function renderBrowserPreview() {
         ${preview.url ? `<span class="detail-chip">${escapeHtml(domainFromUrl(preview.url) || inferSourceType(preview.url))}</span>` : ""}
       </header>
       ${preview.url ? `<p class="result-url">${escapeHtml(preview.url)}</p>` : ""}
-      ${preview.summary ? `<p>${escapeHtml(preview.summary)}</p>` : ""}
-      ${preview.details ? `<pre class="browser-preview-details">${escapeHtml(preview.details)}</pre>` : ""}
+      <div class="browser-preview-content">${escapeHtml(content)}</div>
+      ${
+        preview.details
+          ? `<details class="browser-preview-details"><summary>Technical metadata</summary><pre>${escapeHtml(preview.details)}</pre></details>`
+          : ""
+      }
       <div class="form-actions">
         ${preview.url ? `<button class="primary-button iconless" type="button" data-preview-open="${escapeHtml(preview.url)}">Open External</button>` : ""}
         ${preview.url ? `<button class="ghost-button iconless" type="button" data-preview-source="${escapeHtml(preview.url)}"${writeDisabledAttr()}>Add to Sources</button>` : ""}
@@ -3710,6 +3808,69 @@ function readFileAsDataUrl(file) {
     reader.addEventListener("error", () => reject(reader.error || new Error("File preview read failed.")));
     reader.readAsDataURL(file);
   });
+}
+
+function openFileStore() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB file storage is not available in this browser."));
+      return;
+    }
+    const request = indexedDB.open(FILE_STORE_DB_NAME, FILE_STORE_DB_VERSION);
+    request.addEventListener("upgradeneeded", () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(FILE_STORE_OBJECT_STORE)) {
+        db.createObjectStore(FILE_STORE_OBJECT_STORE, { keyPath: "id" });
+      }
+    });
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error || new Error("IndexedDB file store failed to open.")));
+  });
+}
+
+async function writeStoredFileBlob(file, id = fileStoreKeyForFile(file)) {
+  if (!file || file.size > FILE_STORE_MAX_BYTES) return "";
+  const db = await openFileStore();
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(FILE_STORE_OBJECT_STORE, "readwrite");
+      const store = transaction.objectStore(FILE_STORE_OBJECT_STORE);
+      store.put({
+        id,
+        blob: file,
+        fileName: file.name || id,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size || 0,
+        updatedAt: new Date().toISOString(),
+      });
+      transaction.addEventListener("complete", resolve);
+      transaction.addEventListener("error", () => reject(transaction.error || new Error("Stored file write failed.")));
+      transaction.addEventListener("abort", () => reject(transaction.error || new Error("Stored file write aborted.")));
+    });
+    return id;
+  } finally {
+    db.close();
+  }
+}
+
+async function readStoredFileBlob(id) {
+  if (!id) return null;
+  const db = await openFileStore();
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction(FILE_STORE_OBJECT_STORE, "readonly");
+      const request = transaction.objectStore(FILE_STORE_OBJECT_STORE).get(id);
+      request.addEventListener("success", () => resolve(request.result || null));
+      request.addEventListener("error", () => reject(request.error || new Error("Stored file read failed.")));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function fileStoreKeyForFile(file) {
+  const safeName = slugify(file?.name || "file");
+  return `blob-${Date.now()}-${Math.round(Math.random() * 9999)}-${safeName}`;
 }
 
 function previewKindForFile(fileData = {}) {
@@ -4908,6 +5069,7 @@ function normalizeFileNode(node = {}) {
     mimeType: String(node.mimeType || (kind === "file" ? "text/plain" : "")),
     size: Number(node.size || 0),
     text: String(node.text || ""),
+    blobKey: String(node.blobKey || ""),
     dataUrl: String(node.dataUrl || ""),
     previewKind: String(node.previewKind || (kind === "folder" ? "folder" : "text")),
     createdAt: String(node.createdAt || now),
@@ -4926,8 +5088,35 @@ function renderFileManager() {
   els.fileManagerTree.querySelectorAll("[data-file-id]").forEach((button) => {
     button.addEventListener("click", () => selectFileManagerNode(button.dataset.fileId));
   });
+  renderFileExplorerList(selected);
   renderFileManagerDetail(selected);
   renderPermissionState();
+}
+
+function renderFileExplorerList(selected) {
+  if (!els.fileManagerFolderView) return;
+  const folder = selected?.kind === "folder" ? selected : getFileNode(selected?.parentId) || getFileNode(getFileManager().rootId);
+  const children = folder ? getFileChildren(folder.id) : [];
+  if (els.fileExplorerFolderName) els.fileExplorerFolderName.textContent = folder?.name || "CORE Atlas";
+  els.fileManagerFolderView.innerHTML = children.length
+    ? children
+        .map((child) => {
+          const active = child.id === selected?.id;
+          return `
+            <button class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}" type="button" data-file-list-id="${escapeHtml(child.id)}">
+              <span class="file-node-icon" aria-hidden="true"></span>
+              <strong>${escapeHtml(child.name)}</strong>
+              <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
+              <span>${escapeHtml(child.kind === "folder" ? `${getFileChildren(child.id).length} item${getFileChildren(child.id).length === 1 ? "" : "s"}` : formatBytes(child.size || 0))}</span>
+              <small>${escapeHtml(new Date(child.updatedAt || Date.now()).toLocaleString())}</small>
+            </button>
+          `;
+        })
+        .join("")
+    : '<div class="file-preview-unavailable"><strong>This folder is empty.</strong><span>Import files, create a folder, or create a TXT note.</span></div>';
+  els.fileManagerFolderView.querySelectorAll("[data-file-list-id]").forEach((button) => {
+    button.addEventListener("click", () => selectFileManagerNode(button.dataset.fileListId));
+  });
 }
 
 function renderFileTree(parentId, depth) {
@@ -4965,27 +5154,11 @@ function renderFileManagerDetail(node) {
     els.fileManagerDetail.innerHTML = `
       <h3>${escapeHtml(node.name)}</h3>
       ${meta}
-      <div class="file-folder-grid">
-        ${
-          children.length
-            ? children
-                .map(
-                  (child) => `
-                    <button class="file-folder-tile" type="button" data-file-tile="${escapeHtml(child.id)}">
-                      <span class="file-folder-tile-icon ${child.kind === "folder" ? "is-folder" : "is-file"}" aria-hidden="true"></span>
-                      <strong>${escapeHtml(child.name)}</strong>
-                      <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
-                    </button>
-                  `
-                )
-                .join("")
-            : '<div class="empty-state">This folder is empty. Import files or create a TXT note.</div>'
-        }
+      <div class="file-preview-unavailable">
+        <strong>${children.length} item${children.length === 1 ? "" : "s"} in this folder.</strong>
+        <span>Select a file from the center pane to preview its actual content here.</span>
       </div>
     `;
-    els.fileManagerDetail.querySelectorAll("[data-file-tile]").forEach((button) => {
-      button.addEventListener("click", () => selectFileManagerNode(button.dataset.fileTile));
-    });
     return;
   }
   els.fileManagerDetail.innerHTML = `
@@ -5005,18 +5178,33 @@ function renderFileManagerDetail(node) {
   els.fileManagerDetail.querySelectorAll("[data-file-share-team]").forEach((button) => {
     button.addEventListener("click", () => shareFileManagerNodeToTeam(button.dataset.fileShareTeam));
   });
+  hydrateFileManagerPreviewFromStore(node);
 }
 
 function renderFileNodePreview(node) {
-  if (node.previewKind === "image" && node.dataUrl) return `<img class="file-preview-media" src="${escapeHtml(node.dataUrl)}" alt="${escapeHtml(node.name)}">`;
-  if (node.previewKind === "video" && node.dataUrl) return `<video class="file-preview-media" controls src="${escapeHtml(node.dataUrl)}"></video>`;
-  if (node.previewKind === "audio" && node.dataUrl) return `<audio class="file-preview-audio" controls src="${escapeHtml(node.dataUrl)}"></audio>`;
-  if (node.previewKind === "pdf" && node.dataUrl) return `<iframe class="file-preview-document" title="${escapeHtml(node.name)}" src="${escapeHtml(node.dataUrl)}"></iframe>`;
+  const viewUrl = node.objectUrl || node.dataUrl || "";
+  if (node.previewKind === "image" && viewUrl) return `<img class="file-preview-media" src="${escapeHtml(viewUrl)}" alt="${escapeHtml(node.name)}">`;
+  if (node.previewKind === "video" && viewUrl) return `<video class="file-preview-media" controls src="${escapeHtml(viewUrl)}"></video>`;
+  if (node.previewKind === "audio" && viewUrl) return `<audio class="file-preview-audio" controls src="${escapeHtml(viewUrl)}"></audio>`;
+  if (node.previewKind === "pdf" && viewUrl) return `<iframe class="file-preview-document" title="${escapeHtml(node.name)}" src="${escapeHtml(viewUrl)}"></iframe>`;
   if (node.previewKind === "text" || node.extension === ".txt") {
-    return `<textarea class="file-text-editor" data-file-text-editor rows="14">${escapeHtml(node.text || decodeDataUrlText(node.dataUrl) || "")}</textarea>`;
+    return `<textarea class="file-text-editor" data-file-text-editor rows="14">${escapeHtml(node.text || decodeDataUrlText(viewUrl) || "")}</textarea>`;
   }
-  const fallback = node.text || node.dataUrl ? "Preview stored. Export or open this file from the manager." : "Metadata-only file record.";
-  return `<pre class="file-preview-text">${escapeHtml(fallback)}</pre>`;
+  if (node.blobKey) return '<div class="file-preview-loading" data-file-store-loading>Loading actual file content...</div>';
+  return '<div class="file-preview-unavailable"><strong>No actual file content stored.</strong><span>Re-import this file to preview the real document/media content.</span></div>';
+}
+
+async function hydrateFileManagerPreviewFromStore(node = {}) {
+  if (!node.blobKey || node.dataUrl || !els.fileManagerDetail?.querySelector("[data-file-store-loading]")) return;
+  try {
+    const hydrated = await hydrateStoredFile(fileManagerNodeToPreviewFile(node));
+    const html = renderFileNodePreview({ ...node, objectUrl: hydrated.objectUrl, text: hydrated.textExcerpt || node.text });
+    const loading = els.fileManagerDetail.querySelector("[data-file-store-loading]");
+    if (loading) loading.outerHTML = html;
+  } catch (error) {
+    const loading = els.fileManagerDetail.querySelector("[data-file-store-loading]");
+    if (loading) loading.outerHTML = `<div class="file-preview-unavailable"><strong>Stored file could not be opened.</strong><span>${escapeHtml(error.message)}</span></div>`;
+  }
 }
 
 function selectFileManagerNode(id) {
@@ -5199,6 +5387,12 @@ async function fileManagerNodeFromUpload(file, parentId) {
   const textLike = previewKind === "text";
   const text = textLike ? await readFileTextSlice(file, PREVIEW_TEXT_LIMIT) : "";
   const dataUrl = canStoreData && !textLike ? await readFileAsDataUrl(file) : "";
+  let blobKey = "";
+  try {
+    blobKey = await writeStoredFileBlob(file);
+  } catch {
+    blobKey = "";
+  }
   return {
     id: `file-import-${Date.now()}-${Math.round(Math.random() * 9999)}`,
     parentId,
@@ -5208,6 +5402,7 @@ async function fileManagerNodeFromUpload(file, parentId) {
     mimeType: file.type || inferSourceType(file.name),
     size: file.size,
     text,
+    blobKey,
     dataUrl,
     previewKind,
     createdAt: new Date().toISOString(),
@@ -5251,10 +5446,10 @@ function exportFileManagerNode() {
   download(`${slugify(node.name)}.json`, "application/json", JSON.stringify(node, null, 2));
 }
 
-function openFileManagerNodeOriginal(nodeId) {
+async function openFileManagerNodeOriginal(nodeId) {
   const node = getFileNode(nodeId);
   if (!node || node.kind !== "file") return;
-  if (!openStoredFilePage(fileManagerNodeToPreviewFile(node), { title: node.name, origin: fileManagerPath(node.id) })) {
+  if (!(await openStoredFilePage(fileManagerNodeToPreviewFile(node), { title: node.name, origin: fileManagerPath(node.id) }))) {
     window.alert("This file manager item only has metadata. Import the original file under the stored preview limit to open it directly.");
   }
 }
@@ -5302,11 +5497,12 @@ function fileManagerNodeToPreviewFile(node = {}) {
     mimeType: node.mimeType,
     size: node.size,
     previewKind: node.previewKind || previewKindForFile(node),
+    blobKey: node.blobKey || "",
     dataUrl: node.dataUrl || "",
     text: node.text || "",
     textExcerpt: node.text || decodeDataUrlText(node.dataUrl),
     summary: `${node.kind === "folder" ? "Folder" : "Virtual file"} stored in the CORE Atlas file manager.`,
-    storedPreview: Boolean(node.dataUrl || node.text),
+    storedPreview: Boolean(node.blobKey || node.dataUrl || node.text),
     warnings: node.dataUrl || node.text ? [] : ["Original bytes are not stored for this file manager item."],
   };
 }
@@ -5323,6 +5519,7 @@ function fileManagerNodeToTeamAttachment(node = {}) {
     summary: preview.summary,
     keywords: extractKeywords(`${preview.fileName} ${preview.textExcerpt || ""}`),
     textExcerpt: clampText(preview.textExcerpt || preview.text || "", PREVIEW_TEXT_LIMIT),
+    blobKey: preview.blobKey || "",
     dataUrl: preview.dataUrl,
     storedPreview: preview.storedPreview,
     warnings: preview.warnings,
