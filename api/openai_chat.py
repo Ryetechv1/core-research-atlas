@@ -27,7 +27,23 @@ class handler(BaseHTTPRequestHandler):
         except ValueError as error:
             write_json(self, {"ok": False, "error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
-        except (OpenAIChatApiError, json.JSONDecodeError) as error:
-            write_json(self, {"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
+        except OpenAIChatApiError as error:
+            write_json(
+                self,
+                {"ok": False, "error": str(error), "errorType": error.error_type},
+                safe_http_status(error.status_code, HTTPStatus.BAD_GATEWAY),
+            )
+            return
+        except json.JSONDecodeError as error:
+            write_json(self, {"ok": False, "error": str(error), "errorType": "invalid_json"}, HTTPStatus.BAD_GATEWAY)
             return
         write_json(self, {"ok": True, **response})
+
+
+def safe_http_status(status_code: int, fallback: HTTPStatus) -> HTTPStatus:
+    try:
+        if 400 <= int(status_code) <= 599:
+            return HTTPStatus(int(status_code))
+    except (TypeError, ValueError):
+        pass
+    return fallback

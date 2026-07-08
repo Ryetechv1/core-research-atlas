@@ -2081,7 +2081,18 @@ async function handleOpenAiChatSubmit(event) {
     });
     const data = await readJsonResponse(response);
     if (!response.ok || data.ok === false) {
-      throw new Error(data.error || `OpenAI chat route returned HTTP ${response.status}.`);
+      getOpenAiChatMessages().push({
+        id: `openai-error-${Date.now()}`,
+        role: "assistant",
+        owner: "OpenAI GPT-5.5",
+        content: buildOpenAiFailureReply(data, prompt, response.status),
+        error: true,
+        errorType: data.errorType || "api_error",
+        createdAt: new Date().toISOString(),
+      });
+      state.archive.openAiChatMessages = getOpenAiChatMessages().slice(-120);
+      persistArchive("OpenAI chat unavailable notice");
+      return;
     }
     getOpenAiChatMessages().push({
       id: `openai-assistant-${Date.now()}`,
@@ -2101,8 +2112,9 @@ async function handleOpenAiChatSubmit(event) {
       id: `openai-error-${Date.now()}`,
       role: "assistant",
       owner: "OpenAI GPT-5.5",
-      content: `OpenAI chat is not available: ${error.message}`,
+      content: buildOpenAiFailureReply({ error: error.message, errorType: "backend_unavailable" }, prompt),
       error: true,
+      errorType: "backend_unavailable",
       createdAt: new Date().toISOString(),
     });
     state.archive.openAiChatMessages = getOpenAiChatMessages().slice(-120);
@@ -2191,6 +2203,99 @@ function buildOpenAiChatContext(prompt) {
         : null,
     },
   };
+}
+
+function buildOpenAiFailureReply(data = {}, prompt = "", statusCode = 0) {
+  const errorType = data.errorType || "api_error";
+  const error = data.error || `OpenAI chat route returned HTTP ${statusCode || "unknown"}.`;
+  if (errorType === "quota_exceeded") {
+    return [
+      "OpenAI was reached, but this API project has no usable quota, credits, or billing available right now.",
+      "",
+      `OpenAI error: ${error}`,
+      "",
+      "Fix:",
+      "- Add API billing or credits: https://platform.openai.com/settings/organization/billing",
+      "- Check project/org usage limits: https://platform.openai.com/settings/organization/limits",
+      "- ChatGPT Plus/Pro and OpenAI API billing are separate.",
+      "- After billing is active, you can test cheaper by setting OPENAI_CHAT_MODEL=gpt-5.4-mini in .env.local, then switch back to gpt-5.5 when ready.",
+      "",
+      "Local atlas fallback:",
+      buildLocalAtlasReply(prompt),
+    ].join("\n");
+  }
+  if (errorType === "authentication") {
+    return [
+      "OpenAI rejected the backend key.",
+      "",
+      `OpenAI error: ${error}`,
+      "",
+      "Fix: replace OPENAI_API_KEY in .env.local with a valid project key, restart python server.py, then try again.",
+      "",
+      "Local atlas fallback:",
+      buildLocalAtlasReply(prompt),
+    ].join("\n");
+  }
+  if (errorType === "access_or_model") {
+    return [
+      "OpenAI was reached, but this key/project does not have access to the configured model.",
+      "",
+      `OpenAI error: ${error}`,
+      "",
+      "Fix: check OPENAI_CHAT_MODEL in .env.local and the project tied to the API key.",
+      "",
+      "Local atlas fallback:",
+      buildLocalAtlasReply(prompt),
+    ].join("\n");
+  }
+  if (errorType === "backend_unavailable") {
+    return [
+      "The OpenAI backend route is not available from this host.",
+      "",
+      `App error: ${error}`,
+      "",
+      "Fix: run the Python backend with python server.py, or deploy the app to a backend host that supports /api/openai-chat. GitHub Pages alone is static and cannot execute this API route.",
+      "",
+      "Local atlas fallback:",
+      buildLocalAtlasReply(prompt),
+    ].join("\n");
+  }
+  return [
+    "OpenAI chat is not available right now.",
+    "",
+    `Error: ${error}`,
+    "",
+    "Local atlas fallback:",
+    buildLocalAtlasReply(prompt),
+  ].join("\n");
+}
+
+function buildLocalAtlasReply(prompt = "") {
+  const browser = getBrowserContext();
+  const rankedSources = rankSources(`${prompt} ${browser.searchText}`).slice(0, 5);
+  const sources = rankedSources.length ? rankedSources : state.archive.sources.slice(0, 5);
+  const sourceLines = sources.map((source) => {
+    const locator = source.url ? ` / ${source.url}` : "";
+    return `- ${source.title} [${source.evidenceTier}; ${source.citationStatus}]${locator}: ${clampText(source.notes, 180)}`;
+  });
+  const browserPreview = browser.preview
+    ? `${browser.preview.title || "Current preview"} / ${browser.preview.url || browser.preview.type || "no URL"}`
+    : "No active browser preview.";
+  const docs = getCollabDocs()
+    .slice(0, 3)
+    .map((doc) => `- ${doc.title} (${doc.status || "Draft"}): ${clampText(stripHtml(doc.contentHtml || ""), 140)}`);
+  return [
+    `Prompt: ${prompt || "No prompt provided."}`,
+    `Current browser context: ${browserPreview}`,
+    "",
+    "Best matching source leads:",
+    ...(sourceLines.length ? sourceLines : ["- No source leads available yet."]),
+    "",
+    "Useful document context:",
+    ...(docs.length ? docs : ["- No collaboration documents available yet."]),
+    "",
+    "Next step: open or add source links in the Browser tab, then retry OpenAI after API billing/quota is active.",
+  ].join("\n");
 }
 
 function clearOpenAiChat() {

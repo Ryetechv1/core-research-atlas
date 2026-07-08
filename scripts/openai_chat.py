@@ -38,6 +38,11 @@ class OpenAIChatConfigError(RuntimeError):
 class OpenAIChatApiError(RuntimeError):
     """Raised when the Responses API call fails."""
 
+    def __init__(self, message: str, status_code: int = 502, error_type: str = "api_error") -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.error_type = error_type
+
 
 def openai_chat_response(
     messages: list[dict[str, Any]],
@@ -135,22 +140,42 @@ def post_json(url: str, payload: dict[str, Any], api_key: str) -> dict[str, Any]
         with urllib.request.urlopen(request, timeout=75) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
-        detail = safe_error_detail(error)
-        raise OpenAIChatApiError(f"OpenAI API returned HTTP {error.code}: {detail}") from error
+        detail, error_type = safe_error_detail(error)
+        raise OpenAIChatApiError(
+            f"OpenAI API returned HTTP {error.code}: {detail}",
+            status_code=error.code,
+            error_type=error_type,
+        ) from error
     except urllib.error.URLError as error:
-        raise OpenAIChatApiError(f"OpenAI API request failed: {error.reason}") from error
+        raise OpenAIChatApiError(f"OpenAI API request failed: {error.reason}", error_type="network_error") from error
     except json.JSONDecodeError as error:
-        raise OpenAIChatApiError("OpenAI API returned invalid JSON.") from error
+        raise OpenAIChatApiError("OpenAI API returned invalid JSON.", error_type="invalid_json") from error
 
 
-def safe_error_detail(error: urllib.error.HTTPError) -> str:
+def safe_error_detail(error: urllib.error.HTTPError) -> tuple[str, str]:
     try:
         raw = error.read().decode("utf-8")
         parsed = json.loads(raw or "{}")
-        message = parsed.get("error", {}).get("message") or parsed.get("message") or raw
-        return clamp(str(message), 500)
+        error_object = parsed.get("error", {}) if isinstance(parsed, dict) else {}
+        message = error_object.get("message") or parsed.get("message") or raw
+        code = str(error_object.get("code") or "")
+        error_type = classify_openai_error(error.code, str(message), code)
+        return clamp(str(message), 500), error_type
     except Exception:
-        return error.reason or "Unknown API error"
+        return error.reason or "Unknown API error", classify_openai_error(error.code, error.reason or "", "")
+
+
+def classify_openai_error(status_code: int, message: str, code: str) -> str:
+    text = f"{message} {code}".lower()
+    if status_code == 401 or "invalid_api_key" in text:
+        return "authentication"
+    if "current quota" in text or "insufficient_quota" in text or "billing" in text or "credits" in text:
+        return "quota_exceeded"
+    if "rate_limit" in text or "rate limit" in text:
+        return "rate_limited"
+    if status_code == 403 or "model_not_found" in text or "does not have access" in text:
+        return "access_or_model"
+    return "api_error"
 
 
 def extract_output_text(data: dict[str, Any]) -> str:

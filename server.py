@@ -171,8 +171,12 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
         except ValueError as error:
             self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
-        except (OpenAIChatApiError, json.JSONDecodeError) as error:
-            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
+        except OpenAIChatApiError as error:
+            status = safe_http_status(error.status_code, HTTPStatus.BAD_GATEWAY)
+            self.write_json({"ok": False, "error": str(error), "errorType": error.error_type}, status)
+            return
+        except json.JSONDecodeError as error:
+            self.write_json({"ok": False, "error": str(error), "errorType": "invalid_json"}, HTTPStatus.BAD_GATEWAY)
             return
         self.write_json({"ok": True, **response})
 
@@ -288,6 +292,15 @@ def dedupe_team_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]
         seen.add(item_id)
         output.append(message)
     return output[:TEAM_CHAT_LIMIT]
+
+
+def safe_http_status(status_code: int, fallback: HTTPStatus) -> HTTPStatus:
+    try:
+        if 400 <= int(status_code) <= 599:
+            return HTTPStatus(int(status_code))
+    except (TypeError, ValueError):
+        pass
+    return fallback
 
 
 def main() -> int:
