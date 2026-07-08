@@ -720,6 +720,7 @@ const state = {
   sourceFeedTimer: null,
   fileClipboard: null,
   fileManagerSaveTimer: null,
+  fileManagerStatusMessage: "",
   filePreviewObjectUrls: [],
   backendCapabilities: {
     checked: false,
@@ -1751,6 +1752,9 @@ function renderFilePreviewContent(file = {}, context = {}) {
     const decoded = decodeDataUrlText(dataUrl) || text;
     return `<pre class="file-preview-text">${escapeHtml(clampText(decoded, PREVIEW_TEXT_LIMIT))}</pre><div class="file-preview-content-first">${originalButton}</div>${meta}`;
   }
+  if (dataUrl) {
+    return `<iframe class="file-preview-document" title="${escapeHtml(file.fileName || "Raw file preview")}" src="${escapeHtml(dataUrl)}"></iframe><div class="file-preview-content-first">${originalButton}</div>${meta}`;
+  }
   if (file.blobKey) {
     return `<div class="file-preview-loading">Loading actual stored file content...</div><div class="file-preview-content-first">${originalButton}</div>${meta}`;
   }
@@ -1810,6 +1814,16 @@ function revokeFilePreviewObjectUrls() {
 }
 
 async function openStoredFilePage(file = {}, context = {}) {
+  let viewerWindow = null;
+  try {
+    viewerWindow = window.open("about:blank", "_blank");
+    if (viewerWindow) {
+      viewerWindow.document.write("<!doctype html><title>Opening file...</title><body style=\"margin:0;background:#050505;color:#fff;font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;\">Opening original file...</body>");
+      viewerWindow.document.close();
+    }
+  } catch {
+    viewerWindow = null;
+  }
   if (file.blobKey && !file.objectUrl) {
     file = await hydrateStoredFile(file);
   }
@@ -1817,11 +1831,22 @@ async function openStoredFilePage(file = {}, context = {}) {
   const dataUrl = file.objectUrl || file.dataUrl || "";
   const url = context.url || file.url || "";
   if (!dataUrl && /^https?:\/\//i.test(url)) {
-    openExternalUrl(url);
+    if (viewerWindow) {
+      viewerWindow.location.href = url;
+    } else {
+      openExternalUrl(url);
+    }
     return true;
   }
   const text = isTextOriginalFile(file, kind) ? decodeDataUrlText(dataUrl) || file.text || file.textExcerpt || "" : "";
-  if (!dataUrl && !text) return false;
+  if (!dataUrl && !text) {
+    try {
+      viewerWindow?.close();
+    } catch {
+      // Nothing to close.
+    }
+    return false;
+  }
 
   saveCurrentUserLocation();
   const title = context.title || file.fileName || "Source file";
@@ -1886,9 +1911,15 @@ async function openStoredFilePage(file = {}, context = {}) {
 </body>
 </html>`;
   const pageUrl = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-  const opened = window.open(pageUrl, "_blank");
+  let opened = false;
+  if (viewerWindow) {
+    viewerWindow.location.href = pageUrl;
+    opened = true;
+  } else {
+    opened = Boolean(window.open(pageUrl, "_blank"));
+  }
   window.setTimeout(() => URL.revokeObjectURL(pageUrl), 90_000);
-  return Boolean(opened);
+  return opened;
 }
 
 function isTextOriginalFile(file = {}, kind = file.previewKind || previewKindForFile(file)) {
@@ -5142,7 +5173,8 @@ function renderFileManager() {
   const selected = getFileNode(manager.selectedId) || getFileNode(manager.rootId);
   if (selected) manager.selectedId = selected.id;
   els.fileManagerPath.textContent = fileManagerPath(selected?.id || manager.rootId);
-  els.fileManagerStatus.textContent = `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
+  els.fileManagerStatus.textContent =
+    state.fileManagerStatusMessage || `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
   els.fileManagerTree.innerHTML = renderFileTree(manager.rootId, 0);
   els.fileManagerTree.querySelectorAll("[data-file-id]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -5151,7 +5183,7 @@ function renderFileManager() {
         openFileManagerFolder(node.id);
         return;
       }
-      selectFileManagerNode(button.dataset.fileId);
+      openFileManagerFile(node?.id);
     });
   });
   renderFileExplorerList(selected);
@@ -5187,7 +5219,7 @@ function renderFileExplorerList(selected) {
         openFileManagerFolder(node.id);
         return;
       }
-      selectFileManagerNode(button.dataset.fileListId);
+      openFileManagerFile(node?.id);
     });
   });
 }
@@ -5284,6 +5316,7 @@ function selectFileManagerNode(id) {
   const manager = getFileManager();
   if (!getFileNode(id)) return;
   manager.selectedId = id;
+  state.fileManagerStatusMessage = "";
   persistArchive("File manager selection");
   renderFileManager();
 }
@@ -5293,8 +5326,25 @@ function openFileManagerFolder(id) {
   const node = getFileNode(id);
   if (!node || node.kind !== "folder") return;
   manager.selectedId = node.id;
+  state.fileManagerStatusMessage = `Opened ${node.name}`;
   persistArchive("Opened virtual folder");
   renderFileManager();
+}
+
+function openFileManagerFile(id) {
+  const manager = getFileManager();
+  const node = getFileNode(id);
+  if (!node || node.kind !== "file") return;
+  manager.selectedId = node.id;
+  state.fileManagerStatusMessage = `Opening ${node.name}`;
+  persistArchive("Opened virtual file");
+  renderFileManager();
+  openFilePreviewDialog(fileManagerNodeToPreviewFile(node), { title: node.name, origin: fileManagerPath(node.id) });
+}
+
+function setFileManagerStatus(message) {
+  state.fileManagerStatusMessage = message;
+  if (els.fileManagerStatus) els.fileManagerStatus.textContent = message;
 }
 
 function getFileNode(id) {
@@ -5350,6 +5400,7 @@ function createFileManagerFolder() {
   };
   manager.nodes.push(node);
   manager.selectedId = node.id;
+  state.fileManagerStatusMessage = `Created ${node.name}`;
   persistFileManager("Created virtual folder");
 }
 
@@ -5374,6 +5425,7 @@ function createFileManagerTextFile() {
   };
   manager.nodes.push(node);
   manager.selectedId = node.id;
+  state.fileManagerStatusMessage = `Created ${node.name}`;
   persistFileManager("Created virtual text file");
 }
 
@@ -5397,29 +5449,42 @@ function nextFileManagerName(parentId, baseName, extension = "") {
 function renameFileManagerNode() {
   if (!ensureCanWrite("rename files and folders")) return;
   const node = getSelectedFileNode();
-  if (!node || node.id === getFileManager().rootId) return;
+  if (!node || node.id === getFileManager().rootId) {
+    setFileManagerStatus("Select a folder or file before renaming.");
+    return;
+  }
   const name = window.prompt("New name", node.name);
   if (!name) return;
   node.name = name.trim();
   node.updatedAt = new Date().toISOString();
+  state.fileManagerStatusMessage = `Renamed to ${node.name}`;
   persistFileManager("Renamed virtual file node");
 }
 
 function copyFileManagerNode(mode = "copy") {
   if (!ensureCanWrite(`${mode} files and folders`)) return;
   const node = getSelectedFileNode();
-  if (!node || node.id === getFileManager().rootId) return;
+  if (!node || node.id === getFileManager().rootId) {
+    setFileManagerStatus(`Select a file or folder before choosing ${mode}.`);
+    return;
+  }
   state.fileClipboard = { id: node.id, mode };
-  els.fileManagerStatus.textContent = `${mode === "move" ? "Moving" : "Copied"} ${node.name}`;
+  setFileManagerStatus(`${mode === "move" ? "Ready to move" : "Copied"} ${node.name}`);
 }
 
 function pasteFileManagerNode() {
   if (!ensureCanWrite("paste files and folders")) return;
   const clipboard = state.fileClipboard;
-  if (!clipboard) return;
+  if (!clipboard) {
+    setFileManagerStatus("Copy or move a file/folder before pasting.");
+    return;
+  }
   const targetFolderId = getSelectedFolderId();
   const node = getFileNode(clipboard.id);
-  if (!node || node.id === getFileManager().rootId || node.id === targetFolderId || isFileDescendant(targetFolderId, node.id)) return;
+  if (!node || node.id === getFileManager().rootId || node.id === targetFolderId || isFileDescendant(targetFolderId, node.id)) {
+    setFileManagerStatus("That item cannot be pasted into the selected folder.");
+    return;
+  }
   if (clipboard.mode === "move") {
     node.parentId = targetFolderId;
     node.updatedAt = new Date().toISOString();
@@ -5427,6 +5492,7 @@ function pasteFileManagerNode() {
   } else {
     cloneFileNodeTree(node.id, targetFolderId);
   }
+  state.fileManagerStatusMessage = `${clipboard.mode === "move" ? "Moved" : "Pasted"} ${node.name}`;
   persistFileManager(`${clipboard.mode === "move" ? "Moved" : "Copied"} virtual file node`);
 }
 
@@ -5453,7 +5519,10 @@ function deleteFileManagerNode() {
   if (!ensureCanWrite("delete files and folders")) return;
   const node = getSelectedFileNode();
   const manager = getFileManager();
-  if (!node || node.id === manager.rootId) return;
+  if (!node || node.id === manager.rootId) {
+    setFileManagerStatus("Select a file or folder before deleting.");
+    return;
+  }
   const confirmed = window.confirm(`Delete "${node.name}" and all nested contents?`);
   if (!confirmed) return;
   const ids = new Set([node.id]);
@@ -5469,6 +5538,7 @@ function deleteFileManagerNode() {
   }
   manager.nodes = manager.nodes.filter((item) => !ids.has(item.id));
   manager.selectedId = node.parentId || manager.rootId;
+  state.fileManagerStatusMessage = `Deleted ${node.name}`;
   persistFileManager("Deleted virtual file node");
 }
 
@@ -5478,8 +5548,11 @@ async function handleFileManagerImport(event) {
   if (!files.length) return;
   const parentId = getSelectedFolderId();
   const nodes = await Promise.all(files.map((file) => fileManagerNodeFromUpload(file, parentId)));
-  getFileManager().nodes.push(...nodes);
+  const manager = getFileManager();
+  manager.nodes.push(...nodes);
+  manager.selectedId = nodes[0]?.id || manager.selectedId;
   event.target.value = "";
+  state.fileManagerStatusMessage = `Imported ${nodes.length} file${nodes.length === 1 ? "" : "s"}`;
   persistFileManager(`Imported ${nodes.length} virtual file${nodes.length === 1 ? "" : "s"}`);
 }
 
@@ -5525,7 +5598,10 @@ function updateFileManagerTextFile(id, text) {
 
 function exportFileManagerNode() {
   const node = getSelectedFileNode();
-  if (!node) return;
+  if (!node) {
+    setFileManagerStatus("Select a file or folder before exporting.");
+    return;
+  }
   if (node.kind === "folder") {
     const ids = new Set([node.id]);
     let changed = true;
@@ -5560,7 +5636,7 @@ async function openFileManagerNodeOriginal(nodeId) {
 function shareSelectedFileToTeamChat() {
   const node = getSelectedFileNode();
   if (!node || node.kind !== "file") {
-    window.alert("Select a file before sharing to Team Chat.");
+    setFileManagerStatus("Select a file before sharing to Team Chat.");
     return;
   }
   shareFileManagerNodeToTeam(node.id);
