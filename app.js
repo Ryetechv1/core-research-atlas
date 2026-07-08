@@ -34,6 +34,7 @@ const FILE_STORE_DB_VERSION = 1;
 const FILE_STORE_MAX_BYTES = 50_000_000;
 const PREVIEW_TEXT_LIMIT = 80_000;
 const FILE_MANAGER_DRAG_MIME = "application/x-core-atlas-file-id";
+const BENGUIAT_FONT_STACK = "'ITC Benguiat', 'ITC Benguiat Std', 'ITC Benguiat Book', 'Benguiat', 'Benguiat Std', 'Benguiat Book', 'Bookman Old Style', Georgia, serif";
 const GUEST_SESSION_VALUE = "Guest";
 const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
 
@@ -1819,12 +1820,45 @@ function revokeFilePreviewObjectUrls() {
   state.filePreviewObjectUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
 }
 
+function assetUrl(path) {
+  try {
+    return new URL(path, window.location.href).href;
+  } catch {
+    return path;
+  }
+}
+
+function benguiatFontFaceCss() {
+  const sources = [
+    'local("ITC Benguiat")',
+    'local("ITC Benguiat Std")',
+    'local("ITC Benguiat Std Book")',
+    'local("ITC Benguiat Book")',
+    'local("ITCBenguiatStd")',
+    'local("ITCBenguiatStd-Book")',
+    'local("ITCBenguiat-Book")',
+    'local("Benguiat")',
+    'local("Benguiat Std")',
+    'local("Benguiat Std Book")',
+    'local("Benguiat Book")',
+    `url("${assetUrl("assets/fonts/ITC-Benguiat.woff2")}") format("woff2")`,
+    `url("${assetUrl("assets/fonts/ITC-Benguiat.woff")}") format("woff")`,
+    `url("${assetUrl("assets/fonts/ITC-Benguiat.ttf")}") format("truetype")`,
+    `url("${assetUrl("assets/fonts/ITC-Benguiat.otf")}") format("opentype")`,
+    `url("${assetUrl("assets/fonts/Benguiat.woff2")}") format("woff2")`,
+    `url("${assetUrl("assets/fonts/Benguiat.woff")}") format("woff")`,
+    `url("${assetUrl("assets/fonts/Benguiat.ttf")}") format("truetype")`,
+    `url("${assetUrl("assets/fonts/Benguiat.otf")}") format("opentype")`,
+  ];
+  return `@font-face{font-family:"ITC Benguiat";src:${sources.join(",")};font-weight:400 900;font-style:normal;font-display:swap}`;
+}
+
 async function openStoredFilePage(file = {}, context = {}) {
   let viewerWindow = null;
   try {
     viewerWindow = window.open("about:blank", "_blank");
     if (viewerWindow) {
-      viewerWindow.document.write("<!doctype html><title>Opening file...</title><body style=\"margin:0;background:#050505;color:#fff;font-family:'ITC Benguiat','Benguiat',Georgia,serif;display:grid;place-items:center;min-height:100vh;\">Opening original file...</body>");
+      viewerWindow.document.write(`<!doctype html><title>Opening file...</title><style>${benguiatFontFaceCss()}</style><body style="margin:0;background:#050505;color:#fff;font-family:${BENGUIAT_FONT_STACK};display:grid;place-items:center;min-height:100vh;">Opening original file...</body>`);
       viewerWindow.document.close();
     }
   } catch {
@@ -1887,9 +1921,9 @@ async function openStoredFilePage(file = {}, context = {}) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
   <style>
-    @font-face { font-family: "ITC Benguiat"; src: local("ITC Benguiat"), local("ITC Benguiat Std"), local("Benguiat"), local("Benguiat Std"); font-weight: 400 900; font-style: normal; font-display: swap; }
+    ${benguiatFontFaceCss()}
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #050505, #303030 55%, #f5f5f5); color: #fff; font-family: "ITC Benguiat", "Benguiat", Georgia, serif; }
+    body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #050505, #303030 55%, #f5f5f5); color: #fff; font-family: ${BENGUIAT_FONT_STACK}; }
     header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px; border-bottom: 1px solid rgba(255,255,255,.28); background: rgba(0,0,0,.46); }
     h1 { margin: 0; font-size: 18px; line-height: 1.25; }
     p { margin: 4px 0 0; color: rgba(255,255,255,.76); font-size: 13px; }
@@ -2679,9 +2713,9 @@ function renderBrowserFrameDocument(url, preview = {}) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-      @font-face { font-family: "ITC Benguiat"; src: local("ITC Benguiat"), local("ITC Benguiat Std"), local("Benguiat"), local("Benguiat Std"); font-weight: 400 900; font-style: normal; font-display: swap; }
+      ${benguiatFontFaceCss()}
       :root { color-scheme: dark; }
-      body { margin: 0; font-family: "ITC Benguiat", "Benguiat", Georgia, serif; background: #050505; color: #f8f8f8; }
+      body { margin: 0; font-family: ${BENGUIAT_FONT_STACK}; background: #050505; color: #f8f8f8; }
       main { min-height: 100vh; display: grid; align-content: center; gap: 16px; padding: 32px; box-sizing: border-box; }
       article { border: 1px solid #3b3b3b; border-radius: 8px; padding: 20px; background: linear-gradient(145deg, #151515, #0a0a0a); }
       h1 { margin: 0 0 8px; font-size: 22px; }
@@ -5120,8 +5154,8 @@ function renderCollabDocHtml(doc) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(doc.title || "CORE document")}</title>
 <style>
-@font-face{font-family:"ITC Benguiat";src:local("ITC Benguiat"),local("ITC Benguiat Std"),local("Benguiat"),local("Benguiat Std");font-weight:400 900;font-style:normal;font-display:swap}
-body{font-family:"ITC Benguiat","Benguiat",Georgia,serif;margin:32px;line-height:1.55;color:#101010;background:#fff}
+${benguiatFontFaceCss()}
+body{font-family:${BENGUIAT_FONT_STACK};margin:32px;line-height:1.55;color:#101010;background:#fff}
 main{max-width:850px;margin:auto}
 h1{font-size:30px;margin:0 0 6px}small{color:#666}a{color:#111}blockquote{border-left:4px solid #222;margin:16px 0;padding:10px 14px;background:#f3f3f3}
 pre{white-space:pre-wrap;background:#f5f5f5;padding:12px;border:1px solid #ddd}
@@ -6718,8 +6752,8 @@ function buildHtmlDigest(archive) {
 <meta charset="utf-8">
 <title>${escapeHtml(archive.project.name)} Digest</title>
 <style>
-@font-face{font-family:"ITC Benguiat";src:local("ITC Benguiat"),local("ITC Benguiat Std"),local("Benguiat"),local("Benguiat Std");font-weight:400 900;font-style:normal;font-display:swap}
-body{font-family:"ITC Benguiat","Benguiat",Georgia,serif;margin:32px;color:#111;background:#f7f7f7}
+${benguiatFontFaceCss()}
+body{font-family:${BENGUIAT_FONT_STACK};margin:32px;color:#111;background:#f7f7f7}
 h1{font-size:28px}p{max-width:900px;line-height:1.5;color:#333}
 table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #d9d9d9;padding:10px;text-align:left;font-size:13px}th{background:#efefef}
 a{color:#111}

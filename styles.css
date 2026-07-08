@@ -3,8 +3,23 @@
   src:
     local("ITC Benguiat"),
     local("ITC Benguiat Std"),
+    local("ITC Benguiat Std Book"),
+    local("ITC Benguiat Book"),
+    local("ITCBenguiatStd"),
+    local("ITCBenguiatStd-Book"),
+    local("ITCBenguiat-Book"),
     local("Benguiat"),
-    local("Benguiat Std");
+    local("Benguiat Std"),
+    local("Benguiat Std Book"),
+    local("Benguiat Book"),
+    url("./assets/fonts/ITC-Benguiat.woff2") format("woff2"),
+    url("./assets/fonts/ITC-Benguiat.woff") format("woff"),
+    url("./assets/fonts/ITC-Benguiat.ttf") format("truetype"),
+    url("./assets/fonts/ITC-Benguiat.otf") format("opentype"),
+    url("./assets/fonts/Benguiat.woff2") format("woff2"),
+    url("./assets/fonts/Benguiat.woff") format("woff"),
+    url("./assets/fonts/Benguiat.ttf") format("truetype"),
+    url("./assets/fonts/Benguiat.otf") format("opentype");
   font-weight: 400 900;
   font-style: normal;
   font-display: swap;
@@ -33,8 +48,8 @@
   --border-gradient: linear-gradient(135deg, #000, #606060, #111, #000);
   --shadow: 0 22px 70px rgba(0, 0, 0, 0.48);
   --radius: 8px;
-  --font-ui: "ITC Benguiat", "Benguiat", "Benguiat Std", Georgia, "Times New Roman", serif;
-  --font-doc: "ITC Benguiat", "Benguiat", "Benguiat Std", Georgia, "Times New Roman", serif;
+  --font-ui: "ITC Benguiat", "ITC Benguiat Std", "ITC Benguiat Book", "Benguiat", "Benguiat Std", "Benguiat Book", "Bookman Old Style", Georgia, "Times New Roman", serif;
+  --font-doc: "ITC Benguiat", "ITC Benguiat Std", "ITC Benguiat Book", "Benguiat", "Benguiat Std", "Benguiat Book", "Bookman Old Style", Georgia, "Times New Roman", serif;
 }
 
 * {
