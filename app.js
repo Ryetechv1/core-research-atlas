@@ -5251,13 +5251,17 @@ function renderFileExplorerList(selected, openFolder = null) {
     ? children
         .map((child) => {
           const active = child.id === selected?.id;
+          const itemType = child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file";
+          const itemMeasure = child.kind === "folder" ? `${getFileChildren(child.id).length} item${getFileChildren(child.id).length === 1 ? "" : "s"}` : formatBytes(child.size || 0);
+          const itemAction = child.kind === "folder" ? "Tap to open / drop here" : "Tap to preview / drag to move";
           return `
-            <button class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}${child.id === state.fileManagerRecentNodeId ? " is-recent" : ""}" type="button" draggable="true" data-file-list-id="${escapeHtml(child.id)}" data-drop-folder-id="${escapeHtml(child.kind === "folder" ? child.id : folder.id)}">
+            <button class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}${child.id === state.fileManagerRecentNodeId ? " is-recent" : ""}" type="button" draggable="true" title="${escapeHtml(child.name)}" data-file-list-id="${escapeHtml(child.id)}" data-drop-folder-id="${escapeHtml(child.kind === "folder" ? child.id : folder.id)}">
               <span class="file-node-icon" aria-hidden="true"></span>
-              <strong>${escapeHtml(child.name)}</strong>
-              <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
-              <span>${escapeHtml(child.kind === "folder" ? `${getFileChildren(child.id).length} item${getFileChildren(child.id).length === 1 ? "" : "s"}` : formatBytes(child.size || 0))}</span>
-              <small>${escapeHtml(child.kind === "folder" ? "Tap to open / drop here" : "Tap to preview / drag to move")}</small>
+              <span class="file-explorer-main">
+                <strong>${escapeHtml(child.name)}</strong>
+                <small>${escapeHtml(itemType)} / ${escapeHtml(itemMeasure)}</small>
+                <em>${escapeHtml(itemAction)}</em>
+              </span>
             </button>
           `;
         })
