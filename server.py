@@ -20,16 +20,7 @@ from typing import Any
 
 from scripts.file_import_extract import FileImportError, extract_uploaded_file
 from scripts.google_search import GoogleSearchApiError, GoogleSearchConfigError, fallback_search_url, search_google
-from scripts.local_free_agent import (
-    LocalAgentApiError,
-    LocalAgentConfigError,
-    configured_local_model,
-    create_local_research_answer,
-    is_local_agent_available,
-)
 from scripts.multipart_upload import MultipartUploadError, read_uploaded_file
-from scripts.openai_agent import OpenAIAgentApiError, OpenAIAgentConfigError, create_research_answer
-from scripts.web_scrape_extract import scrape_urls
 
 
 ROOT = Path(__file__).resolve().parent
@@ -69,21 +60,14 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
                 {
                     "ok": True,
                     "service": "CORE Research Atlas",
-                    "freeLocalAgentConfigured": is_local_agent_available(),
-                    "localAgentModel": configured_local_model(),
                     "googleSearchConfigured": bool(
                         os.environ.get("GOOGLE_CUSTOM_SEARCH_API_KEY")
                         or os.environ.get("GOOGLE_CSE_API_KEY")
                         or os.environ.get("CUSTOM_SEARCH_API_KEY")
                     ),
-                    "openaiAgentConfigured": bool(os.environ.get("OPENAI_API_KEY")),
-                    "agentModel": os.environ.get("OPENAI_AGENT_MODEL", "gpt-5.5"),
                     "routes": [
                         "/api/health",
-                        "/api/local-agent",
                         "/api/search",
-                        "/api/agent",
-                        "/api/scrape",
                         "/api/import-file",
                         "/api/team-chat",
                     ],
@@ -96,17 +80,8 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self) -> None:
-        if self.path == "/api/local-agent":
-            self.handle_local_agent()
-            return
         if self.path == "/api/search":
             self.handle_google_search()
-            return
-        if self.path == "/api/agent":
-            self.handle_openai_agent()
-            return
-        if self.path == "/api/scrape":
-            self.handle_web_scrape()
             return
         if self.path == "/api/import-file":
             self.handle_file_import()
@@ -115,26 +90,6 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
             self.handle_team_chat()
             return
         self.write_json({"ok": False, "error": "Unknown API route."}, HTTPStatus.NOT_FOUND)
-
-    def handle_local_agent(self) -> None:
-        load_local_env()
-        try:
-            body = self.read_json_body()
-            response = create_local_research_answer(body)
-        except LocalAgentConfigError as error:
-            self.write_json(
-                {
-                    "ok": False,
-                    "error": str(error),
-                    "fallback": "Use the local app synthesizer, or install Ollama and pull a local model.",
-                },
-                HTTPStatus.SERVICE_UNAVAILABLE,
-            )
-            return
-        except (LocalAgentApiError, ValueError, json.JSONDecodeError) as error:
-            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
-            return
-        self.write_json({"ok": True, "response": response})
 
     def handle_google_search(self) -> None:
         load_local_env()
@@ -167,44 +122,6 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
             return
         except (GoogleSearchApiError, ValueError, json.JSONDecodeError) as error:
             self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
-            return
-        self.write_json({"ok": True, "response": response})
-
-    def handle_openai_agent(self) -> None:
-        load_local_env()
-        try:
-            body = self.read_json_body()
-            response = create_research_answer(body)
-        except OpenAIAgentConfigError as error:
-            self.write_json(
-                {
-                    "ok": False,
-                    "error": str(error),
-                    "fallback": "Use the local app synthesizer until OPENAI_API_KEY is configured on the backend host.",
-                },
-                HTTPStatus.SERVICE_UNAVAILABLE,
-            )
-            return
-        except (OpenAIAgentApiError, ValueError, json.JSONDecodeError) as error:
-            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
-            return
-        self.write_json({"ok": True, "response": response})
-
-    def handle_web_scrape(self) -> None:
-        try:
-            body = self.read_json_body()
-            urls = body.get("urls", [])
-            if isinstance(urls, str):
-                urls = [urls]
-            urls = [str(url).strip() for url in urls if str(url).strip()]
-            settings = body.get("advanced_settings", {})
-            response = scrape_urls(
-                urls,
-                full_content=bool(settings.get("full_content", False)),
-                include_links=bool(settings.get("include_links", True)),
-            )
-        except (ValueError, json.JSONDecodeError) as error:
-            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
         self.write_json({"ok": True, "response": response})
 

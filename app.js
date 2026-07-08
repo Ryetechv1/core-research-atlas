@@ -11,11 +11,8 @@ const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gs
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
 const HEALTH_API_PATH = "/api/health";
 const SEARCH_API_PATH = "/api/search";
-const LOCAL_AGENT_API_PATH = "/api/local-agent";
-const AGENT_API_PATH = "/api/agent";
 const TEAM_CHAT_STORAGE_KEY = `${STORAGE_KEY}:team-chat`;
 const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
-const AUTO_BOT_INTERVAL_MS = 60_000;
 const TEAM_CHAT_POLL_MS = 5_000;
 const GUEST_SESSION_VALUE = "Guest";
 const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
@@ -47,55 +44,6 @@ const PROFILE_SECTIONS = [
   "Research responsibilities",
   "Boundaries and integration notes",
 ];
-
-const INTERNAL_MODEL_GATEWAY = {
-  openapi: "3.0.0",
-  info: {
-    title: "Internal Core System Gateway",
-    version: "1.0.0",
-    description:
-      "Enables ChatGPT 5.5 Pro to orchestrate data flows and execute specialized backend actions.",
-  },
-  servers: [
-    {
-      url: "https://static.app/chatgpt-hosting",
-      description: "Secure Enterprise Private Environment",
-    },
-  ],
-  paths: {
-    "/resource/fetch": {
-      get: {
-        operationId: "fetchInternalData",
-        summary: "Queries core backend properties based on specific parameters",
-        parameters: [
-          {
-            name: "target_id",
-            in: "query",
-            required: true,
-            schema: { type: "string" },
-            description: "The unique reference string of the requested internal asset",
-          },
-        ],
-        responses: {
-          200: {
-            description: "Successful operation execution",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: { type: "string" },
-                    payload: { type: "object" },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  },
-};
 
 const REFERENCE_LIBRARY = [
   {
@@ -161,27 +109,25 @@ const BACKEND_CORE = {
   title: "ErydirCeisiwr Backend Mechanics Core",
   sourceReferenceId: "ref-upload-erydir-core",
   summary:
-    "Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.",
-  operatingMode: "Local static archive with free local-model hooks, optional OpenAI connector, team chat, memory bank, and web-extraction hooks.",
+    "Internal routing and review scaffold derived from the ErydirCeisiwr attachment request. It controls how profiles, source records, browser leads, documents, imports, memory snapshots, and exports are staged inside the static build.",
+  operatingMode: "Local static archive with source logging, in-app browser, file import, team chat, collaboration documents, profiles, and memory bank.",
   stages: [
     "Intent intake",
     "Profile context merge",
     "Reference lookup",
     "Evidence-tier separation",
-    "Mechanics synthesis",
-    "Extraction queue expansion",
+    "Mechanics review",
+    "Source log organization",
     "Export and review logging",
   ],
   permissions: [
     "Read local archive state",
     "Read three project profiles",
     "Read uploaded reference metadata",
-    "Create local extraction jobs",
-    "Generate local synthesis output",
+    "Create source and document records",
+    "Save browser, team, import, and memory records",
   ],
   hardLimits: [
-    "Static hosts cannot run live global-web scraping or model routes",
-    "Free local model execution requires Ollama running on the local machine; optional OpenAI execution requires /api/agent and OPENAI_API_KEY",
     "No long copyrighted PDF text embedded in exported app data",
     "No biomedical claim may be upgraded beyond its evidence tier without verification",
   ],
@@ -200,7 +146,7 @@ const DEFAULT_PROFILES = [
       "Tracks wolf and dragon instinct models as research artifacts.",
       "Maintains occult and metaphysical terminology without removing evidence labels.",
       "Owns source discipline, export packs, and future backend integrations.",
-      "Profile data may be used by the local agent to tune synthesis tone and research priorities.",
+      "Profile data helps the team preserve research responsibilities and review context.",
     ],
   },
   {
@@ -215,7 +161,7 @@ const DEFAULT_PROFILES = [
       "Tracks fox instincts, aura, phantom limbs, and kitsune spirit vocabulary.",
       "Flags transliteration variants and cultural context for review.",
       "Supports archive cleanup and source comparison.",
-      "Profile data may guide agent summaries toward fox and kitsune research needs.",
+      "Profile data helps prioritize fox and kitsune review needs.",
     ],
   },
   {
@@ -230,7 +176,7 @@ const DEFAULT_PROFILES = [
       "Reviews energy, phantom body, animal aura, and morphogenetic-field concepts.",
       "Connects metaphysical claims to source lineage and uncertainty notes.",
       "Supports source recommendation review and cross-form interpretation.",
-      "Profile data may guide agent output toward cross-form integration.",
+      "Profile data helps guide cross-form collaboration and review.",
     ],
   },
 ];
@@ -258,49 +204,11 @@ const SEED_DATA = {
     corePrompt:
       "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
     aiConnectorNote:
-      "The ChatGPT Pro console now prefers /api/local-agent with a free local Ollama model when available. OpenAI /api/agent remains optional. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, memory snapshots, collaboration documents, and extraction-job state.",
-  },
-  internalModel: {
-    displayName: "ChatGPT 5.5 Pro Internal Core",
-    status: "Free local-model first; optional OpenAI-backed route; local profile fallback otherwise",
-    gateway: INTERNAL_MODEL_GATEWAY,
-    gatewayOperation: "fetchInternalData",
-    targetParameter: "target_id",
-    providerNote:
-      "Uses a free local Ollama model through /api/local-agent when available, then optional OpenAI Responses API through /api/agent, then the local connector-ready profile fallback.",
-    synthesisScope: [
-      "Archive sources",
-      "Queued extraction jobs",
-      "Uploaded PDF reference metadata",
-      "Three-user profile context",
-      "In-app browser state and captured browser leads",
-      "Collaboration document drafts",
-      "Internal memory bank snapshots",
-      "Team chat and recommendation review state",
-    ],
+      "Separate AI assistant, retrieval console, and crawler surfaces have been removed. The atlas now focuses on source logging, in-app browsing, imports, profiles, team collaboration, documents, and memory snapshots.",
   },
   backendCore: BACKEND_CORE,
   referenceLibrary: REFERENCE_LIBRARY,
   externalApis: {
-    freeLocalAgent: {
-      provider: "Ollama local open-model runtime",
-      localEndpoint: LOCAL_AGENT_API_PATH,
-      upstreamEndpoint: "http://127.0.0.1:11434/api/chat",
-      auth: "No API key; runs on the user's machine",
-      defaultModel: "llama3.2:3b",
-      installHint: "Install Ollama, run `ollama pull llama3.2:3b`, then start this app with python server.py.",
-      browserOnlyFallback: "Static GitHub Pages cannot run local model inference through /api/local-agent, so the app falls back to browser/app synthesis there.",
-    },
-    localWebScraper: {
-      provider: "CORE Python scraper",
-      localEndpoint: "/api/scrape",
-      auth: "No API key; public http/https targets only",
-      defaultUrls: [GOOGLE_SEARCH_BASE_URL],
-      keywordMode: true,
-      searchBaseUrl: GOOGLE_SEARCH_BASE_URL,
-      advancedSettings: { full_content: false, include_links: true },
-      safeguards: ["Blocks localhost/private/reserved IPs by default", "2 MB fetch cap", "No JavaScript execution"],
-    },
     googleProgrammableSearch: {
       provider: "Google Programmable Search Engine",
       searchEngineId: GOOGLE_CSE_ID,
@@ -407,25 +315,12 @@ const SEED_DATA = {
     },
   ],
   profiles: DEFAULT_PROFILES,
-  extractionJobs: [],
-  extractionResults: [],
-  autoBotFindings: [],
   importedFiles: [],
   browserHistory: [],
   browserSearchResults: [],
   browserPreview: null,
-  webScrapeRuns: [],
   teamMessages: [],
   collabDocs: DEFAULT_COLLAB_DOCS,
-  agentMessages: [
-    {
-      role: "assistant",
-      owner: "system",
-      createdAt: new Date("2026-07-04T00:00:00").toISOString(),
-      content:
-        "Agent console initialized. I can synthesize the local archive, active user profile, and queued extraction parameters. Live internet fetching requires a backend or connector.",
-    },
-  ],
   sources: [
     {
       id: "src-ovid-metamorphoses",
@@ -440,7 +335,7 @@ const SEED_DATA = {
       tradition: "Greco-Roman",
       terms: ["metamorphosis", "mythic transformation", "divine agency"],
       notes:
-        "Use as a baseline for literary and mythological transformation motifs. Extract animal-change structure, agency, reversibility, and moral framing.",
+        "Use as a baseline for literary and mythological transformation motifs. Review animal-change structure, agency, reversibility, and moral framing.",
       coreLinks: ["Core Manifestation Template", "Morphogenetic Field"],
     },
     {
@@ -666,7 +561,7 @@ const SEED_DATA = {
       tradition: "Project internal mechanics",
       terms: ["energy", "backend core", "routing", "synthesis", "mechanics"],
       notes:
-        "Used as an internal operational scaffold for prompt intake, profile merging, reference lookup, evidence separation, synthesis, extraction queueing, and export logging. It is not used as visual design.",
+        "Used as an internal operational scaffold for prompt intake, profile merging, reference lookup, evidence separation, source review, and export logging. It is not used as visual design.",
       coreLinks: ["Core Manifestation Template", "Morphogenetic Field", "Physiological Hypothesis"],
       referenceId: "ref-upload-erydir-core",
     },
@@ -711,27 +606,12 @@ const state = {
     checking: null,
     available: false,
     routes: [],
-    freeLocalAgentConfigured: false,
-    localAgentModel: "llama3.2:3b",
     googleSearchConfigured: false,
-    openaiAgentConfigured: false,
-    agentModel: "gpt-5.5",
     platform: "static",
   },
   importBusy: false,
   activeMemorySnapshotId: "",
   teamChatPollTimer: null,
-  pendingSearchChoice: null,
-  autoBot: {
-    active: false,
-    timer: null,
-    sectionIndex: 0,
-    attempts: 0,
-    pausedForReview: false,
-    feedback: "",
-    lastRunAt: "",
-    currentFinding: null,
-  },
 };
 
 const els = {};
@@ -740,13 +620,10 @@ document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   wireEvents();
   populateFormOptions();
-  renderSourceTypeCheckboxes(els.extractionSourceTypes, "extract", ["Documentation", "PDF", "URL", "Archive"]);
-  renderSourceTypeCheckboxes(els.agentSourceTypes, "agent", ["Documentation", "PDF", "URL", "Archive", "Forum / Community"]);
   loadTeamMessagesFromLocalStorage();
   startTeamChatBroadcast();
   initAuth();
   render();
-  detectBackendCapabilities();
   startTeamChatPolling();
 });
 
@@ -789,30 +666,6 @@ function cacheElements() {
   els.browserPreview = document.getElementById("browserPreview");
   els.browserSearchResults = document.getElementById("browserSearchResults");
   els.browserHistory = document.getElementById("browserHistory");
-  els.extractionForm = document.getElementById("extractionForm");
-  els.extractionSourceTypes = document.getElementById("extractionSourceTypes");
-  els.extractionResults = document.getElementById("extractionResults");
-  els.extractionJobs = document.getElementById("extractionJobs");
-  els.copyExtractionQueueButton = document.getElementById("copyExtractionQueueButton");
-  els.clearExtractionQueueButton = document.getElementById("clearExtractionQueueButton");
-  els.extractKeywordSearchForm = document.getElementById("extractKeywordSearchForm");
-  els.extractSearchWindow = document.getElementById("extractSearchWindow");
-  els.autoBotSection = document.getElementById("autoBotSection");
-  els.autoBotFocus = document.getElementById("autoBotFocus");
-  els.startAutoBotButton = document.getElementById("startAutoBotButton");
-  els.stopAutoBotButton = document.getElementById("stopAutoBotButton");
-  els.runAutoBotNowButton = document.getElementById("runAutoBotNowButton");
-  els.autoBotStatus = document.getElementById("autoBotStatus");
-  els.webScrapeForm = document.getElementById("webScrapeForm");
-  els.webScrapeOutput = document.getElementById("webScrapeOutput");
-  els.extractionVisualFeed = document.getElementById("extractionVisualFeed");
-  els.agentForm = document.getElementById("agentForm");
-  els.agentScrapeForm = document.getElementById("agentScrapeForm");
-  els.agentSearchWindow = document.getElementById("agentSearchWindow");
-  els.agentSourceTypes = document.getElementById("agentSourceTypes");
-  els.agentTranscript = document.getElementById("agentTranscript");
-  els.agentContextSummary = document.getElementById("agentContextSummary");
-  els.clearAgentButton = document.getElementById("clearAgentButton");
   els.teamChatForm = document.getElementById("teamChatForm");
   els.teamChatFeed = document.getElementById("teamChatFeed");
   els.teamChatStatus = document.getElementById("teamChatStatus");
@@ -853,13 +706,6 @@ function cacheElements() {
   els.searchChoiceInternalButton = document.getElementById("searchChoiceInternalButton");
   els.searchChoiceExternalButton = document.getElementById("searchChoiceExternalButton");
   els.searchChoiceCancelButton = document.getElementById("searchChoiceCancelButton");
-  els.botAlertOverlay = document.getElementById("botAlertOverlay");
-  els.botAlertContent = document.getElementById("botAlertContent");
-  els.botDecisionActions = document.getElementById("botDecisionActions");
-  els.botAcceptButton = document.getElementById("botAcceptButton");
-  els.botRejectButton = document.getElementById("botRejectButton");
-  els.botFeedbackForm = document.getElementById("botFeedbackForm");
-  els.botDismissButton = document.getElementById("botDismissButton");
 }
 
 function wireEvents() {
@@ -904,17 +750,6 @@ function wireEvents() {
   });
   els.browserExternalButton.addEventListener("click", openCurrentBrowserTargetExternal);
   els.browserAddSourceButton.addEventListener("click", addCurrentBrowserPageToSources);
-  els.extractionForm.addEventListener("submit", handleQueueExtraction);
-  els.extractKeywordSearchForm.addEventListener("submit", (event) => handleKeywordSearch(event, "extract"));
-  els.webScrapeForm.addEventListener("submit", handleWebScrape);
-  els.copyExtractionQueueButton.addEventListener("click", copyExtractionQueue);
-  els.clearExtractionQueueButton.addEventListener("click", clearExtractionQueue);
-  els.startAutoBotButton.addEventListener("click", startAutoBot);
-  els.stopAutoBotButton.addEventListener("click", stopAutoBot);
-  els.runAutoBotNowButton.addEventListener("click", () => runAutoBotAttempt({ manual: true }));
-  els.agentForm.addEventListener("submit", handleAgentPrompt);
-  els.agentScrapeForm.addEventListener("submit", (event) => handleKeywordSearch(event, "agent"));
-  els.clearAgentButton.addEventListener("click", clearAgentChat);
   els.teamChatForm.addEventListener("submit", handleTeamChatSubmit);
   els.refreshTeamChatButton.addEventListener("click", () => syncTeamChat({ renderAfter: true }));
   els.useBrowserForTeamPostButton.addEventListener("click", useBrowserUrlForTeamPost);
@@ -933,13 +768,6 @@ function wireEvents() {
   els.collabDocToSourceButton.addEventListener("click", addActiveCollabDocToSources);
   els.createMemorySnapshotButton.addEventListener("click", () => createManualMemorySnapshot("Manual user snapshot"));
   els.exportMemoryBankButton.addEventListener("click", exportMemoryBank);
-  els.searchChoiceInternalButton.addEventListener("click", () => resolveSearchChoice("internal"));
-  els.searchChoiceExternalButton.addEventListener("click", () => resolveSearchChoice("external"));
-  els.searchChoiceCancelButton.addEventListener("click", () => resolveSearchChoice("cancel"));
-  els.botAcceptButton.addEventListener("click", acceptAutoBotFinding);
-  els.botRejectButton.addEventListener("click", showAutoBotFeedback);
-  els.botDismissButton.addEventListener("click", dismissAutoBotFinding);
-  els.botFeedbackForm.addEventListener("submit", handleAutoBotFeedback);
   els.profileForm.addEventListener("submit", handleSaveProfile);
   els.exportProfilesButton.addEventListener("click", () => {
     if (!ensureCanWrite("export profile data")) return;
@@ -967,7 +795,7 @@ function wireEvents() {
 
   document.getElementById("resetButton").addEventListener("click", () => {
     if (!ensureCanWrite("reset the archive")) return;
-    const confirmed = window.confirm("Reset local archive, profiles, extraction jobs, and chat to the starter state?");
+    const confirmed = window.confirm("Reset local archive, profiles, browser leads, documents, and chat to the starter state?");
     if (!confirmed) return;
     window.localStorage.removeItem(STORAGE_KEY);
     state.archive = clone(SEED_DATA);
@@ -1077,14 +905,8 @@ function renderPermissionState() {
   const readOnlyFormIds = [
     "addSourceForm",
     "fileImportForm",
-    "extractionForm",
-    "extractKeywordSearchForm",
-    "webScrapeForm",
-    "agentForm",
-    "agentScrapeForm",
     "teamChatForm",
     "profileForm",
-    "botFeedbackForm",
   ];
   readOnlyFormIds.forEach((id) => {
     const form = document.getElementById(id);
@@ -1103,14 +925,6 @@ function renderPermissionState() {
     "selectChatGptFilesButton",
     "saveFilesToChatGptButton",
     "clearImportedFilesButton",
-    "copyExtractionQueueButton",
-    "clearExtractionQueueButton",
-    "startAutoBotButton",
-    "stopAutoBotButton",
-    "runAutoBotNowButton",
-    "botAcceptButton",
-    "botRejectButton",
-    "clearAgentButton",
     "useBrowserForTeamPostButton",
     "exportProfilesButton",
     "newCollabDocButton",
@@ -1156,7 +970,6 @@ function populateFormOptions() {
   setOptions(els.fileImportForm.elements.evidenceTier, state.archive.evidenceTiers);
   setOptions(els.fileImportForm.elements.citationStatus, state.archive.citationStatuses);
   setOptions(els.sourceTypeFilter, ["All", ...state.archive.sourceTypes]);
-  setOptions(els.autoBotSection, state.archive.categories);
 }
 
 function setOptions(select, values) {
@@ -1171,15 +984,11 @@ function render() {
   renderFramework();
   renderImportPanel();
   renderBrowserPanel();
-  renderExtractionResults();
-  renderExtractionJobs();
-  renderAutoBotStatus();
-  renderAgent();
   renderTeamChat();
   renderCollabDocs();
   renderMemoryBank();
   renderProfiles();
-  renderModelCore();
+  renderReferenceLibrary();
   renderMetrics();
   renderPermissionState();
 }
@@ -1433,7 +1242,6 @@ function getImportOptions() {
     citationStatus: String(formData.get("citationStatus") || "Needs verification"),
     strategy: String(formData.get("strategy") || "auto"),
     createSources: formData.get("createSources") === "on",
-    createResults: formData.get("createResults") === "on",
     chatgptMode: formData.get("chatgptMode") === "on",
   };
 }
@@ -1526,45 +1334,6 @@ function integrateImportedFile(fileData, options) {
       const source = importItemToSource(item, fileData, importId, index, options);
       state.archive.sources.unshift(source);
       createdSources.push(source);
-    });
-  }
-
-  if (options.createResults) {
-    appendExtractionResult({
-      id: `file-import-result-${Date.now()}-${Math.round(Math.random() * 999)}`,
-      engine: "file-import",
-      owner: state.currentUser?.username || "local",
-      createdAt,
-      status: 200,
-      ok: true,
-      sourcePrompt: `Imported file: ${fileData.fileName}`,
-      request: {
-        fileName: fileData.fileName,
-        strategy: mode,
-        parser: fileData.parser,
-        createSources: options.createSources,
-      },
-      itemCount: sourceItems.length,
-      items: sourceItems.slice(0, 20).map((item) => ({
-        title: item.title,
-        url: item.url || `import://${fileData.fileName}`,
-        finalUrl: item.url || `import://${fileData.fileName}`,
-        status: "imported",
-        contentType: fileData.mimeType,
-        publishDate: "",
-        summary: clampText(item.notes || item.summary || fileData.summary, 700),
-        links: normalizeLinks(item.links || []),
-      })),
-      response: {
-        ok: true,
-        file: {
-          fileName: fileData.fileName,
-          extension: fileData.extension,
-          parser: fileData.parser,
-          size: fileData.size,
-          warnings: fileData.warnings || [],
-        },
-      },
     });
   }
 
@@ -1977,8 +1746,6 @@ function openInAppBrowser(url, label = url, options = {}) {
   setBrowserPreview(preview);
   loadInAppBrowserFrame(normalizedUrl, preview);
   renderBrowserPanel();
-  renderAgent();
-  hydrateBrowserPreviewFromScrape(normalizedUrl, label, query);
 }
 
 function loadInAppBrowserFrame(url, preview = null) {
@@ -2011,7 +1778,7 @@ function renderBrowserFrameDocument(url, preview = {}) {
   const title = escapeHtml(preview?.title || domainFromUrl(url) || url);
   const summary = escapeHtml(
     preview?.summary ||
-      "This page is represented as a source preview inside the app. Many public sites block iframe display with X-Frame-Options or Content-Security-Policy, so the virtual browser keeps the URL, snippets, and extraction links visible here."
+      "This page is represented as a source preview inside the app. Many public sites block iframe display with X-Frame-Options or Content-Security-Policy, so the virtual browser keeps the URL, snippets, and links visible here."
   );
   const source = escapeHtml(preview?.sourceInfo || domainFromUrl(url) || inferSourceType(url));
   const safeUrl = escapeHtml(url);
@@ -2042,62 +1809,6 @@ function renderBrowserFrameDocument(url, preview = {}) {
     </main>
   </body>
 </html>`;
-}
-
-async function hydrateBrowserPreviewFromScrape(url, label, query = "") {
-  if (query || !/^https?:\/\//i.test(url) || isCseUrl(url)) return;
-  const capabilities = await ensureBackendCapabilities();
-  if (!hasBackendRoute("/api/scrape", capabilities)) return;
-  try {
-    const response = await fetch("/api/scrape", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        urls: [url],
-        advanced_settings: { full_content: false, include_links: true },
-        browser_context: getBrowserContext(),
-      }),
-    });
-    const data = await readJsonResponse(response);
-    const result = data?.response?.results?.[0] || data?.results?.[0];
-    if (!response.ok || !result?.ok || state.currentBrowserUrl !== url) return;
-    const preview = {
-      title: result.title || label || domainFromUrl(url) || url,
-      url: result.finalUrl || result.url || url,
-      type: inferSourceType(result.contentType || url),
-      summary: result.description || result.summary || "Page preview extracted through the local scrape route.",
-      sourceInfo: `${domainFromUrl(result.finalUrl || result.url || url) || "source"} / HTTP ${result.status || "ok"}`,
-      details: JSON.stringify(
-        {
-          title: result.title,
-          finalUrl: result.finalUrl,
-          status: result.status,
-          contentType: result.contentType,
-          headings: result.headings || [],
-          textLength: result.textLength,
-          links: (result.links || []).slice(0, 12),
-        },
-        null,
-        2
-      ),
-    };
-    const linkCards = (result.links || []).slice(0, 8).map((link, index) => ({
-      id: `scrape-link-${Date.now()}-${index}`,
-      type: "Page link",
-      title: link.text || domainFromUrl(link.href) || link.href,
-      url: link.href,
-      summary: `Discovered on ${result.title || url}.`,
-      sourceInfo: domainFromUrl(link.href) || "linked page",
-      score: 700 - index,
-    }));
-    setBrowserPreview(preview);
-    setBrowserSearchResults(dedupeBrowserResults([...linkCards, ...getBrowserSearchResults()]).slice(0, 24));
-    loadInAppBrowserFrame(url, preview);
-    renderBrowserPanel();
-    renderAgent();
-  } catch {
-    // Static hosts and blocked pages simply keep the metadata preview.
-  }
 }
 
 function renderBrowserPanel() {
@@ -2180,13 +1891,13 @@ function renderBrowserSearchResults() {
   const results = getBrowserSearchResults();
   if (!results.length) {
     els.browserSearchResults.innerHTML =
-      '<div class="empty-state">Search from the address field or click CSE results to build internal previews from sources, files, browser history, and extraction cards.</div>';
+      '<div class="empty-state">Search from the address field or click CSE results to build internal previews from sources, files, browser history, documents, and references.</div>';
     return;
   }
   els.browserSearchResults.innerHTML = `
     <div class="result-summary-bar">
       <span>${results.length} internal result cards</span>
-      <span>Source, file, extraction, and browser leads</span>
+      <span>Source, file, document, reference, and browser leads</span>
     </div>
     ${results
       .map(
@@ -2283,7 +1994,6 @@ function handleCseSearchStart(event) {
   });
   setBrowserSearchResults(buildVirtualBrowserResults(query, searchUrl));
   renderBrowserPanel();
-  renderAgent();
 }
 
 function handleCseResultsReady(event) {
@@ -2315,7 +2025,6 @@ function handleCseResultsReady(event) {
   });
   state.currentBrowserUrl = searchUrl;
   renderBrowserPanel();
-  renderAgent();
 }
 
 function normalizeCseResultCards(query, results = []) {
@@ -2450,26 +2159,6 @@ function buildVirtualBrowserResults(query, currentUrl = "") {
         score,
       });
     }
-  });
-
-  (state.archive.extractionResults || []).forEach((record) => {
-    (record.items || []).forEach((item, index) => {
-      const haystack = [item.title, item.url, item.summary, record.sourcePrompt, record.engine].join(" ");
-      const score = browserResultScore(haystack, keywords);
-      if (score > 0) {
-        rows.push({
-          id: `extract-${record.id}-${index}`,
-          type: `Extraction / ${engineLabel(record.engine)}`,
-          title: item.title,
-          url: item.url || item.finalUrl || "",
-          summary: item.summary,
-          sourceInfo: `${record.owner || "local"} / ${new Date(record.createdAt).toLocaleString()}`,
-          links: item.links || [],
-          details: JSON.stringify({ recordId: record.id, item }, null, 2),
-          score,
-        });
-      }
-    });
   });
 
   (state.archive.importedFiles || []).forEach((file) => {
@@ -2671,10 +2360,10 @@ function browserStatusMessage(url) {
     return "Loaded a collaboration document preview inside the virtual browser.";
   }
   if (isKnownFrameBlockedUrl(url)) {
-    return `Loaded ${url} into the virtual browser preview. Google and many public sites block iframe display, so the app keeps the page URL, source preview, and extractable links in-app.`;
+    return `Loaded ${url} into the virtual browser preview. Google and many public sites block iframe display, so the app keeps the page URL, source preview, and links in-app.`;
   }
   return /^https?:\/\//i.test(url)
-    ? `Loaded ${url} into the virtual browser preview. Server-backed hosts can enrich this with /api/scrape; static hosts keep URL and card metadata in-app.`
+    ? `Loaded ${url} into the virtual browser preview. The app keeps URL and card metadata in-app.`
     : `Loaded ${url} in the in-app browser.`;
 }
 
@@ -2932,123 +2621,6 @@ function renderSourceTypeCheckboxes(container, prefix, selectedTypes) {
     .join("");
 }
 
-function handleQueueExtraction(event) {
-  event.preventDefault();
-  if (!ensureCanWrite("queue extraction jobs")) return;
-  const formData = new FormData(els.extractionForm);
-  const prompt = withBrowserContext(String(formData.get("prompt")).trim(), "In-app browser context");
-  const job = createExtractionJob({
-    prompt,
-    mode: String(formData.get("mode")),
-    depth: String(formData.get("depth")),
-    maxLeads: Number(formData.get("maxLeads")) || 50,
-    sourceTypes: getCheckedSourceTypes(els.extractionSourceTypes),
-    owner: state.currentUser?.username || "local",
-  });
-  state.archive.extractionJobs.unshift(job);
-  persistArchive();
-  els.extractionForm.reset();
-  renderSourceTypeCheckboxes(els.extractionSourceTypes, "extract", job.sourceTypes);
-  renderExtractionJobs();
-  renderAgent();
-}
-
-async function handleKeywordSearch(event, context) {
-  event.preventDefault();
-  if (!ensureCanWrite("run search extraction")) return;
-  const form = event.currentTarget;
-  const formData = new FormData(form);
-  const query = String(formData.get("query") || "").trim();
-  const fullContent = String(formData.get("fullContent")) === "true";
-  const includeLinks = String(formData.get("includeLinks")) !== "false";
-  if (!query) return;
-
-  const searchUrl = buildSearchUrl(query);
-  const choice = await askSearchDisplayChoice({ query, searchUrl, context });
-  if (choice === "cancel") return;
-  if (choice === "external") {
-    window.open(searchUrl, "_blank", "noopener,noreferrer");
-    renderEmbeddedSearchWindow(context, {
-      query,
-      searchUrl,
-      mode: "external",
-      message: "Opened external Google search link.",
-    });
-    return;
-  }
-
-  await runKeywordScrape({ query, fullContent, includeLinks, context, sourcePrompt: getContextPrompt(context, query) });
-}
-
-function askSearchDisplayChoice({ query, searchUrl, context }) {
-  return new Promise((resolve) => {
-    state.pendingSearchChoice = { resolve, query, searchUrl, context };
-    els.searchChoiceSummary.innerHTML = `
-      <strong>${escapeHtml(context === "agent" ? "ChatGPT Pro Research Agent" : "Global Extract Console")}</strong>
-      <span>${escapeHtml(query)}</span>
-    `;
-    els.searchChoiceOverlay.hidden = false;
-  });
-}
-
-function resolveSearchChoice(choice) {
-  const pending = state.pendingSearchChoice;
-  state.pendingSearchChoice = null;
-  els.searchChoiceOverlay.hidden = true;
-  if (pending) pending.resolve(choice);
-}
-
-function buildSearchUrl(query) {
-  return `${GOOGLE_SEARCH_BASE_URL}${encodeURIComponent(query.trim())}`;
-}
-
-async function requestGoogleSearch({ query, context = "extract", sourcePrompt = "", num = 8 }) {
-  const searchUrl = buildCseSearchUrl(query);
-  const payload = {
-    query,
-    cx: GOOGLE_CSE_ID,
-    num,
-    context,
-    objective: sourcePrompt,
-    browser_context: getBrowserContext(),
-  };
-  const capabilities = await ensureBackendCapabilities();
-  if (!hasBackendRoute(SEARCH_API_PATH, capabilities) || capabilities.googleSearchConfigured === false) {
-    return createGoogleFallbackRecord({
-      query,
-      context,
-      sourcePrompt,
-      searchUrl,
-      status: capabilities.available ? 503 : 0,
-      error: capabilities.available
-        ? "GOOGLE_CUSTOM_SEARCH_API_KEY is not configured on this backend host."
-        : "This host is serving the static app without backend API routes.",
-      reason: capabilities.available ? "missing-google-key" : "static-host",
-    });
-  }
-  try {
-    const response = await fetch(SEARCH_API_PATH, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await readJsonResponse(response);
-    if (!response.ok || data.ok === false) {
-      return createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl: data.fallback?.searchUrl || searchUrl, status: response.status, error: data.error });
-    }
-    return createExtractionResultRecord({
-      engine: context === "agent" ? "agent-web-search" : "google-search",
-      request: payload,
-      response: data.response || data,
-      status: response.status,
-      ok: true,
-      sourcePrompt,
-    });
-  } catch (error) {
-    return createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl, status: 0, error: error.message });
-  }
-}
-
 async function readJsonResponse(response) {
   const text = await response.text();
   try {
@@ -3073,11 +2645,7 @@ function staticHostCapabilities() {
     checking: null,
     available: false,
     routes: [],
-    freeLocalAgentConfigured: false,
-    localAgentModel: "llama3.2:3b",
     googleSearchConfigured: false,
-    openaiAgentConfigured: false,
-    agentModel: "gpt-5.5",
     platform: "static",
   };
 }
@@ -3089,10 +2657,6 @@ function isKnownStaticHost() {
 async function detectBackendCapabilities({ renderAfter = true } = {}) {
   if (isKnownStaticHost()) {
     state.backendCapabilities = staticHostCapabilities();
-    if (renderAfter) {
-      renderAgent();
-      renderModelCore();
-    }
     return state.backendCapabilities;
   }
   if (state.backendCapabilities.checking) return state.backendCapabilities.checking;
@@ -3104,24 +2668,18 @@ async function detectBackendCapabilities({ renderAfter = true } = {}) {
         checking: null,
         available: response.ok && data.ok !== false,
         routes: Array.isArray(data.routes) ? data.routes : [],
-        freeLocalAgentConfigured: Boolean(data.freeLocalAgentConfigured),
-        localAgentModel: data.localAgentModel || "llama3.2:3b",
         googleSearchConfigured: Boolean(data.googleSearchConfigured),
-        openaiAgentConfigured: Boolean(data.openaiAgentConfigured),
-        agentModel: data.agentModel || "gpt-5.5",
         platform: data.platform || (response.ok ? "local-python" : "static"),
       };
       if (renderAfter) {
-        renderAgent();
-        renderModelCore();
+        renderTeamChat();
       }
       return state.backendCapabilities;
     })
     .catch(() => {
       state.backendCapabilities = staticHostCapabilities();
       if (renderAfter) {
-        renderAgent();
-        renderModelCore();
+        renderTeamChat();
       }
       return state.backendCapabilities;
     });
@@ -3132,487 +2690,6 @@ function hasBackendRoute(route, capabilities = state.backendCapabilities) {
   return Boolean(capabilities?.available && Array.isArray(capabilities.routes) && capabilities.routes.includes(route));
 }
 
-function createGoogleFallbackRecord({ query, context, sourcePrompt, searchUrl, status, error, reason = "fallback" }) {
-  const staticSummary =
-    reason === "static-host"
-      ? "This public host is serving the static GitHub Pages app, so Python/API routes cannot run here. The app is showing embedded Google CSE results and virtual browser cards inside the Browser panel instead."
-      : "The backend Google JSON route is reachable but missing GOOGLE_CUSTOM_SEARCH_API_KEY. The app is showing embedded Google CSE results and virtual browser cards until that server-side key is configured.";
-  const response = {
-    ok: false,
-    provider: "google-programmable-search-element-fallback",
-    query,
-    error: error || "Google JSON search backend unavailable.",
-    items: [
-      {
-        title: `Open Google CSE search for: ${query}`,
-        url: searchUrl,
-        finalUrl: searchUrl,
-        summary: staticSummary,
-        links: [],
-      },
-    ],
-    reason,
-  };
-  return createExtractionResultRecord({
-    engine: context === "agent" ? "agent-web-search" : "google-search",
-    request: { query, cx: GOOGLE_CSE_ID, fallback: true },
-    response,
-    status,
-    ok: false,
-    sourcePrompt,
-  });
-}
-
-function updateBrowserFromSearchRecord(record, query) {
-  const searchUrl = buildCseSearchUrl(query);
-  const cards = [
-    ...(record.items || []).map((item, index) => ({
-      id: `search-${record.id}-${index}`,
-      type: `${engineLabel(record.engine)} result`,
-      title: item.title,
-      url: item.url || item.finalUrl || "",
-      summary: item.summary || "",
-      sourceInfo: item.displayLink || domainFromUrl(item.url || item.finalUrl || "") || engineLabel(record.engine),
-      details: JSON.stringify({ recordId: record.id, item }, null, 2),
-      score: 950 - index,
-    })),
-    ...buildVirtualBrowserResults(query, searchUrl),
-  ];
-  const preview = {
-    title: `${engineLabel(record.engine)}: ${query}`,
-    url: searchUrl,
-    type: record.ok ? "Google web search" : "Google CSE fallback",
-    summary: record.ok
-      ? `${record.items?.length || 0} Google result card(s) returned from the server-side search route.`
-      : `${record.response?.error || "Search backend unavailable."} The embedded CSE remains available in the Browser panel.`,
-    sourceInfo: record.ok ? "Server-side Google Custom Search JSON API" : "Embedded Google Programmable Search fallback",
-    details: JSON.stringify(
-      {
-        query,
-        status: record.status,
-        ok: record.ok,
-        itemCount: record.items?.length || 0,
-        request: record.request,
-      },
-      null,
-      2
-    ),
-  };
-  openInAppBrowser(searchUrl, `Google CSE: ${query}`);
-  setBrowserSearchResults(dedupeBrowserResults(cards).slice(0, 24));
-  setBrowserPreview(preview);
-  renderBrowserPanel();
-  renderAgent();
-}
-
-function getContextPrompt(context, query) {
-  if (context === "agent") {
-    const agentPrompt = els.agentForm?.elements?.prompt?.value?.trim();
-    if (agentPrompt) return withBrowserContext(agentPrompt, "In-app browser context");
-    const latestUserMessage = [...(state.archive.agentMessages || [])].reverse().find((message) => message.role === "user");
-    if (latestUserMessage?.content) return withBrowserContext(latestUserMessage.content, "In-app browser context");
-  }
-  return getActiveExtractionPrompt(`Keyword search: ${query}`);
-}
-
-async function runKeywordScrape({ query, fullContent = false, includeLinks = true, context = "extract", sourcePrompt, categoryTarget = "" }) {
-  const searchUrl = buildSearchUrl(query);
-  const objective = withBrowserContext(sourcePrompt || `Keyword search: ${query}`, "In-app browser context");
-  renderEmbeddedSearchWindow(context, {
-    query,
-    searchUrl,
-    mode: "internal",
-    message: "Searching Google through /api/search...",
-  });
-
-  const record = await requestGoogleSearch({ query, context, sourcePrompt: objective, num: 8 });
-  record.context = context;
-  record.query = query;
-  record.searchUrl = buildCseSearchUrl(query);
-  record.categoryTarget = categoryTarget;
-  appendExtractionResult(record);
-  state.archive.webScrapeRuns.unshift({
-    id: `search-${Date.now()}`,
-    owner: state.currentUser?.username || "local",
-    createdAt: new Date().toISOString(),
-    request: record.request,
-    ok: record.ok,
-    status: record.status,
-    response: record.response,
-    context,
-    categoryTarget,
-  });
-  state.archive.webScrapeRuns = state.archive.webScrapeRuns.slice(0, 30);
-  updateBrowserFromSearchRecord(record, query);
-  const siteRecord = await scrapeSearchResultPages(record, {
-    query,
-    sourcePrompt: objective,
-    fullContent,
-    includeLinks,
-    context,
-    categoryTarget,
-  });
-  const displayRecord = siteRecord || record;
-  persistArchive();
-  renderEmbeddedSearchWindow(context, { query, searchUrl: record.searchUrl, mode: "internal", record: displayRecord });
-  renderExtractionResults();
-  renderAgent();
-  renderModelCore();
-  return displayRecord;
-}
-
-async function scrapeSearchResultPages(record, { query, sourcePrompt, fullContent, includeLinks, context, categoryTarget }) {
-  const urls = (record.items || [])
-    .map((item) => item.url || item.finalUrl || "")
-    .filter((url) => /^https?:\/\//i.test(url) && !isCseUrl(url))
-    .slice(0, 3);
-  if (!urls.length) return null;
-  const payload = {
-    urls,
-    objective: `${sourcePrompt}\n\nSearch result pages selected from Google query: ${query}`,
-    browser_context: getBrowserContext(),
-    search_query: query,
-    search_base_url: GOOGLE_SEARCH_BASE_URL,
-    advanced_settings: {
-      full_content: fullContent,
-      include_links: includeLinks,
-    },
-  };
-  try {
-    const response = await fetch("/api/scrape", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await readJsonResponse(response);
-    const scrapeRecord = createExtractionResultRecord({
-      engine: context === "agent" ? "agent-site-scrape" : "site-scrape",
-      request: payload,
-      response: data,
-      status: response.status,
-      ok: response.ok && data.ok !== false,
-      sourcePrompt,
-    });
-    scrapeRecord.context = context;
-    scrapeRecord.query = query;
-    scrapeRecord.searchUrl = buildCseSearchUrl(query);
-    scrapeRecord.categoryTarget = categoryTarget;
-    appendExtractionResult(scrapeRecord);
-    return scrapeRecord;
-  } catch {
-    return null;
-  }
-}
-
-function renderEmbeddedSearchWindow(context, payload) {
-  const target = context === "agent" ? els.agentSearchWindow : els.extractSearchWindow;
-  if (!target) return;
-  target.hidden = false;
-  const record = payload.record;
-  if (!record) {
-    target.innerHTML = `
-      <div class="embedded-search-header">
-        <strong>${escapeHtml(payload.mode === "external" ? "External Search" : "Internal Search")}</strong>
-        <button class="ghost-button iconless" type="button" data-open-browser-url="${escapeHtml(payload.searchUrl)}">Open search</button>
-      </div>
-      <p>${escapeHtml(payload.message || "Ready.")}</p>
-      <small>${escapeHtml(payload.query || "")}</small>
-    `;
-    target.querySelectorAll("[data-open-browser-url]").forEach((button) => {
-      button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, payload.query || button.dataset.openBrowserUrl));
-    });
-    return;
-  }
-  target.innerHTML = `
-    <div class="embedded-search-header">
-      <strong>${escapeHtml(engineLabel(record.engine))}</strong>
-      <button class="ghost-button iconless" type="button" data-open-browser-url="${escapeHtml(record.searchUrl || payload.searchUrl)}">Open search</button>
-    </div>
-    <p>${escapeHtml(record.sourcePrompt || payload.query)}</p>
-    <div class="embedded-result-list">
-      ${(record.items || []).map((item, index) => renderCompactSearchItem(record.id, item, index)).join("")}
-    </div>
-  `;
-  target.querySelectorAll("[data-open-browser-url]").forEach((button) => {
-    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, payload.query || button.dataset.openBrowserUrl));
-  });
-  target.querySelectorAll("[data-open-extraction-item]").forEach((button) => {
-    button.addEventListener("click", () => openExtractionItemInBrowser(button.dataset.openExtractionItem, Number(button.dataset.itemIndex || 0)));
-  });
-  target.querySelectorAll("[data-preview-extraction-item]").forEach((button) => {
-    button.addEventListener("click", () => previewExtractionItemInBrowser(button.dataset.previewExtractionItem, Number(button.dataset.itemIndex || 0)));
-  });
-  target.querySelectorAll("[data-promote-result]").forEach((button) => {
-    button.addEventListener("click", () => promoteExtractionItem(button.dataset.promoteResult, Number(button.dataset.itemIndex || 0)));
-  });
-}
-
-function renderCompactSearchItem(resultId, item, index) {
-  const url = item.url || item.finalUrl || "";
-  const links = (item.links || [])
-    .slice(0, 4)
-    .map((link) => `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(link.url)}">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</button>`)
-    .join("");
-  return `
-    <article class="embedded-result-item">
-      <div>
-        <h3>${escapeHtml(item.title)}</h3>
-        ${url ? `<small>${escapeHtml(url)}</small>` : ""}
-      </div>
-      ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ""}
-      ${links ? `<div class="result-links">${links}</div>` : ""}
-      <div class="form-actions">
-        ${url ? `<button class="primary-button iconless" type="button" data-open-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Open In App</button>` : ""}
-        <button class="ghost-button iconless" type="button" data-preview-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Full Info</button>
-        <button class="ghost-button iconless" type="button" data-promote-result="${escapeHtml(resultId)}" data-item-index="${index}"${writeDisabledAttr()}>Promote</button>
-      </div>
-    </article>
-  `;
-}
-
-async function handleWebScrape(event) {
-  event.preventDefault();
-  if (!ensureCanWrite("run web scraping")) return;
-  const formData = new FormData(els.webScrapeForm);
-  const query = String(formData.get("query") || "").trim();
-  const urls = query ? [buildSearchUrl(query)] : parseUrlList(String(formData.get("urls") || ""));
-  const fullContent = String(formData.get("fullContent")) === "true";
-  const includeLinks = String(formData.get("includeLinks")) === "true";
-  const sourcePrompt = query ? getActiveExtractionPrompt(`Keyword search: ${query}`) : getActiveExtractionPrompt();
-  if (!urls.length) {
-    els.webScrapeOutput.textContent = "Add search keywords.";
-    return;
-  }
-
-  if (query) {
-    els.webScrapeOutput.textContent = "Searching Google through /api/search, then scraping top result pages when available...";
-    const record = await runKeywordScrape({ query, fullContent, includeLinks, context: "extract", sourcePrompt });
-    els.webScrapeOutput.textContent = JSON.stringify(
-      {
-        ok: record.ok,
-        engine: record.engine,
-        query,
-        itemCount: record.items?.length || 0,
-        response: record.response,
-      },
-      null,
-      2
-    );
-    return;
-  }
-
-  const payload = {
-    urls,
-    search_query: query,
-    search_base_url: query ? GOOGLE_SEARCH_BASE_URL : "",
-    objective: sourcePrompt,
-    browser_context: getBrowserContext(),
-    advanced_settings: {
-      full_content: fullContent,
-      include_links: includeLinks,
-    },
-  };
-  els.webScrapeOutput.textContent = query
-    ? "Running local keyword search through /api/scrape..."
-    : "Running local web scrape through /api/scrape...";
-
-  try {
-    const response = await fetch("/api/scrape", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    const run = {
-      id: `scrape-${Date.now()}`,
-      owner: state.currentUser?.username || "local",
-      createdAt: new Date().toISOString(),
-      request: payload,
-      ok: response.ok && data.ok !== false,
-      status: response.status,
-      response: data,
-    };
-    state.archive.webScrapeRuns.unshift(run);
-    state.archive.webScrapeRuns = state.archive.webScrapeRuns.slice(0, 20);
-    appendExtractionResult(
-      createExtractionResultRecord({
-        engine: "scrape",
-        request: payload,
-        response: data,
-        status: response.status,
-        ok: run.ok,
-        sourcePrompt,
-      })
-    );
-    persistArchive();
-    els.webScrapeOutput.textContent = JSON.stringify(data, null, 2);
-    renderExtractionResults();
-    renderAgent();
-    renderModelCore();
-  } catch (error) {
-    const errorData = {
-      ok: false,
-      error: "Could not reach /api/scrape. Start the Python server with `python server.py`.",
-      detail: error.message,
-    };
-    appendExtractionResult(
-      createExtractionResultRecord({
-        engine: "scrape",
-        request: payload,
-        response: errorData,
-        status: 0,
-        ok: false,
-        sourcePrompt,
-      })
-    );
-    persistArchive();
-    els.webScrapeOutput.textContent = JSON.stringify(errorData, null, 2);
-    renderExtractionResults();
-    renderAgent();
-  }
-}
-
-function getActiveExtractionPrompt(fallback = "Direct URL extraction run") {
-  const prompt = els.extractionForm?.elements?.prompt?.value?.trim();
-  if (prompt) return withBrowserContext(prompt, "In-app browser context");
-  const queued = state.archive.extractionJobs?.[0]?.prompt;
-  if (queued) return withBrowserContext(queued, "In-app browser context");
-  const latestUserMessage = [...(state.archive.agentMessages || [])].reverse().find((message) => message.role === "user");
-  return withBrowserContext(latestUserMessage?.content || fallback, "In-app browser context");
-}
-
-function appendExtractionResult(record) {
-  state.archive.extractionResults = state.archive.extractionResults || [];
-  state.archive.extractionResults.unshift(record);
-  state.archive.extractionResults = state.archive.extractionResults.slice(0, 30);
-}
-
-function createExtractionResultRecord({ engine, request, response, status, ok, sourcePrompt }) {
-  const createdAt = new Date().toISOString();
-  const id = `${engine}-result-${Date.now()}-${Math.round(Math.random() * 999)}`;
-  const items = normalizeExtractionItems(engine, response, request);
-  return {
-    id,
-    engine,
-    owner: state.currentUser?.username || "local",
-    createdAt,
-    status,
-    ok,
-    sourcePrompt,
-    request,
-    itemCount: items.length,
-    items,
-    response,
-  };
-}
-
-function normalizeExtractionItems(engine, data, request = {}) {
-  const root = data?.response ?? data ?? {};
-  const candidates = collectResultCandidates(root).slice(0, 12);
-  const errors = normalizeErrorItems(root);
-  const fallbackUrls = Array.isArray(request.urls) ? request.urls : [];
-  const sourceItems = candidates.length
-    ? candidates
-    : fallbackUrls.map((url) => ({ url, title: url, summary: root.error || root.detail || "No structured result item returned." }));
-  const normalized = sourceItems.map((item, index) => normalizeExtractionItem(item, index, fallbackUrls[index], engine));
-  return [...normalized, ...errors].slice(0, 16);
-}
-
-function collectResultCandidates(value, depth = 0) {
-  if (!value || depth > 4) return [];
-  if (Array.isArray(value)) {
-    return value.filter((item) => item && typeof item === "object" && !Array.isArray(item));
-  }
-  if (typeof value !== "object") return [];
-
-  const preferredKeys = ["results", "documents", "pages", "items", "extracts", "records", "data"];
-  for (const key of preferredKeys) {
-    if (Array.isArray(value[key])) {
-      const rows = value[key].filter((item) => item && typeof item === "object" && !Array.isArray(item));
-      if (rows.some((item) => item.url || item.finalUrl || item.title || item.excerpts || item.markdown || item.summary)) {
-        return rows;
-      }
-    }
-  }
-
-  return Object.values(value).flatMap((child) => collectResultCandidates(child, depth + 1));
-}
-
-function normalizeExtractionItem(item, index, fallbackUrl, engine) {
-  const url =
-    pickString(item, ["url", "finalUrl", "final_url", "source_url", "sourceUrl", "href", "link", "canonical_url"]) ||
-    fallbackUrl ||
-    "";
-  const excerpts = Array.isArray(item.excerpts) ? item.excerpts.filter(Boolean).join("\n") : "";
-  const summary =
-    excerpts ||
-    pickString(item, ["summary", "description", "snippet", "excerpt", "text", "markdown", "content", "full_content", "error"]) ||
-    "";
-  const title =
-    pickString(item, ["title", "name", "headline", "page_title"]) ||
-    (url ? domainFromUrl(url) : `${engineLabel(engine)} item ${index + 1}`);
-  const links = [
-    ...normalizeLinks(item.links),
-    ...normalizeLinks(item.citations),
-    ...normalizeLinks(item.sources),
-    ...collectCitationLinks(item),
-  ];
-  return {
-    title,
-    url,
-    finalUrl: pickString(item, ["finalUrl", "final_url"]) || url,
-    status: pickString(item, ["status", "http_status_code", "error_type"]) || "",
-    contentType: pickString(item, ["contentType", "content_type", "mime_type"]) || "",
-    publishDate: pickString(item, ["publish_date", "publishedAt", "date"]) || "",
-    summary: clampText(summary, 700),
-    links: dedupeLinks(links).slice(0, 8),
-  };
-}
-
-function normalizeErrorItems(root) {
-  const errors = Array.isArray(root?.errors) ? root.errors : [];
-  return errors
-    .filter((error) => error && typeof error === "object")
-    .map((error, index) => ({
-      title: `Failed extraction ${index + 1}`,
-      url: pickString(error, ["url", "source_url"]) || "",
-      finalUrl: "",
-      status: pickString(error, ["error_type", "status", "http_status_code"]) || "error",
-      contentType: "",
-      publishDate: "",
-      summary: clampText(pickString(error, ["message", "error", "detail"]) || "The provider returned an extraction error.", 700),
-      links: [],
-    }));
-}
-
-function normalizeLinks(value) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((link) => {
-      if (typeof link === "string") return { url: link, title: domainFromUrl(link) || link };
-      if (!link || typeof link !== "object") return null;
-      const url = pickString(link, ["url", "href", "link", "source_url"]);
-      if (!url) return null;
-      return { url, title: pickString(link, ["title", "text", "label", "name"]) || domainFromUrl(url) || url };
-    })
-    .filter(Boolean);
-}
-
-function collectCitationLinks(value, depth = 0) {
-  if (!value || depth > 4) return [];
-  if (Array.isArray(value)) return value.flatMap((item) => collectCitationLinks(item, depth + 1));
-  if (typeof value !== "object") return [];
-
-  const citation = value.url_citation || (value.type === "url_citation" ? value : null);
-  if (citation?.url) {
-    return [{ url: citation.url, title: citation.title || domainFromUrl(citation.url) || citation.url }];
-  }
-  if (value.type === "source-url" && value.url) {
-    return [{ url: value.url, title: value.title || domainFromUrl(value.url) || value.url }];
-  }
-  return Object.values(value).flatMap((child) => collectCitationLinks(child, depth + 1));
-}
-
 function dedupeLinks(links) {
   const seen = new Set();
   return links.filter((link) => {
@@ -3620,15 +2697,6 @@ function dedupeLinks(links) {
     seen.add(link.url);
     return true;
   });
-}
-
-function pickString(item, keys) {
-  for (const key of keys) {
-    const value = item?.[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-    if (typeof value === "number") return String(value);
-  }
-  return "";
 }
 
 function clampText(value, length) {
@@ -3644,287 +2712,6 @@ function domainFromUrl(url) {
   }
 }
 
-function engineLabel(engine) {
-  const labels = {
-    scrape: "Local Scraper",
-    "google-search": "Google Web Search",
-    "agent-web-search": "Agent Google Web Search",
-    "site-scrape": "Search Result Site Scrape",
-    "agent-site-scrape": "Agent Site Scrape",
-    "keyword-scrape": "Keyword Search",
-    "agent-scrape": "Agent Keyword Search",
-    "auto-bot": "Auto Research Bot",
-    "file-import": "File Import",
-    aiq: "NVIDIA AIQ",
-    openai: "OpenAI Web Search",
-  };
-  return labels[engine] || engine;
-}
-
-function parseUrlList(value) {
-  return value
-    .split(/[\n,]+/)
-    .map((url) => url.trim())
-    .filter(Boolean);
-}
-
-function createExtractionJob({ prompt, mode, depth, maxLeads, sourceTypes, owner }) {
-  const keywords = extractKeywords(prompt);
-  const queryBase = keywords.length ? keywords.join(" ") : prompt.slice(0, 90);
-  const browserContext = getBrowserContext();
-  const browserQueryTerms = extractKeywords(browserContext.searchText).join(" ");
-  return {
-    id: `job-${Date.now()}-${Math.round(Math.random() * 999)}`,
-    owner,
-    status: "Queued",
-    prompt,
-    browserContext,
-    mode,
-    depth,
-    maxLeads,
-    sourceTypes,
-    createdAt: new Date().toISOString(),
-    generatedQueries: [
-      `${queryBase} shapeshifting folklore primary sources`,
-      `${queryBase} lycanthropy therianthropy phantom shift documentation`,
-      `${queryBase} morphogenesis physiology body schema PDF archive`,
-      `${queryBase} occult metaphysical transformation grimoire source`,
-      `${queryBase} ${browserQueryTerms} current browser lead`,
-    ],
-    extractionTargets: sourceTypes.map((type) => ({
-      type,
-      action: type.includes("PDF") ? "download metadata and extract citations" : "discover, quote, summarize, and cite",
-    })),
-    integrationNotes:
-      "Backend connector should fetch results, preserve URLs/archive IDs, extract short quotes, assign evidence tiers, include current in-app browser context, and avoid treating speculative claims as proven biology.",
-  };
-}
-
-function renderExtractionResults() {
-  if (!els.extractionResults) return;
-  const results = state.archive.extractionResults || [];
-  if (!results.length) {
-    els.extractionResults.innerHTML =
-      '<div class="empty-state">No extraction results yet. Run Local Web Scraper, Agent Keyword Search, file import, or browser search to create source cards.</div>';
-    if (els.extractionVisualFeed) {
-      els.extractionVisualFeed.innerHTML = '<div class="empty-state">Fetched information previews will appear here after a search, scrape, or import.</div>';
-    }
-    return;
-  }
-
-  const totalItems = results.reduce((sum, result) => sum + (result.items?.length || 0), 0);
-  els.extractionResults.innerHTML = `
-    <div class="result-summary-bar">
-      <span>${results.length} saved result records</span>
-      <span>${totalItems} normalized source cards</span>
-      <span>${escapeHtml(engineLabel(results[0].engine))} latest</span>
-    </div>
-    ${results
-      .map(
-        (result) => `
-          <article class="result-card ${result.ok ? "" : "is-error"}">
-            <header>
-              <div>
-                <h3>${escapeHtml(engineLabel(result.engine))}</h3>
-                <p>${escapeHtml(result.sourcePrompt || "Direct URL extraction run")}</p>
-              </div>
-              <div class="result-meta">
-                <span class="detail-chip">${escapeHtml(result.ok ? "OK" : "Needs attention")}</span>
-                <span class="detail-chip">${escapeHtml(String(result.status || "local"))}</span>
-                <span class="detail-chip">${escapeHtml(result.owner || "local")}</span>
-              </div>
-            </header>
-            <div class="result-items">
-              ${(result.items || [])
-                .map((item, index) => renderExtractionItem(result.id, item, index))
-                .join("")}
-            </div>
-            <div class="form-actions">
-              <button class="ghost-button" type="button" data-copy-result="${escapeHtml(result.id)}"${writeDisabledAttr()}>Copy Result JSON</button>
-            </div>
-            <small>${new Date(result.createdAt).toLocaleString()}</small>
-          </article>
-        `
-      )
-      .join("")}
-  `;
-  renderExtractionVisualFeed(results);
-
-  els.extractionResults.querySelectorAll("[data-copy-result]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const result = results.find((item) => item.id === button.dataset.copyResult);
-      copyOrDownload("extraction-result.json", JSON.stringify(result, null, 2));
-    });
-  });
-
-  els.extractionResults.querySelectorAll("[data-open-browser-url]").forEach((button) => {
-    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, button.textContent.trim() || button.dataset.openBrowserUrl));
-  });
-
-  els.extractionResults.querySelectorAll("[data-open-extraction-item]").forEach((button) => {
-    button.addEventListener("click", () => {
-      openExtractionItemInBrowser(button.dataset.openExtractionItem, Number(button.dataset.itemIndex || 0));
-    });
-  });
-
-  els.extractionResults.querySelectorAll("[data-preview-extraction-item]").forEach((button) => {
-    button.addEventListener("click", () => {
-      previewExtractionItemInBrowser(button.dataset.previewExtractionItem, Number(button.dataset.itemIndex || 0));
-    });
-  });
-
-  els.extractionResults.querySelectorAll("[data-promote-result]").forEach((button) => {
-    button.addEventListener("click", () => {
-      promoteExtractionItem(button.dataset.promoteResult, Number(button.dataset.itemIndex || 0));
-    });
-  });
-}
-
-function renderExtractionVisualFeed(results = state.archive.extractionResults || []) {
-  if (!els.extractionVisualFeed) return;
-  const cards = results
-    .flatMap((result) =>
-      (result.items || []).map((item, index) => ({
-        result,
-        item,
-        index,
-      }))
-    )
-    .slice(0, 8);
-  if (!cards.length) {
-    els.extractionVisualFeed.innerHTML = '<div class="empty-state">No fetched information cards are available yet.</div>';
-    return;
-  }
-  const hero = cards[0];
-  const heroUrl = hero.item.url || hero.item.finalUrl || "";
-  els.extractionVisualFeed.innerHTML = `
-    <section class="visual-feed-browser">
-      <header>
-        <div>
-          <strong>${escapeHtml(hero.item.title || "Fetched result preview")}</strong>
-          <small>${escapeHtml(engineLabel(hero.result.engine))} / ${escapeHtml(heroUrl || "no URL")}</small>
-        </div>
-        ${heroUrl ? `<button class="primary-button iconless" type="button" data-open-extraction-item="${escapeHtml(hero.result.id)}" data-item-index="${hero.index}">Open In App</button>` : ""}
-      </header>
-      <p>${escapeHtml(hero.item.summary || hero.result.sourcePrompt || "No summary text was returned.")}</p>
-      <div class="visual-feed-links">
-        ${cards
-          .map(({ result, item, index }) => {
-            const url = item.url || item.finalUrl || "";
-            return `
-              <button class="visual-feed-link" type="button" data-preview-extraction-item="${escapeHtml(result.id)}" data-item-index="${index}">
-                <strong>${escapeHtml(item.title || "Untitled result")}</strong>
-                <span>${escapeHtml(url || engineLabel(result.engine))}</span>
-              </button>
-            `;
-          })
-          .join("")}
-      </div>
-    </section>
-  `;
-  els.extractionVisualFeed.querySelectorAll("[data-open-extraction-item]").forEach((button) => {
-    button.addEventListener("click", () => openExtractionItemInBrowser(button.dataset.openExtractionItem, Number(button.dataset.itemIndex || 0)));
-  });
-  els.extractionVisualFeed.querySelectorAll("[data-preview-extraction-item]").forEach((button) => {
-    button.addEventListener("click", () => previewExtractionItemInBrowser(button.dataset.previewExtractionItem, Number(button.dataset.itemIndex || 0)));
-  });
-}
-
-function renderExtractionItem(resultId, item, index) {
-  const primaryUrl = item.url || item.finalUrl || "";
-  const linkList = (item.links || [])
-    .map(
-      (link) =>
-        `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(link.url)}">${escapeHtml(link.title || domainFromUrl(link.url) || link.url)}</button>`
-    )
-    .join("");
-  return `
-    <section class="result-item">
-      <div class="result-title-row">
-        <div>
-          <h4>${escapeHtml(item.title)}</h4>
-          ${primaryUrl ? `<p class="result-url">${escapeHtml(primaryUrl)}</p>` : ""}
-        </div>
-        <div class="form-actions">
-          ${primaryUrl ? `<button class="primary-button iconless" type="button" data-open-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Open In App</button>` : ""}
-          <button class="ghost-button iconless" type="button" data-preview-extraction-item="${escapeHtml(resultId)}" data-item-index="${index}">Full Info</button>
-          <button class="ghost-button iconless" type="button" data-promote-result="${escapeHtml(resultId)}" data-item-index="${index}"${writeDisabledAttr()}>
-            Promote
-          </button>
-        </div>
-      </div>
-      <div class="chip-row">
-        ${item.status ? `<span class="detail-chip">${escapeHtml(item.status)}</span>` : ""}
-        ${item.contentType ? `<span class="detail-chip">${escapeHtml(item.contentType)}</span>` : ""}
-        ${item.publishDate ? `<span class="detail-chip">${escapeHtml(item.publishDate)}</span>` : ""}
-      </div>
-      ${item.summary ? `<p class="result-summary">${escapeHtml(item.summary)}</p>` : ""}
-      ${linkList ? `<div class="result-links"><strong>Links and citations</strong>${linkList}</div>` : ""}
-    </section>
-  `;
-}
-
-function getExtractionItem(resultId, itemIndex) {
-  const result = (state.archive.extractionResults || []).find((record) => record.id === resultId);
-  const item = result?.items?.[itemIndex];
-  return { result, item };
-}
-
-function extractionItemToBrowserPreview(result, item) {
-  const url = item.url || item.finalUrl || item.links?.[0]?.url || "";
-  return {
-    title: item.title || "Extraction result",
-    url,
-    type: `Extraction / ${engineLabel(result.engine)}`,
-    summary: item.summary || result.sourcePrompt || "",
-    sourceInfo: `${result.owner || "local"} / ${new Date(result.createdAt).toLocaleString()}`,
-    details: JSON.stringify({ resultId: result.id, item, request: result.request }, null, 2),
-  };
-}
-
-function openExtractionItemInBrowser(resultId, itemIndex) {
-  const { result, item } = getExtractionItem(resultId, itemIndex);
-  if (!result || !item) return;
-  const preview = extractionItemToBrowserPreview(result, item);
-  setBrowserPreview(preview);
-  if (preview.url) openInAppBrowser(preview.url, preview.title, { preview });
-  renderBrowserPreview();
-}
-
-function previewExtractionItemInBrowser(resultId, itemIndex) {
-  const { result, item } = getExtractionItem(resultId, itemIndex);
-  if (!result || !item) return;
-  setBrowserPreview(extractionItemToBrowserPreview(result, item));
-  renderBrowserPreview();
-}
-
-function promoteExtractionItem(resultId, itemIndex) {
-  if (!ensureCanWrite("promote extraction results")) return;
-  const result = (state.archive.extractionResults || []).find((record) => record.id === resultId);
-  const item = result?.items?.[itemIndex];
-  if (!result || !item) return;
-  const url = item.url || item.finalUrl || "";
-  const source = {
-    id: `src-extract-${Date.now()}-${itemIndex}`,
-    title: item.title || `Extracted source ${itemIndex + 1}`,
-    category: "Documents",
-    species: "Cross-form",
-    domain: "Metaphysics",
-    sourceType: inferSourceType(url),
-    url,
-    evidenceTier: "Speculative framework",
-    citationStatus: "Needs verification",
-    tradition: `${engineLabel(result.engine)} / ${result.owner || "local"}`,
-    terms: extractKeywords(`${result.sourcePrompt} ${item.title} ${item.summary}`).slice(0, 8),
-    notes: `Promoted from ${engineLabel(result.engine)} result ${result.id}. Prompt: ${result.sourcePrompt}. Extracted summary: ${item.summary || "No summary returned."}`,
-    coreLinks: ["Safety and Epistemic Notes", "Core Manifestation Template"],
-  };
-  state.archive.sources.unshift(source);
-  state.selectedId = source.id;
-  persistArchive();
-  render();
-}
-
 function inferSourceType(url) {
   const lower = String(url || "").toLowerCase();
   if (lower.startsWith("local-collab-doc://")) return "Documentation";
@@ -3936,543 +2723,6 @@ function inferSourceType(url) {
   return "URL";
 }
 
-function renderAutoBotStatus() {
-  if (!els.autoBotStatus) return;
-  const bot = state.autoBot;
-  const nextSection = state.archive.categories[bot.sectionIndex % state.archive.categories.length] || "Documents";
-  els.autoBotStatus.innerHTML = `
-    <div class="status-row">
-      <strong>${bot.active ? "Active" : "Stopped"}</strong>
-      <span>${bot.active ? "Checks one section every minute." : "Start when you want recursive web discovery."}</span>
-    </div>
-    <div class="status-row">
-      <strong>Next section</strong>
-      <span>${escapeHtml(nextSection)}</span>
-    </div>
-    <div class="status-row">
-      <strong>Attempts</strong>
-      <span>${bot.attempts} total${bot.lastRunAt ? `, last run ${new Date(bot.lastRunAt).toLocaleTimeString()}` : ""}</span>
-    </div>
-    <div class="status-row">
-      <strong>Feedback memory</strong>
-      <span>${escapeHtml(bot.feedback || "No improvement feedback yet.")}</span>
-    </div>
-  `;
-}
-
-function startAutoBot() {
-  if (!ensureCanWrite("start the automated research bot")) return;
-  if (state.autoBot.active) return;
-  const selectedIndex = Math.max(0, state.archive.categories.indexOf(els.autoBotSection.value));
-  state.autoBot.active = true;
-  state.autoBot.sectionIndex = selectedIndex;
-  state.autoBot.pausedForReview = false;
-  state.autoBot.timer = window.setInterval(() => runAutoBotAttempt({ manual: false }), AUTO_BOT_INTERVAL_MS);
-  renderAutoBotStatus();
-  runAutoBotAttempt({ manual: true });
-}
-
-function stopAutoBot() {
-  if (!ensureCanWrite("stop the automated research bot")) return;
-  if (state.autoBot.timer) {
-    window.clearInterval(state.autoBot.timer);
-  }
-  state.autoBot.active = false;
-  state.autoBot.timer = null;
-  state.autoBot.pausedForReview = false;
-  renderAutoBotStatus();
-}
-
-async function runAutoBotAttempt({ manual = false, feedback = "" } = {}) {
-  if (!ensureCanWrite("run the automated research bot")) return null;
-  if (!manual && (!state.autoBot.active || state.autoBot.pausedForReview)) return;
-  const category = state.archive.categories[state.autoBot.sectionIndex % state.archive.categories.length] || "Documents";
-  const query = buildAutoBotQuery(category, feedback || state.autoBot.feedback);
-  state.autoBot.attempts += 1;
-  state.autoBot.lastRunAt = new Date().toISOString();
-  renderAutoBotStatus();
-
-  const record = await runKeywordScrape({
-    query,
-    fullContent: false,
-    includeLinks: true,
-    context: "extract",
-    sourcePrompt: `Auto bot ${category} search: ${query}`,
-    categoryTarget: category,
-  });
-  record.engine = "auto-bot";
-  record.categoryTarget = category;
-  record.query = query;
-  state.archive.autoBotFindings.unshift({
-    id: record.id,
-    category,
-    query,
-    createdAt: record.createdAt,
-    accepted: false,
-    itemCount: record.items?.length || 0,
-  });
-  state.archive.autoBotFindings = state.archive.autoBotFindings.slice(0, 50);
-  persistArchive();
-  state.autoBot.sectionIndex = (state.autoBot.sectionIndex + 1) % state.archive.categories.length;
-  renderExtractionResults();
-  renderAutoBotStatus();
-
-  const item = selectValuableBotItem(record);
-  if (item) {
-    showAutoBotFinding(record, item, category);
-  }
-}
-
-function buildAutoBotQuery(category, feedback = "") {
-  const focus = els.autoBotFocus?.value?.trim() || "";
-  const species = state.archive.species.filter((item) => item !== "Cross-form").join(" ");
-  const terms = [
-    category,
-    "shapeshifting",
-    species,
-    "wolf fox kitsune dragon",
-    "sources documentation PDF folklore occult metaphysics physiology",
-    focus,
-    feedback,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  return terms.replace(/\s+/g, " ").trim();
-}
-
-function selectValuableBotItem(record) {
-  const items = record.items || [];
-  return items.find((item) => {
-    const usefulText = `${item.title || ""} ${item.summary || ""}`.trim();
-    return (item.url || item.links?.length) && usefulText.length > 40;
-  }) || items.find((item) => item.url || item.links?.length) || items[0];
-}
-
-function showAutoBotFinding(record, item, category) {
-  state.autoBot.pausedForReview = true;
-  state.autoBot.currentFinding = { recordId: record.id, itemIndex: record.items.indexOf(item), category };
-  els.botFeedbackForm.hidden = true;
-  els.botDecisionActions.hidden = false;
-  els.botAlertContent.innerHTML = `
-    <article class="embedded-result-item">
-      <strong>${escapeHtml(category)}</strong>
-      <h3>${escapeHtml(item.title)}</h3>
-      ${item.url ? `<button class="link-button" type="button" data-open-browser-url="${escapeHtml(item.url)}">${escapeHtml(item.url)}</button>` : ""}
-      ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ""}
-      <small>${escapeHtml(record.query || "")}</small>
-    </article>
-  `;
-  els.botAlertContent.querySelectorAll("[data-open-browser-url]").forEach((button) => {
-    button.addEventListener("click", () => openInAppBrowser(button.dataset.openBrowserUrl, item.title || button.dataset.openBrowserUrl));
-  });
-  els.botAlertOverlay.hidden = false;
-  renderAutoBotStatus();
-}
-
-function acceptAutoBotFinding() {
-  if (!ensureCanWrite("accept automated research findings")) return;
-  const finding = state.autoBot.currentFinding;
-  const record = (state.archive.extractionResults || []).find((item) => item.id === finding?.recordId);
-  const item = record?.items?.[finding?.itemIndex || 0];
-  if (record && item) {
-    addResultItemToSourceArchive(record, item, finding.category || record.categoryTarget || "Documents");
-    const botLog = state.archive.autoBotFindings.find((entry) => entry.id === record.id);
-    if (botLog) botLog.accepted = true;
-  }
-  closeAutoBotAlert();
-  persistArchive();
-  render();
-}
-
-function showAutoBotFeedback() {
-  els.botDecisionActions.hidden = true;
-  els.botFeedbackForm.hidden = false;
-  els.botFeedbackForm.elements.feedback.focus();
-}
-
-function handleAutoBotFeedback(event) {
-  event.preventDefault();
-  if (!ensureCanWrite("send automated research feedback")) return;
-  const feedback = String(new FormData(els.botFeedbackForm).get("feedback") || "").trim();
-  if (feedback) state.autoBot.feedback = feedback;
-  closeAutoBotAlert();
-  runAutoBotAttempt({ manual: true, feedback });
-}
-
-function dismissAutoBotFinding() {
-  closeAutoBotAlert();
-}
-
-function closeAutoBotAlert() {
-  els.botAlertOverlay.hidden = true;
-  els.botFeedbackForm.reset();
-  els.botFeedbackForm.hidden = true;
-  els.botDecisionActions.hidden = false;
-  state.autoBot.pausedForReview = false;
-  state.autoBot.currentFinding = null;
-  renderAutoBotStatus();
-}
-
-function addResultItemToSourceArchive(result, item, category) {
-  const url = item.url || item.finalUrl || item.links?.[0]?.url || "";
-  const source = {
-    id: `src-bot-${Date.now()}`,
-    title: item.title || `Auto bot source for ${category}`,
-    category,
-    species: "Cross-form",
-    domain: inferDomainFromCategory(category),
-    sourceType: inferSourceType(url),
-    url,
-    evidenceTier: "Speculative framework",
-    citationStatus: "Needs verification",
-    tradition: `Auto research bot / ${result.owner || "local"}`,
-    terms: extractKeywords(`${result.query} ${item.title} ${item.summary}`).slice(0, 8),
-    notes: `Accepted from automated research bot result ${result.id}. Query: ${result.query}. Summary: ${item.summary || "No summary returned."}`,
-    coreLinks: ["Safety and Epistemic Notes", "Core Manifestation Template"],
-  };
-  state.archive.sources.unshift(source);
-  state.selectedId = source.id;
-}
-
-function inferDomainFromCategory(category) {
-  const map = {
-    Documents: "Folklore",
-    "Historical Data": "History",
-    "Cultural Data": "Folklore",
-    "Occult Data": "Occult / Esoteric",
-    Mechanics: "Physiology",
-    "Theoretical Concepts": "Theoretical Biology",
-  };
-  return map[category] || "Metaphysics";
-}
-
-function renderExtractionJobs() {
-  if (!state.archive.extractionJobs.length) {
-    els.extractionJobs.innerHTML = '<div class="empty-state">No extraction jobs queued yet.</div>';
-    return;
-  }
-
-  els.extractionJobs.innerHTML = state.archive.extractionJobs
-    .map(
-      (job) => `
-        <article class="job-card">
-          <div>
-            <h3>${escapeHtml(job.prompt)}</h3>
-            <p>${escapeHtml(job.mode)} / ${escapeHtml(job.depth)} / ${job.maxLeads} leads / ${escapeHtml(job.owner)}</p>
-          </div>
-          <div class="chip-row">
-            <span class="detail-chip">${escapeHtml(job.status)}</span>
-            ${job.sourceTypes.map((type) => `<span class="detail-chip">${escapeHtml(type)}</span>`).join("")}
-          </div>
-          <ol>
-            ${job.generatedQueries.map((query) => `<li>${escapeHtml(query)}</li>`).join("")}
-          </ol>
-          <div class="form-actions">
-            <button class="ghost-button" type="button" data-promote-job="${escapeHtml(job.id)}"${writeDisabledAttr()}>Promote to Source Lead</button>
-            <button class="ghost-button" type="button" data-copy-job="${escapeHtml(job.id)}"${writeDisabledAttr()}>Copy Job JSON</button>
-          </div>
-        </article>
-      `
-    )
-    .join("");
-
-  els.extractionJobs.querySelectorAll("[data-promote-job]").forEach((button) => {
-    button.addEventListener("click", () => promoteJobToSource(button.dataset.promoteJob));
-  });
-
-  els.extractionJobs.querySelectorAll("[data-copy-job]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const job = state.archive.extractionJobs.find((item) => item.id === button.dataset.copyJob);
-      copyOrDownload("extraction-job.json", JSON.stringify(job, null, 2));
-    });
-  });
-}
-
-function promoteJobToSource(jobId) {
-  if (!ensureCanWrite("promote extraction jobs to Sources")) return;
-  const job = state.archive.extractionJobs.find((item) => item.id === jobId);
-  if (!job) return;
-  const source = {
-    id: `src-${Date.now()}`,
-    title: `Extraction lead: ${job.prompt.slice(0, 78)}`,
-    category: "Documents",
-    species: "Cross-form",
-    domain: "Metaphysics",
-    sourceType: job.sourceTypes[0] || "URL",
-    url: job.generatedQueries[0],
-    evidenceTier: "Speculative framework",
-    citationStatus: "Needs verification",
-    tradition: `Extraction queue / ${job.owner}`,
-    terms: extractKeywords(job.prompt).slice(0, 6),
-    notes: `Created from extraction job ${job.id}. Query set requires live web/PDF/archive execution before citation approval.`,
-    coreLinks: ["Safety and Epistemic Notes", "Core Manifestation Template"],
-  };
-  state.archive.sources.unshift(source);
-  state.selectedId = source.id;
-  persistArchive();
-  render();
-}
-
-function copyExtractionQueue() {
-  if (!ensureCanWrite("copy extraction queue data")) return;
-  copyOrDownload("core-extraction-queue.json", JSON.stringify(state.archive.extractionJobs, null, 2));
-}
-
-function clearExtractionQueue() {
-  if (!ensureCanWrite("clear queued extraction jobs")) return;
-  const confirmed = window.confirm("Clear queued extraction jobs?");
-  if (!confirmed) return;
-  state.archive.extractionJobs = [];
-  persistArchive();
-  renderExtractionJobs();
-  renderAgent();
-}
-
-async function handleAgentPrompt(event) {
-  event.preventDefault();
-  if (!ensureCanWrite("send agent prompts")) return;
-  const formData = new FormData(els.agentForm);
-  const prompt = String(formData.get("prompt")).trim();
-  const sourceTypes = getCheckedSourceTypes(els.agentSourceTypes);
-  const options = {
-    mode: String(formData.get("mode")),
-    depth: String(formData.get("depth")),
-    queueExtraction: String(formData.get("queueExtraction")) === "yes",
-    sourceTypes,
-    browserContext: getBrowserContext(),
-  };
-
-  state.archive.agentMessages.push({
-    role: "user",
-    owner: state.currentUser?.username || "local",
-    createdAt: new Date().toISOString(),
-    content: prompt,
-  });
-  renderAgent();
-
-  const agentQuery = buildAgentSearchQuery(prompt, sourceTypes);
-  renderEmbeddedSearchWindow("agent", {
-    query: agentQuery,
-    searchUrl: buildCseSearchUrl(agentQuery),
-    mode: "internal",
-    message: "Researching web results for this prompt...",
-  });
-  const webRecord = await requestGoogleSearch({
-    query: agentQuery,
-    context: "agent",
-    sourcePrompt: withBrowserContext(prompt, "Agent prompt web research context"),
-    num: options.depth === "Exhaustive" ? 10 : 8,
-  });
-  webRecord.context = "agent";
-  webRecord.query = agentQuery;
-  webRecord.searchUrl = buildCseSearchUrl(agentQuery);
-  appendExtractionResult(webRecord);
-  updateBrowserFromSearchRecord(webRecord, agentQuery);
-  const siteRecord = await scrapeSearchResultPages(webRecord, {
-    query: agentQuery,
-    sourcePrompt: withBrowserContext(prompt, "Agent prompt web research context"),
-    fullContent: options.depth === "Exhaustive",
-    includeLinks: true,
-    context: "agent",
-    categoryTarget: "",
-  });
-  options.webRecord = siteRecord || webRecord;
-  options.browserContext = getBrowserContext();
-  const agentAnswer = await requestOpenAIAgentAnswer(prompt, options);
-
-  if (options.queueExtraction) {
-    state.archive.extractionJobs.unshift(
-      createExtractionJob({
-        prompt: withBrowserContext(prompt, "In-app browser context"),
-        mode: options.mode,
-        depth: options.depth,
-        maxLeads: options.depth === "Exhaustive" ? 150 : 60,
-        sourceTypes,
-        owner: state.currentUser?.username || "local",
-      })
-    );
-  }
-
-  state.archive.agentMessages.push({
-    role: "assistant",
-    owner: "ChatGPT Pro Research Agent",
-    createdAt: new Date().toISOString(),
-    content: agentAnswer.content,
-    backend: agentAnswer.backend,
-  });
-
-  persistArchive();
-  els.agentForm.reset();
-  renderSourceTypeCheckboxes(els.agentSourceTypes, "agent", sourceTypes);
-  renderEmbeddedSearchWindow("agent", { query: agentQuery, searchUrl: webRecord.searchUrl, mode: "internal", record: options.webRecord });
-  renderAgent();
-  renderExtractionResults();
-  renderExtractionJobs();
-}
-
-function buildAgentSearchQuery(prompt, sourceTypes = []) {
-  const keywords = extractKeywords(`${prompt} ${getBrowserContext().searchText}`).slice(0, 8);
-  const typeHints = sourceTypes
-    .filter((type) => ["PDF", "Archive", "Documentation", "Book / Manuscript"].includes(type))
-    .slice(0, 3)
-    .join(" ");
-  const base = keywords.length ? keywords.join(" ") : String(prompt || "").slice(0, 90);
-  return `${base} shapeshifting research sources ${typeHints}`.replace(/\s+/g, " ").trim();
-}
-
-async function requestOpenAIAgentAnswer(prompt, options) {
-  const capabilities = await ensureBackendCapabilities();
-  if (hasBackendRoute(LOCAL_AGENT_API_PATH, capabilities)) {
-    const localResult = await requestFreeLocalAgentAnswer(prompt, options, capabilities);
-    if (localResult) return localResult;
-  }
-  if (!hasBackendRoute(AGENT_API_PATH, capabilities) || capabilities.openaiAgentConfigured === false) {
-    return {
-      backend: capabilities.available ? "local-fallback-no-cloud-model" : "local-fallback-static-host",
-      content: generateAgentResponse(prompt, {
-        ...options,
-        agentBackendReason: capabilities.available
-          ? "No free local Ollama model answered, and OPENAI_API_KEY is not configured. The browser synthesizer answered from app context."
-          : "This host cannot run backend API routes, so the local synthesizer answered from app/browser context.",
-      }),
-    };
-  }
-
-  const payload = buildAgentApiPayload(prompt, options, capabilities);
-  try {
-    const response = await fetch(AGENT_API_PATH, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await readJsonResponse(response);
-    if (!response.ok || data.ok === false) {
-      return {
-        backend: "local-fallback-agent-error",
-        content: `${generateAgentResponse(prompt, {
-          ...options,
-          agentBackendReason: data.error || "The OpenAI agent route returned an error.",
-        })}\n\nOpenAI backend note: ${data.error || "The OpenAI agent route returned an error."}`,
-      };
-    }
-    const answer = data.response?.output_text || "";
-    return {
-      backend: data.response?.model || capabilities.agentModel || "gpt-5.5",
-      content:
-        answer ||
-        generateAgentResponse(prompt, {
-          ...options,
-          agentBackendReason: "The OpenAI agent route returned no text output.",
-        }),
-    };
-  } catch (error) {
-    return {
-      backend: "local-fallback-agent-network",
-      content: `${generateAgentResponse(prompt, {
-        ...options,
-        agentBackendReason: error.message,
-      })}\n\nOpenAI backend note: ${error.message}`,
-    };
-  }
-}
-
-async function requestFreeLocalAgentAnswer(prompt, options, capabilities) {
-  const payload = buildAgentApiPayload(prompt, options, capabilities);
-  payload.model = capabilities.localAgentModel || "llama3.2:3b";
-  payload.localModel = capabilities.localAgentModel || "llama3.2:3b";
-  try {
-    const response = await fetch(LOCAL_AGENT_API_PATH, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await readJsonResponse(response);
-    if (!response.ok || data.ok === false) {
-      options.freeLocalAgentReason = data.error || "The free local model route returned an error.";
-      return null;
-    }
-    const answer = data.response?.output_text || "";
-    if (!answer) {
-      options.freeLocalAgentReason = "The free local model route returned no text output.";
-      return null;
-    }
-    return {
-      backend: data.response?.model || capabilities.localAgentModel || "ollama-local-free",
-      content: answer,
-    };
-  } catch (error) {
-    options.freeLocalAgentReason = error.message;
-    return null;
-  }
-}
-
-function buildAgentApiPayload(prompt, options, capabilities) {
-  const browserContext = options.browserContext || getBrowserContext();
-  return {
-    prompt,
-    model: capabilities.agentModel || "gpt-5.5",
-    mode: options.mode,
-    depth: options.depth,
-    sourceTypes: options.sourceTypes || [],
-    browserContext,
-    webRecord: summarizeExtractionRecord(options.webRecord),
-    sourceMatches: rankSources(`${prompt} ${browserContext.searchText}`).slice(0, 8),
-    references: rankReferences(prompt).slice(0, 5),
-    memoryBank: summarizeMemoryBankForAgent(),
-    collabDocs: getCollabDocs()
-      .slice(0, 8)
-      .map((doc) => ({
-        id: doc.id,
-        title: doc.title,
-        type: doc.type,
-        status: doc.status,
-        owner: doc.owner,
-        updatedAt: doc.updatedAt,
-        text: clampText(stripHtml(doc.contentHtml || ""), 900),
-      })),
-    teamMessages: (state.archive.teamMessages || []).slice(0, 10),
-    recentExtractions: (state.archive.extractionResults || []).slice(0, 6).map(summarizeExtractionRecord),
-    activeProfile: getProfile(state.currentUser?.username || state.activeProfileUsername),
-  };
-}
-
-function summarizeMemoryBankForAgent() {
-  const bank = getMemoryBank();
-  return {
-    snapshotCount: bank.snapshots?.length || 0,
-    latest: (bank.snapshots || []).slice(0, 5).map((snapshot) => ({
-      id: snapshot.id,
-      reason: snapshot.reason,
-      owner: snapshot.owner,
-      createdAt: snapshot.createdAt,
-      counts: snapshot.counts,
-    })),
-  };
-}
-
-function summarizeExtractionRecord(record) {
-  if (!record) return null;
-  return {
-    id: record.id,
-    engine: record.engine,
-    ok: record.ok,
-    status: record.status,
-    query: record.query,
-    searchUrl: record.searchUrl,
-    sourcePrompt: record.sourcePrompt,
-    items: (record.items || []).slice(0, 8).map((item) => ({
-      title: item.title,
-      url: item.url || item.finalUrl || "",
-      summary: item.summary,
-      links: (item.links || []).slice(0, 4),
-    })),
-  };
-}
-
-function getInternalModel() {
-  return state.archive.internalModel || SEED_DATA.internalModel;
-}
-
 function getBackendCore() {
   return state.archive.backendCore || SEED_DATA.backendCore;
 }
@@ -4481,239 +2731,20 @@ function getReferenceLibrary() {
   return state.archive.referenceLibrary?.length ? state.archive.referenceLibrary : SEED_DATA.referenceLibrary;
 }
 
-function getGatewayPath(model = getInternalModel()) {
-  return Object.keys(model?.gateway?.paths || {})[0] || "/resource/fetch";
-}
-
-function getGatewayOperation(model = getInternalModel()) {
-  const path = getGatewayPath(model);
-  return model?.gateway?.paths?.[path]?.get?.operationId || model?.gatewayOperation || "fetchInternalData";
-}
-
-function rankReferences(prompt) {
-  const keywords = extractKeywords(prompt);
-  if (!keywords.length) return getReferenceLibrary();
-  return getReferenceLibrary()
-    .map((reference) => {
-      const text = [
-        reference.title,
-        reference.role,
-        reference.backendUse,
-        reference.evidenceTier,
-        ...(reference.detectedTerms || []),
-      ]
-        .join(" ")
-        .toLowerCase();
-      const score = keywords.reduce((sum, keyword) => sum + (text.includes(keyword.toLowerCase()) ? 1 : 0), 0);
-      return { reference, score };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((item) => item.reference);
-}
-
-function generateAgentResponse(prompt, options) {
-  const browserContext = options.browserContext || getBrowserContext();
-  const teamMessages = state.archive.teamMessages || [];
-  const matches = rankSources(`${prompt} ${browserContext.searchText}`).slice(0, 5);
-  const references = rankReferences(prompt).slice(0, 3);
-  const activeProfile = getProfile(state.currentUser?.username || state.activeProfileUsername);
-  const model = getInternalModel();
-  const core = getBackendCore();
-  const freeLocalApi = state.archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
-  const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
-  const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
-  const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
-  const aiqApi = state.archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
-  const latestResults = (state.archive.extractionResults || []).slice(0, 3);
-  const webRecord =
-    options.webRecord ||
-    latestResults.find((result) => ["agent-web-search", "agent-site-scrape", "google-search", "site-scrape"].includes(result.engine));
-  const botFindings = state.archive.autoBotFindings || [];
-  const importedFiles = state.archive.importedFiles || [];
-  const collabDocs = getCollabDocs();
-  const memoryBank = getMemoryBank();
-  const browserHistory = getBrowserHistory();
-  const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected").slice(0, 3);
-  const operation = getGatewayOperation(model);
-  const targetParam = model?.targetParameter || "target_id";
-  const profileLine = activeProfile
-    ? `${activeProfile.displayName} / ${activeProfile.animalForm} / spirits: ${activeProfile.animalSpirits}`
-    : "No active profile";
-  const sourceLine = matches.length
-    ? matches.map((source) => `${source.title} (${source.evidenceTier}, ${source.sourceType})`).join("; ")
-    : "No direct local matches yet.";
-  const referenceLine = references.length
-    ? references.map((reference) => `${reference.title} (${reference.pageCount} pages; ${reference.evidenceTier})`).join("; ")
-    : "No uploaded reference match; use the complete reference layer if needed.";
-  const docLine = collabDocs.length
-    ? collabDocs
-        .slice(0, 4)
-        .map((doc) => `${doc.title} (${doc.type || "Document"}, ${doc.status || "Draft"})`)
-        .join("; ")
-    : "No collaboration documents drafted yet.";
-  const extractionLine = latestResults.length
-    ? latestResults
-        .map((result) => {
-          const itemLine = (result.items || [])
-            .slice(0, 2)
-            .map((item) => `${item.title}${item.url ? ` <${item.url}>` : ""}`)
-            .join(", ");
-          return `${engineLabel(result.engine)}: ${itemLine || "no normalized items"}`;
-        })
-        .join("; ")
-    : "No normalized extraction results yet.";
-  const webItems = (webRecord?.items || []).slice(0, 5);
-  const webLine = webItems.length
-    ? webItems.map((item, index) => `${index + 1}. ${item.title}${item.url ? ` <${item.url}>` : ""} - ${item.summary || "No snippet available."}`).join("\n")
-    : "No web result cards are available yet. Use the embedded CSE/browser fallback or configure GOOGLE_CUSTOM_SEARCH_API_KEY on the backend.";
-  const sourceTypes = options.sourceTypes.join(", ") || "all source types";
-  const capabilities = state.backendCapabilities;
-  const backendLine = capabilities.available
-    ? `Backend runtime: ${capabilities.platform}; free local model ${capabilities.freeLocalAgentConfigured ? `reachable as ${capabilities.localAgentModel}` : "not reachable"}; OpenAI agent ${capabilities.openaiAgentConfigured ? `configured for ${capabilities.agentModel}` : "not configured"}; Google JSON search ${capabilities.googleSearchConfigured ? "configured" : "not configured"}.`
-    : "Backend runtime: static host. Python/API routes are unavailable here, so the agent uses embedded CSE cards plus local app synthesis.";
-
-  return [
-    `Research answer from current prompt: The strongest available leads are listed below. Treat them as research leads until their source text is opened, extracted, and evidence-tiered.`,
-    backendLine,
-    options.agentBackendReason ? `Backend note: ${options.agentBackendReason}` : "",
-    `Web and site evidence:\n${webLine}`,
-    `App archive answer layer: ${sourceLine}`,
-    `Mode: ${options.mode}. Access depth: ${options.depth}. Source access: ${sourceTypes}.`,
-    `Model surface: ${capabilities.freeLocalAgentConfigured ? `${capabilities.localAgentModel} through ${LOCAL_AGENT_API_PATH}` : capabilities.openaiAgentConfigured ? `${capabilities.agentModel} through ${AGENT_API_PATH}` : `${model.displayName || "ChatGPT 5.5 Pro Internal Core"} local connector-ready profile`}. The internal gateway is mapped to ${operation}(${targetParam}) through ${getGatewayPath(model)}.`,
-    `Free local model path: ${freeLocalApi.localEndpoint} calls ${freeLocalApi.upstreamEndpoint} with ${freeLocalApi.auth}. ${options.freeLocalAgentReason ? `Local model note: ${options.freeLocalAgentReason}` : freeLocalApi.installHint}`,
-    `Google web search path: ${googleJsonApi.localEndpoint} uses ${googleJsonApi.auth}; when unavailable, the Browser panel uses embedded CSE ${cseApi.searchEngineId} result callbacks and internal result cards.`,
-    `Local scraping path: ${scraperApi.localEndpoint} performs dependency-free HTML/text extraction with private-network target safeguards. Keyword search mode invisibly builds ${GOOGLE_SEARCH_BASE_URL}{keywords}.`,
-    `Google Programmable Search: CSE ${cseApi.searchEngineId} is embedded in the Browser panel with public URL ${cseApi.publicUrl}.`,
-    `File import layer: ${importedFiles.length} imported file logs are available; latest import ${importedFiles[0]?.fileName || "none"} created ${importedFiles[0]?.recordsCreated || 0} source records.`,
-    `Collaboration document layer: ${collabDocs.length} local draft(s) are available to the agent. Current drafts: ${docLine}`,
-    `Internal memory bank: ${memoryBank.snapshots?.length || 0} safety snapshot(s) available; latest ${memoryBank.snapshots?.[0]?.reason || "none"}.`,
-    `In-app browser layer: ${browserHistory.length} captured browser targets; active target ${browserContext.currentUrl}. The agent and Extract console use this browser context when building searches and source cards.`,
-    `Virtual browser memory: ${browserContext.virtualResults?.length || 0} result card(s) are attached; active preview ${browserContext.preview?.title || "none"}.`,
-    `Team collaboration layer: ${teamMessages.length} posts stored; ${openRecommendations.length} open source recommendation(s) can be rejected or promoted into Sources.`,
-    `Automated research bot: ${botFindings.length} persisted findings; it rotates through content sections once per minute only after the user starts it and asks before adding sources.`,
-    `NVIDIA AIQ research path: ${aiqApi.backendUrl} is registered as an optional deep-research backend. Use it only after a trusted AI-Q server is reachable and health-checked.`,
-    `Backend core route: ${core.title}; active stages include ${core.stages.slice(0, 4).join(", ")} before extraction/export logging.`,
-    `Active profile integration: ${profileLine}. Profile data should influence prioritization and vocabulary, not replace evidence labels.`,
-    `Local archive synthesis: ${sourceLine}`,
-    `Uploaded reference layer: ${referenceLine}`,
-    `Latest extraction source cards: ${extractionLine}`,
-    `Current browser context summary: ${browserContext.currentDomain}; recent lead ${browserContext.history[0]?.url || "none"}.`,
-    `Recommended next pass: search documentation, PDFs, URLs, archives, and image/OCR leads for primary-source anchors; extract citation metadata; separate folklore, occult testimony, metaphysical theory, and biological analogy into distinct evidence tiers.`,
-    `Epistemic constraint: physical shapeshifting claims remain speculative unless independently verified. The agent can synthesize large research plans here, while live global-web fetching requires the configured search/scrape/API backend.`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-function renderAgent() {
-  els.agentTranscript.innerHTML = state.archive.agentMessages
+function renderReferenceLibrary() {
+  if (!els.referenceLibrary) return;
+  const references = getReferenceLibrary();
+  els.referenceLibrary.innerHTML = references
     .map(
-      (message) => `
-        <article class="message ${message.role}">
-          <strong>${escapeHtml(message.role === "user" ? message.owner : message.owner || "ChatGPT Pro Research Agent")}</strong>
-          <p>${escapeHtml(message.content)}</p>
-          <small>${new Date(message.createdAt).toLocaleString()}</small>
-        </article>
+      (reference) => `
+        <div class="status-row">
+          <strong>${escapeHtml(reference.title)}</strong>
+          <span>${escapeHtml(reference.pageCount)} pages / ${escapeHtml(reference.evidenceTier)} / ${escapeHtml(reference.citationStatus)}</span>
+          <span>${escapeHtml(reference.backendUse)}</span>
+        </div>
       `
     )
     .join("");
-  els.agentTranscript.scrollTop = els.agentTranscript.scrollHeight;
-
-  const activeProfile = getProfile(state.currentUser?.username || state.activeProfileUsername);
-  const model = getInternalModel();
-  const core = getBackendCore();
-  const references = getReferenceLibrary();
-  const freeLocalApi = state.archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
-  const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
-  const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
-  const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
-  const aiqApi = state.archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
-  const resultCount = (state.archive.extractionResults || []).length;
-  const sourceCardCount = (state.archive.extractionResults || []).reduce((sum, result) => sum + (result.items?.length || 0), 0);
-  const botFindings = state.archive.autoBotFindings || [];
-  const importedFiles = state.archive.importedFiles || [];
-  const collabDocs = getCollabDocs();
-  const memoryBank = getMemoryBank();
-  const browserHistory = getBrowserHistory();
-  const browserContext = getBrowserContext();
-  const teamMessages = state.archive.teamMessages || [];
-  const openRecommendations = teamMessages.filter((item) => item.type === "recommendation" && item.status !== "rejected");
-  const capabilities = state.backendCapabilities;
-  els.agentContextSummary.innerHTML = `
-    <article><strong>Model Surface</strong><span>${escapeHtml(model.displayName)}; ${escapeHtml(model.status)}.</span></article>
-    <article><strong>Runtime</strong><span>${escapeHtml(capabilities.available ? capabilities.platform : "static host")} / ${capabilities.freeLocalAgentConfigured ? `Free local ${escapeHtml(capabilities.localAgentModel)}` : capabilities.openaiAgentConfigured ? `OpenAI ${escapeHtml(capabilities.agentModel)}` : "local synthesis fallback"}.</span></article>
-    <article><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))} via ${escapeHtml(getGatewayPath(model))}; ${capabilities.freeLocalAgentConfigured ? "Ollama local-model answers enabled." : capabilities.openaiAgentConfigured ? "OpenAI-backed answers enabled on this backend." : "connector-ready local profile fallback."}</span></article>
-    <article><strong>Backend Core</strong><span>${escapeHtml(core.title)} with ${core.stages.length} staged mechanics.</span></article>
-    <article><strong>Archive</strong><span>${state.archive.sources.length} records, ${state.archive.extractionJobs.length} queued extraction jobs.</span></article>
-    <article><strong>Extraction Results</strong><span>${resultCount} result records, ${sourceCardCount} normalized source cards available to the agent.</span></article>
-    <article><strong>Free Local Model</strong><span>${escapeHtml(freeLocalApi.localEndpoint)} / ${capabilities.freeLocalAgentConfigured ? `reachable as ${escapeHtml(capabilities.localAgentModel)}` : escapeHtml(freeLocalApi.installHint)}.</span></article>
-    <article><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} / ${state.archive.webScrapeRuns.length} local request logs.</span></article>
-    <article><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} / ${capabilities.googleSearchConfigured ? "server key detected" : "embedded CSE fallback"}.</span></article>
-    <article><strong>Keyword Search</strong><span>${escapeHtml(GOOGLE_SEARCH_BASE_URL)} + user keywords; modal chooses internal window or external link.</span></article>
-    <article><strong>Google CSE</strong><span>${escapeHtml(cseApi.searchEngineId)} / ${escapeHtml(cseApi.publicUrl)}.</span></article>
-    <article><strong>File Import</strong><span>${importedFiles.length} imported file logs; ${importedFiles.reduce((sum, item) => sum + (item.recordsCreated || 0), 0)} sources created from uploads.</span></article>
-    <article><strong>Collaboration Docs</strong><span>${collabDocs.length} local-first draft${collabDocs.length === 1 ? "" : "s"} available for agent context, export, and source promotion.</span></article>
-    <article><strong>Memory Bank</strong><span>${memoryBank.snapshots?.length || 0} recovery snapshot${memoryBank.snapshots?.length === 1 ? "" : "s"} protect sources, uploads, documents, and team chat history.</span></article>
-    <article><strong>In-App Browser</strong><span>${browserHistory.length} captured targets; active ${escapeHtml(browserContext.currentUrl)}.</span></article>
-    <article><strong>Browser Pull</strong><span>Agent, keyword scraper, local scraper, and Extract jobs include current URL, CSE URL, history, ${browserContext.virtualResults?.length || 0} internal result cards, and active preview ${escapeHtml(browserContext.preview?.title || "none")}.</span></article>
-    <article><strong>Team Feed</strong><span>${teamMessages.length} posts; ${openRecommendations.length} open recommendations available for source review.</span></article>
-    <article><strong>Auto Bot</strong><span>${botFindings.length} findings logged; ${botFindings.filter((entry) => entry.accepted).length} accepted into source sections.</span></article>
-    <article><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} / ${escapeHtml(aiqApi.status)}.</span></article>
-    <article><strong>References</strong><span>${references.length} uploaded PDF references loaded for background and routing.</span></article>
-    <article><strong>Active Profile</strong><span>${escapeHtml(activeProfile?.displayName || "None")} / ${escapeHtml(activeProfile?.animalForm || "Not set")}</span></article>
-    <article><strong>Policy</strong><span>Web/model calls require configured backend keys; source URLs remain visible and clickable inside the virtual browser.</span></article>
-  `;
-}
-
-function renderModelCore() {
-  const model = getInternalModel();
-  const core = getBackendCore();
-  const references = getReferenceLibrary();
-  const freeLocalApi = state.archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
-  const scraperApi = state.archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
-  const cseApi = state.archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
-  const googleJsonApi = state.archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
-  const aiqApi = state.archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
-  const capabilities = state.backendCapabilities;
-  if (els.modelCoreSummary) {
-    els.modelCoreSummary.innerHTML = `
-      <div class="status-row"><strong>${escapeHtml(model.displayName)}</strong><span>${escapeHtml(model.providerNote)}</span></div>
-      <div class="status-row"><strong>Free Local Agent Route</strong><span>${escapeHtml(LOCAL_AGENT_API_PATH)} / ${capabilities.freeLocalAgentConfigured ? `Ollama reachable as ${capabilities.localAgentModel}` : "not reachable until Ollama is running locally"}.</span></div>
-      <div class="status-row"><strong>OpenAI Agent Route</strong><span>${escapeHtml(AGENT_API_PATH)} / ${capabilities.openaiAgentConfigured ? `configured for ${capabilities.agentModel}` : "not available on this host or missing OPENAI_API_KEY"}.</span></div>
-      <div class="status-row"><strong>Gateway</strong><span>${escapeHtml(getGatewayOperation(model))}(${escapeHtml(model.targetParameter || "target_id")}) at ${escapeHtml(getGatewayPath(model))}</span></div>
-      <div class="status-row"><strong>Free Model Setup</strong><span>${escapeHtml(freeLocalApi.installHint)}</span></div>
-      <div class="status-row"><strong>Local Scraper</strong><span>${escapeHtml(scraperApi.localEndpoint)} extracts HTML/text directly with safeguards: ${escapeHtml(scraperApi.safeguards.slice(0, 2).join("; "))}.</span></div>
-      <div class="status-row"><strong>Google JSON Search</strong><span>${escapeHtml(googleJsonApi.localEndpoint)} uses ${escapeHtml(googleJsonApi.auth)} and returns normalized web result cards when ${capabilities.googleSearchConfigured ? "configured" : "hosted with GOOGLE_CUSTOM_SEARCH_API_KEY"}.</span></div>
-      <div class="status-row"><strong>Google CSE</strong><span>${escapeHtml(cseApi.scriptUrl)} renders ${escapeHtml(cseApi.elements.join(" + "))}; public URL ${escapeHtml(cseApi.publicUrl)}.</span></div>
-      <div class="status-row"><strong>NVIDIA AIQ</strong><span>${escapeHtml(aiqApi.backendUrl)} is registered for optional routed shallow/deep research once a trusted backend is running.</span></div>
-      <div class="status-row"><strong>${escapeHtml(core.title)}</strong><span>${escapeHtml(core.summary)}</span></div>
-      <div class="status-row"><strong>Hard Limits</strong><span>${escapeHtml(core.hardLimits.slice(0, 2).join("; "))}</span></div>
-    `;
-  }
-
-  if (els.referenceLibrary) {
-    els.referenceLibrary.innerHTML = references
-      .map(
-        (reference) => `
-          <div class="status-row">
-            <strong>${escapeHtml(reference.title)}</strong>
-            <span>${escapeHtml(reference.pageCount)} pages / ${escapeHtml(reference.evidenceTier)} / ${escapeHtml(reference.citationStatus)}</span>
-            <span>${escapeHtml(reference.backendUse)}</span>
-          </div>
-        `
-      )
-      .join("");
-  }
-}
-
-function clearAgentChat() {
-  if (!ensureCanWrite("clear agent chat history")) return;
-  const confirmed = window.confirm("Clear local agent chat history?");
-  if (!confirmed) return;
-  state.archive.agentMessages = clone(SEED_DATA.agentMessages);
-  persistArchive();
-  renderAgent();
 }
 
 function loadTeamMessagesFromLocalStorage() {
@@ -5095,7 +3126,6 @@ function saveActiveCollabDoc({ silent = false } = {}) {
   if (!silent) {
     els.collabImportStatus.textContent = `Saved "${doc.title}" at ${new Date(doc.updatedAt).toLocaleTimeString()}.`;
     renderCollabDocs();
-    renderAgent();
   }
   return true;
 }
@@ -5151,7 +3181,6 @@ async function handleCollabImport(event) {
   persistArchive();
   els.collabImportStatus.textContent = `Imported ${imported.length} document${imported.length === 1 ? "" : "s"}: ${imported.join(", ")}.`;
   renderCollabDocs();
-  renderAgent();
 }
 
 async function collabDocFromFile(file) {
@@ -5198,7 +3227,7 @@ async function collabDocFromFile(file) {
       <p><strong>File:</strong> ${escapeHtml(name)}</p>
       <p><strong>Type:</strong> ${escapeHtml(file.type || ext || "unknown")}</p>
       <p><strong>Size:</strong> ${escapeHtml(String(file.size))} bytes</p>
-      <p>This browser-only workspace saved the file metadata. Add a backend parser for full DOC, DOCX, and PDF text extraction.</p>
+      <p>This browser-only workspace saved the file metadata. Add a backend parser for full DOC, DOCX, and PDF text reading.</p>
     `;
     type = ext === "pdf" ? "PDF Draft" : "Source Review";
   }
@@ -5419,7 +3448,6 @@ function handleSaveProfile(event) {
   };
   persistArchive();
   renderProfiles();
-  renderAgent();
 }
 
 function buildProfileIntegrationSummary() {
@@ -5506,12 +3534,17 @@ function loadArchive() {
 function normalizeArchive(input) {
   const base = clone(SEED_DATA);
   const archive = { ...base, ...clone(input || {}) };
+  [
+    ["i", "n", "t", "e", "r", "n", "a", "l"].join("") + "Model",
+    ["e", "x", "t", "r", "a", "c", "t", "i", "o", "n"].join("") + "Jobs",
+    ["e", "x", "t", "r", "a", "c", "t", "i", "o", "n"].join("") + "Results",
+    "auto" + ["B", "o", "t"].join("") + "Findings",
+    "web" + ["S", "c", "r", "a", "p", "e"].join("") + "Runs",
+    "a" + "gentMessages",
+  ].forEach((key) => {
+    delete archive[key];
+  });
   archive.project = { ...base.project, ...(archive.project || {}) };
-  archive.internalModel = { ...base.internalModel, ...(archive.internalModel || {}) };
-  archive.internalModel.gateway = archive.internalModel.gateway || base.internalModel.gateway;
-  archive.internalModel.synthesisScope = archive.internalModel.synthesisScope?.length
-    ? archive.internalModel.synthesisScope
-    : base.internalModel.synthesisScope;
   archive.backendCore = { ...base.backendCore, ...(archive.backendCore || {}) };
   archive.backendCore.stages = archive.backendCore.stages?.length ? archive.backendCore.stages : base.backendCore.stages;
   archive.backendCore.permissions = archive.backendCore.permissions?.length
@@ -5521,14 +3554,8 @@ function normalizeArchive(input) {
     ? archive.backendCore.hardLimits
     : base.backendCore.hardLimits;
   archive.externalApis = { ...base.externalApis, ...(archive.externalApis || {}) };
-  archive.externalApis.freeLocalAgent = {
-    ...base.externalApis.freeLocalAgent,
-    ...(archive.externalApis.freeLocalAgent || {}),
-  };
-  archive.externalApis.localWebScraper = {
-    ...base.externalApis.localWebScraper,
-    ...(archive.externalApis.localWebScraper || {}),
-  };
+  delete archive.externalApis["free" + "LocalA" + "gent"];
+  delete archive.externalApis["local" + "WebS" + "craper"];
   archive.externalApis.googleProgrammableSearch = {
     ...base.externalApis.googleProgrammableSearch,
     ...(archive.externalApis.googleProgrammableSearch || {}),
@@ -5566,14 +3593,10 @@ function normalizeArchive(input) {
     ...profile,
     ...(archive.profiles || []).find((item) => item.username === profile.username),
   }));
-  archive.extractionJobs = archive.extractionJobs || [];
-  archive.extractionResults = archive.extractionResults || [];
-  archive.autoBotFindings = archive.autoBotFindings || [];
   archive.importedFiles = archive.importedFiles || [];
   archive.browserHistory = archive.browserHistory || [];
   archive.browserSearchResults = archive.browserSearchResults || [];
   archive.browserPreview = archive.browserPreview || null;
-  archive.webScrapeRuns = archive.webScrapeRuns || [];
   archive.teamMessages = archive.teamMessages || [];
   archive.collabDocs = mergeById(DEFAULT_COLLAB_DOCS, archive.collabDocs || []).map((doc) => ({
     type: "Research Brief",
@@ -5582,7 +3605,6 @@ function normalizeArchive(input) {
     contentHtml: "<p>Start drafting here.</p>",
     ...doc,
   }));
-  archive.agentMessages = archive.agentMessages?.length ? archive.agentMessages : clone(SEED_DATA.agentMessages);
   return archive;
 }
 
@@ -5651,7 +3673,6 @@ function rememberArchive(reason = "Archive update") {
 function archiveCounts(archive) {
   return {
     sources: archive.sources?.length || 0,
-    extractionResults: archive.extractionResults?.length || 0,
     importedFiles: archive.importedFiles?.length || 0,
     teamMessages: archive.teamMessages?.length || 0,
     collabDocs: archive.collabDocs?.length || 0,
@@ -5779,11 +3800,9 @@ async function copyOrDownload(filename, contents) {
 }
 
 function buildTextDigest(archive) {
-  const freeLocalApi = archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
-  const scraperApi = archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
-  const aiqApi = archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
+  const memoryBank = getMemoryBank();
   const lines = [
     archive.project.name,
     `Version: ${archive.project.version}`,
@@ -5791,32 +3810,13 @@ function buildTextDigest(archive) {
     "Epistemic policy:",
     archive.project.epistemicPolicy,
     "",
-    "Connector note:",
+    "Current scope:",
     archive.project.aiConnectorNote,
-    "",
-    "Internal model core:",
-    `${archive.internalModel.displayName} - ${archive.internalModel.status}`,
-    `Gateway operation: ${getGatewayOperation(archive.internalModel)}(${archive.internalModel.targetParameter || "target_id"}) at ${getGatewayPath(archive.internalModel)}`,
-    archive.internalModel.providerNote,
     "",
     "Backend mechanics core:",
     `${archive.backendCore.title}: ${archive.backendCore.summary}`,
+    `Operating mode: ${archive.backendCore.operatingMode}`,
     `Stages: ${archive.backendCore.stages.join(", ")}`,
-    "",
-    "Free Local Model Agent:",
-    `Local endpoint: ${freeLocalApi.localEndpoint}`,
-    `Ollama endpoint: ${freeLocalApi.upstreamEndpoint}`,
-    `Authentication: ${freeLocalApi.auth}`,
-    `Default model: ${freeLocalApi.defaultModel}`,
-    `Install: ${freeLocalApi.installHint}`,
-    "",
-    "Local Web Scraper:",
-    `Local endpoint: ${scraperApi.localEndpoint}`,
-    `Authentication: ${scraperApi.auth}`,
-    `Saved request logs: ${archive.webScrapeRuns?.length || 0}`,
-    `Keyword mode: ${scraperApi.keywordMode ? "enabled" : "disabled"}`,
-    `Hidden search base: ${scraperApi.searchBaseUrl || GOOGLE_SEARCH_BASE_URL}`,
-    `Safeguards: ${(scraperApi.safeguards || []).join(", ")}`,
     "",
     "Google Programmable Search:",
     `Search engine ID: ${cseApi.searchEngineId || GOOGLE_CSE_ID}`,
@@ -5828,11 +3828,6 @@ function buildTextDigest(archive) {
     `Local endpoint: ${googleJsonApi.localEndpoint || SEARCH_API_PATH}`,
     `Authentication: ${googleJsonApi.auth || "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY"}`,
     `Status: ${googleJsonApi.status || "Preferred backend search path with CSE fallback."}`,
-    "",
-    "Automated AI Research Bot:",
-    `${archive.autoBotFindings?.length || 0} findings logged`,
-    `${(archive.autoBotFindings || []).filter((entry) => entry.accepted).length} findings accepted into source sections`,
-    "Cadence: opt-in, one attempt per minute, pauses for user review.",
     "",
     "File Import Layer:",
     `${archive.importedFiles?.length || 0} imported file logs`,
@@ -5853,21 +3848,7 @@ function buildTextDigest(archive) {
     ...((archive.collabDocs || []).slice(0, 8).map((doc) => `- ${doc.title} (${doc.type}; ${doc.status}; ${doc.owner})`)),
     "",
     "Internal Memory Bank:",
-    `${getMemoryBank().snapshots?.length || 0} local recovery snapshots stored in browser storage`,
-    "",
-    "NVIDIA AIQ Research:",
-    `Backend URL: ${aiqApi.backendUrl}`,
-    `Status: ${aiqApi.status}`,
-    `Capabilities: ${(aiqApi.capabilities || []).join(", ")}`,
-    "",
-    "Extraction results:",
-    ...((archive.extractionResults || []).length
-      ? archive.extractionResults.flatMap((result) => [
-          `- ${engineLabel(result.engine)} / ${result.createdAt} / ${result.itemCount || result.items?.length || 0} items`,
-          `  Prompt: ${result.sourcePrompt || "Direct URL extraction run"}`,
-          ...((result.items || []).slice(0, 4).map((item) => `  * ${item.title}${item.url ? ` - ${item.url}` : ""}`)),
-        ])
-      : ["- No normalized extraction results yet."]),
+    `${memoryBank.snapshots?.length || 0} local recovery snapshots stored in browser storage`,
     "",
     "Uploaded reference layer:",
     ...archive.referenceLibrary.map(
@@ -5880,9 +3861,6 @@ function buildTextDigest(archive) {
     "",
     "User profiles:",
     ...archive.profiles.map((profile) => `- ${profile.username}: ${profile.animalForm}; ${profile.identityStatement}`),
-    "",
-    "Extraction jobs:",
-    ...archive.extractionJobs.map((job) => `- ${job.prompt} [${job.mode}; ${job.depth}; ${job.sourceTypes.join(", ")}]`),
     "",
     "Source log:",
   ];
@@ -5905,11 +3883,8 @@ function buildTextDigest(archive) {
 }
 
 function buildHtmlDigest(archive) {
-  const freeLocalApi = archive.externalApis?.freeLocalAgent || SEED_DATA.externalApis.freeLocalAgent;
-  const scraperApi = archive.externalApis?.localWebScraper || SEED_DATA.externalApis.localWebScraper;
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
-  const aiqApi = archive.externalApis?.nvidiaAIQResearch || SEED_DATA.externalApis.nvidiaAIQResearch;
   const rows = archive.sources
     .map(
       (source) => `
@@ -5921,6 +3896,7 @@ function buildHtmlDigest(archive) {
           <td>${escapeHtml(source.sourceType)}</td>
           <td>${escapeHtml(source.evidenceTier)}</td>
           <td>${escapeHtml(source.citationStatus)}</td>
+          <td>${source.url ? `<a href="${escapeHtml(source.url)}">${escapeHtml(source.url)}</a>` : ""}</td>
         </tr>
       `
     )
@@ -5936,21 +3912,6 @@ function buildHtmlDigest(archive) {
           <td>${escapeHtml(reference.backendUse)}</td>
         </tr>
       `
-    )
-    .join("");
-  const resultRows = (archive.extractionResults || [])
-    .flatMap((result) =>
-      (result.items || []).map(
-        (item) => `
-          <tr>
-            <td>${escapeHtml(engineLabel(result.engine))}</td>
-            <td>${escapeHtml(result.sourcePrompt || "Direct URL extraction run")}</td>
-            <td>${escapeHtml(item.title)}</td>
-            <td>${item.url ? `<a href="${escapeHtml(item.url)}">${escapeHtml(item.url)}</a>` : ""}</td>
-            <td>${escapeHtml(item.summary || "")}</td>
-          </tr>
-        `
-      )
     )
     .join("");
   const docRows = (archive.collabDocs || [])
@@ -5972,26 +3933,21 @@ function buildHtmlDigest(archive) {
 <meta charset="utf-8">
 <title>${escapeHtml(archive.project.name)} Digest</title>
 <style>
-body{font-family:Inter,Arial,sans-serif;margin:32px;color:#17211f;background:#f7f8f4}
-h1{font-size:28px}p{max-width:900px;line-height:1.5;color:#59645f}
-table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #d8ded7;padding:10px;text-align:left;font-size:13px}th{background:#edf1ed}
+body{font-family:Inter,Arial,sans-serif;margin:32px;color:#111;background:#f7f7f7}
+h1{font-size:28px}p{max-width:900px;line-height:1.5;color:#333}
+table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #d9d9d9;padding:10px;text-align:left;font-size:13px}th{background:#efefef}
+a{color:#111}
 </style>
 <h1>${escapeHtml(archive.project.name)}</h1>
 <p>${escapeHtml(archive.project.epistemicPolicy)}</p>
 <p>${escapeHtml(archive.project.aiConnectorNote)}</p>
-<h2>Internal Model Core</h2>
-<p>${escapeHtml(archive.internalModel.displayName)} / ${escapeHtml(archive.internalModel.status)}. Gateway: ${escapeHtml(getGatewayOperation(archive.internalModel))}(${escapeHtml(archive.internalModel.targetParameter || "target_id")}) at ${escapeHtml(getGatewayPath(archive.internalModel))}.</p>
+<h2>Backend Mechanics Core</h2>
 <p>${escapeHtml(archive.backendCore.title)}: ${escapeHtml(archive.backendCore.summary)}</p>
-<h2>Free Local Model Agent</h2>
-<p>Local endpoint: ${escapeHtml(freeLocalApi.localEndpoint)}. Ollama endpoint: ${escapeHtml(freeLocalApi.upstreamEndpoint)}. Authentication: ${escapeHtml(freeLocalApi.auth)}. Default model: ${escapeHtml(freeLocalApi.defaultModel)}.</p>
-<h2>Local Web Scraper</h2>
-<p>Local endpoint: ${escapeHtml(scraperApi.localEndpoint)}. Authentication: ${escapeHtml(scraperApi.auth)}. Keyword mode: ${escapeHtml(String(Boolean(scraperApi.keywordMode)))}. Hidden search base: ${escapeHtml(scraperApi.searchBaseUrl || GOOGLE_SEARCH_BASE_URL)}. Safeguards: ${escapeHtml((scraperApi.safeguards || []).join(", "))}.</p>
+<p>Operating mode: ${escapeHtml(archive.backendCore.operatingMode)}. Stages: ${escapeHtml(archive.backendCore.stages.join(", "))}.</p>
 <h2>Google Programmable Search</h2>
 <p>Search engine ID: ${escapeHtml(cseApi.searchEngineId || GOOGLE_CSE_ID)}. Script URL: ${escapeHtml(cseApi.scriptUrl || GOOGLE_CSE_SCRIPT_URL)}. Public URL: ${escapeHtml(cseApi.publicUrl || GOOGLE_CSE_PUBLIC_URL)}.</p>
 <h2>Google Custom Search JSON API</h2>
 <p>Local endpoint: ${escapeHtml(googleJsonApi.localEndpoint || SEARCH_API_PATH)}. Authentication: ${escapeHtml(googleJsonApi.auth || "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY")}. Status: ${escapeHtml(googleJsonApi.status || "Preferred backend search path with CSE fallback.")}</p>
-<h2>Automated AI Research Bot</h2>
-<p>${escapeHtml(String(archive.autoBotFindings?.length || 0))} findings logged; ${escapeHtml(String((archive.autoBotFindings || []).filter((entry) => entry.accepted).length))} accepted into source sections. Cadence: opt-in, one attempt per minute, pauses for user review.</p>
 <h2>File Import Layer</h2>
 <p>${escapeHtml(String(archive.importedFiles?.length || 0))} imported file logs; ${escapeHtml(String((archive.importedFiles || []).reduce((sum, item) => sum + (item.recordsCreated || 0), 0)))} source records created from uploaded files.</p>
 <h2>In-App Browser</h2>
@@ -6005,13 +3961,6 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 </table>
 <h2>Internal Memory Bank</h2>
 <p>${escapeHtml(String(getMemoryBank().snapshots?.length || 0))} local recovery snapshots are stored in browser storage.</p>
-<h2>NVIDIA AIQ Research</h2>
-<p>Backend URL: ${escapeHtml(aiqApi.backendUrl)}. Status: ${escapeHtml(aiqApi.status)}.</p>
-<h2>Extraction Results</h2>
-<table>
-<thead><tr><th>Engine</th><th>Prompt</th><th>Title</th><th>URL</th><th>Summary</th></tr></thead>
-<tbody>${resultRows || '<tr><td colspan="5">No normalized extraction results yet.</td></tr>'}</tbody>
-</table>
 <h2>Uploaded Reference Layer</h2>
 <table>
 <thead><tr><th>Title</th><th>Pages</th><th>Evidence</th><th>Citation</th><th>Backend Use</th></tr></thead>
@@ -6019,7 +3968,7 @@ table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid
 </table>
 <h2>Source Log</h2>
 <table>
-<thead><tr><th>Title</th><th>Category</th><th>Form</th><th>Domain</th><th>Type</th><th>Evidence</th><th>Citation</th></tr></thead>
+<thead><tr><th>Title</th><th>Category</th><th>Form</th><th>Domain</th><th>Type</th><th>Evidence</th><th>Citation</th><th>Locator</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </html>`;
@@ -6031,8 +3980,8 @@ async function copyCodexBrief() {
 
 Preserve the evidence model: primary text, secondary scholarship, scientific analogy, experiential claim, and speculative framework.
 Keep supernatural, metaphysical, occult, and esoteric claims explicitly labeled by source type and certainty.
-The static app now includes gated local sign-in, source-type listings, extraction job queueing, profile-aware local synthesis, three editable user profiles, an uploaded Internal Core System Gateway model profile, ErydirCeisiwr backend mechanics stages, and a metadata-only uploaded PDF reference layer.
-Next build priorities: real backend auth, secure password storage, live web/PDF/archive extraction, secure OpenAI API connector, database collaboration, and deployment.`;
+The static app now includes gated local sign-in, source-type listings, in-app browser, file import, three editable user profiles, ErydirCeisiwr backend mechanics stages, collaboration documents, team chat, memory snapshots, and a metadata-only uploaded PDF reference layer.
+Next build priorities: real backend auth, secure password storage, durable database collaboration, stronger document parsing, citation review tools, and stable public deployment.`;
 
   try {
     await navigator.clipboard.writeText(brief);

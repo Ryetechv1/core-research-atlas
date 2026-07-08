@@ -1,126 +1,63 @@
-CORE Shapeshifting Research Atlas - Codex Integration Brief
+CORE Shapeshifting Research Atlas - Codex Build Brief
 
-Purpose
-Create a collaborative research system for studying shapeshifting traditions,
-metaphysics, occult science, speculative physiology, and theoretical biological
-models around wolf, fox, kitsune, and dragon forms.
+Current scope
+-------------
+The app is a local-first research atlas for source logging, file imports, an
+in-app browser, team collaboration, document drafting, profiles, and memory
+snapshots.
 
-Current internal-app additions
-- Local 3-user sign-in modal for UserSeth, UserSemaj, and UserKhiimori.
-- Editable profile pages with animal form, animal spirits and names, identity
-  statement, and five extended response sections.
-- Source-type listings and filters for documentation, PDFs, WebP/images, URLs,
-  archives, books/manuscripts, forums/communities, datasets, and transcripts.
-- Web extraction/search console that creates structured jobs for future
-  outsourcing, scraping, PDF extraction, archive search, image/OCR, and citation
-  gathering.
-- Connector-ready ChatGPT Pro Research Agent UI that synthesizes archive,
-  profile, extraction state, team recommendations, memory-bank snapshots, and
-  active in-app browser context. It tries the free local model route first when
-  Ollama or another compatible local runtime is available.
-- Uploaded Internal Core System Gateway JSON installed as the local model
-  profile for the agent. This is a connector-ready configuration layer, not a
-  created or hosted OpenAI model.
-- ErydirCeisiwr PDF installed as the backend mechanics core for internal
-  routing, profile context merge, reference lookup, evidence separation,
-  synthesis, extraction queue expansion, and export logging. It is not used as
-  visual design.
-- Uploaded PDFs installed as a metadata-only reference layer. Do not embed long
-  copyrighted or unverified source text in app data or exports.
-- Free local model route installed through /api/local-agent. The route calls an
-  Ollama-compatible /api/chat endpoint at LOCAL_AGENT_BASE_URL and defaults to
-  LOCAL_AGENT_MODEL=llama3.2:3b. This gives the app a no-billing AI path for
-  research synthesis; optional OpenAI support remains available through /api/agent
-  when a secure key is configured separately.
-- Local web scraping extraction installed through /api/scrape. It uses
-  dependency-free Python HTML/text extraction, blocks private/local targets by
-  default, caps fetch size, and does not execute JavaScript.
-- Team chat and recommendation review installed through /api/team-chat. The
-  Team panel supports messages, updates, links, rejectable recommendations, and
-  promotion of approved recommendations into Sources.
-- Internal memory bank installed in browser storage. Every archive mutation
-  creates a timestamped snapshot with owner, reason, counts, and full archive
-  backup, plus an export button for manual backup.
-- Deployment artifacts now include Render web service config, Vercel Python API
-  handlers, and static GitHub Pages support. Catalyst by Zoho is blocked until
-  catalyst init creates .catalystrc and catalyst.json.
+Removed scope
+-------------
+Do not rebuild the old assistant panel, standalone retrieval console, crawler
+tools, automated research loop, or related backend routes. The app should stay
+focused on browse, log, import, draft, review, and export workflows.
 
-Research stance
-The app should catalog supernatural, metaphysical, occult, esoteric, and
-spiritual claims without presenting them as established biomedical fact.
-Physical transformation claims should be marked as speculative unless backed by
-verifiable evidence. Scientific material such as morphogenesis, phantom limbs,
-body schema, regeneration, and developmental biology should be used as analogy
-or constraint unless a source directly supports a stronger claim.
+Preserve
+--------
+- Local gated sign-in for UserSeth, UserSemaj, UserKhiimori, plus read-only
+  guest browsing.
+- Source categories, species filters, evidence tiers, citation status, and
+  source-detail previews.
+- Google Programmable Search inside the Browser panel using CSE ID
+  56f7592d1993141c3.
+- Optional server-side Google Custom Search JSON through /api/search when a
+  backend host provides GOOGLE_CUSTOM_SEARCH_API_KEY.
+- File import for research files and ChatGPT export structures.
+- Team posts, updates, links, recommendations, add/reject handling, and
+  cross-tab sync.
+- Collaboration documents with create, edit, browser-lead insertion, import,
+  export, and print-to-PDF.
+- Profiles for the three users and guest read-only protections.
+- Internal memory snapshots and exportable memory-bank JSON.
+- Uploaded PDF/reference metadata as background source leads only.
 
-Core categories
-- Documents
-- Historical Data
-- Cultural Data
-- Occult Data
-- Mechanics
-- Theoretical Concepts
-- Team Chat and Recommendations
+Backend routes
+--------------
+- GET /api/health
+- POST /api/search
+- POST /api/import-file
+- GET/POST /api/team-chat
 
-Required source fields
-- id
-- title
-- category
-- species
-- domain
-- evidenceTier
-- citationStatus
-- tradition
-- terms
-- notes
-- coreLinks
-
-Expansion priorities
-1. Replace static demo sign-in with real authentication, password hashing,
-   access control, and server-side sessions.
-2. Add source ingestion from URLs, PDFs, books, notes, and manual entries.
-3. Add citation verifier fields: author, publication date, URL, archive date,
-   primary/secondary status, quote extracts, and review owner.
-4. Add live extraction workers for documentation, PDFs, URLs, archives,
-   WebP/images, OCR, datasets, and transcripts.
-5. Add a browser-side WebLLM worker if fully in-browser model inference becomes
-   preferred over the current local Ollama-compatible route.
-6. Add a graph view linking terms such as lycanthropy, alopecanthropy,
-   dracanthrope, therianthropy, kitsune-tsuki, phantom shift, mental shift,
-   animal aura, morphogenetic field, and holographic blueprint.
-7. Replace browser-local team chat storage with durable authenticated records:
-   owner, reviewer, status, comments, votes, and change history.
-8. Expand browser-context extraction so source cards can preserve screenshots,
-   archive URLs, and citation review decisions.
-
-Plugin/toolchain notes
-- Browser and Chrome: visual QA, screenshots, responsive checks.
-- Computer Use: manual browsing, archival inspection, and UI verification.
-- OpenAI Developers: optional AI extraction, summarization, and citation
-  parsing when an API key is configured through the secure connector flow.
-- NVIDIA: optional future acceleration or model research notes.
-- GitHub: source control, issues, reviews, and release packs.
-- Vercel: static deployment target.
-- HeyGen: optional video walkthroughs or research explainers.
-- Base44, Catalyst by Zoho, Quicknode, YepCode, and similar tools: optional
-  future integrations, not required for the static starter app.
-
-Deliverable files in this starter
+Main files
+----------
 - index.html
 - styles.css
 - app.js
-- data/research_seed.json
-- data/internal_model_gateway.json
-- data/reference_ingest.json
 - server.py
-- render.yaml
-- vercel.json
-- api/
-- scripts/local_free_agent.py
-- scripts/web_scrape_extract.py
+- api/health.py
+- api/search.py
+- api/import_file.py
+- api/team_chat.py
+- scripts/google_search.py
 - scripts/file_import_extract.py
 - scripts/export_pack.py
-- docs/extraction-deployment.md
-- docs/codex-build-brief.txt
-- assets/concept-dashboard.png
-- assets/morphogenesis-diagram.png
+- data/research_seed.json
+
+Next build priorities
+---------------------
+1. Real backend authentication and secure password storage.
+2. Durable shared database for team chat, documents, profiles, sources, imports,
+   and memory snapshots.
+3. Stronger document parsing and citation-review tooling.
+4. Public deployment that does not depend on local tunnels.
+5. Mobile layout QA for Sources, Browser, Team, Docs, Profiles, and Memory.

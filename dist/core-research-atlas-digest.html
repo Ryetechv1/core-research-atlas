@@ -11,20 +11,12 @@ th{background:#edf1ed}
 </style>
 <h1>CORE Shapeshifting Research Atlas</h1>
 <p>Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.</p>
-<p>The ChatGPT Pro console now prefers /api/local-agent with a free local Ollama model when available. OpenAI /api/agent remains optional. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, memory snapshots, collaboration documents, and extraction-job state.</p>
-<h2>Internal Model Core</h2>
-<p>ChatGPT 5.5 Pro Internal Core / Free local-model first; optional OpenAI-backed route; local profile fallback otherwise. Gateway: fetchInternalData(target_id) at /resource/fetch.</p>
-<p>ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.</p>
-<h2>Free Local Model Agent</h2>
-<p>Local endpoint: /api/local-agent. Ollama endpoint: http://127.0.0.1:11434/api/chat. Authentication: No API key; runs on the user&#x27;s machine. Default model: llama3.2:3b.</p>
-<h2>Local Web Scraper</h2>
-<p>Local endpoint: /api/scrape. Authentication: No API key; public http/https targets only. Keyword mode: True. Hidden search base: https://www.google.com/search?q=. Safeguards: Blocks localhost/private/reserved IPs by default, 2 MB fetch cap, No JavaScript execution.</p>
+<p>Separate AI assistant, retrieval console, and crawler surfaces have been removed. The atlas focuses on source logging, in-app browsing, imports, profiles, team collaboration, documents, and memory snapshots.</p>
+<p>ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, source records, browser leads, documents, and exports are staged inside the static build.</p>
 <h2>Google Programmable Search</h2>
 <p>Search engine ID: 56f7592d1993141c3. Script URL: https://cse.google.com/cse.js?cx=56f7592d1993141c3. Public URL: https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0.</p>
 <h2>Google Custom Search JSON API</h2>
 <p>Local endpoint: /api/search. Authentication: Server-side GOOGLE_CUSTOM_SEARCH_API_KEY. Status: Preferred backend search path when hosted on a server with an API key; otherwise the app falls back to embedded CSE result cards.</p>
-<h2>Automated AI Research Bot</h2>
-<p>0 findings logged; 0 accepted into source sections. Cadence: opt-in, one attempt per minute, pauses for user review.</p>
 <h2>File Import Layer</h2>
 <p>0 imported file logs; 0 source records created from uploaded files.</p>
 <h2>In-App Browser</h2>
@@ -38,13 +30,6 @@ th{background:#edf1ed}
 </table>
 <h2>Internal Memory Bank</h2>
 <p>Browser runtime snapshots are stored locally by the app and can be exported from the Memory tab.</p>
-<h2>NVIDIA AIQ Research</h2>
-<p>Backend URL: http://localhost:8000. Status: Optional local/self-hosted research backend.</p>
-<h2>Extraction Results</h2>
-<table>
-<thead><tr><th>Engine</th><th>Prompt</th><th>Title</th><th>URL</th><th>Summary</th></tr></thead>
-<tbody><tr><td colspan="5">No normalized extraction results yet.</td></tr></tbody>
-</table>
 <h2>Uploaded Reference Layer</h2>
 <table>
 <thead><tr><th>Title</th><th>Pages</th><th>Evidence</th><th>Citation</th><th>Backend Use</th></tr></thead>

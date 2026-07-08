@@ -7,20 +7,8 @@
       "dest": "/api/health.py"
     },
     {
-      "src": "/api/local-agent",
-      "dest": "/api/local_agent.py"
-    },
-    {
       "src": "/api/search",
       "dest": "/api/search.py"
-    },
-    {
-      "src": "/api/agent",
-      "dest": "/api/agent.py"
-    },
-    {
-      "src": "/api/scrape",
-      "dest": "/api/scrape.py"
     },
     {
       "src": "/api/import-file",

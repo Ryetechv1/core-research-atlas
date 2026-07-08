@@ -1,7 +1,7 @@
 {
   "name": "CORE Shapeshifting Research Atlas",
   "short_name": "CORE Atlas",
-  "description": "Internal research atlas for shapeshifting source logging, extraction planning, profiles, and synthesis.",
+  "description": "Internal research atlas for shapeshifting source logging, in-app browsing, profiles, documents, and collaboration.",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#edf1ed",

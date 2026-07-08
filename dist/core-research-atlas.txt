@@ -1,35 +1,15 @@
 CORE Shapeshifting Research Atlas
-Version: 0.6.0
+Version: 0.7.0
 
 Epistemic policy:
 Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.
 
 AI/search connector note:
-The ChatGPT Pro console now prefers /api/local-agent with a free local Ollama model when available. OpenAI /api/agent remains optional. Static hosts fall back to local synthesis from archive, profile, uploaded reference metadata, in-app browser context, team recommendations, memory snapshots, collaboration documents, and extraction-job state.
-
-Internal model core:
-ChatGPT 5.5 Pro Internal Core - Free local-model first; optional OpenAI-backed route; local profile fallback otherwise
-Gateway operation: fetchInternalData(target_id) at /resource/fetch
-Uses a free local Ollama model through /api/local-agent when available, then optional OpenAI Responses API through /api/agent, then the local connector-ready profile fallback.
+Separate AI assistant, retrieval console, and crawler surfaces have been removed. The atlas focuses on source logging, in-app browsing, imports, profiles, team collaboration, documents, and memory snapshots.
 
 Backend mechanics core:
-ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, extraction jobs, and exports are staged inside the static build.
-Stages: Intent intake, Profile context merge, Reference lookup, Evidence-tier separation, Mechanics synthesis, Extraction queue expansion, Export and review logging
-
-Free Local Model Agent:
-Local endpoint: /api/local-agent
-Ollama endpoint: http://127.0.0.1:11434/api/chat
-Authentication: No API key; runs on the user's machine
-Default model: llama3.2:3b
-Install: Install Ollama, run `ollama pull llama3.2:3b`, then start this app with python server.py.
-
-Local Web Scraper:
-Local endpoint: /api/scrape
-Authentication: No API key; public http/https targets only
-Saved request logs: 0
-Keyword mode: True
-Hidden search base: https://www.google.com/search?q=
-Safeguards: Blocks localhost/private/reserved IPs by default, 2 MB fetch cap, No JavaScript execution
+ErydirCeisiwr Backend Mechanics Core: Internal routing and synthesis scaffold derived from the ErydirCeisiwr attachment request. It controls how prompts, profiles, source records, source records, browser leads, documents, and exports are staged inside the static build.
+Stages: Intent intake, Profile context merge, Reference lookup, Evidence-tier separation, Mechanics synthesis, Export and review logging
 
 Google Programmable Search:
 Search engine ID: 56f7592d1993141c3
@@ -41,11 +21,6 @@ Google Custom Search JSON API:
 Local endpoint: /api/search
 Authentication: Server-side GOOGLE_CUSTOM_SEARCH_API_KEY
 Status: Preferred backend search path when hosted on a server with an API key; otherwise the app falls back to embedded CSE result cards.
-
-Automated AI Research Bot:
-Findings logged: 0
-Accepted findings: 0
-Cadence: opt-in, one attempt per minute, pauses for user review.
 
 File Import Layer:
 Imported file logs: 0
@@ -64,14 +39,6 @@ Draft documents stored: 1
 
 Internal Memory Bank:
 Browser runtime snapshots are stored locally by the app and exported separately from the live browser.
-
-NVIDIA AIQ Research:
-Backend URL: http://localhost:8000
-Status: Optional local/self-hosted research backend
-Capabilities: Intent-routed shallow research with source citation, Async deep research jobs, Source registry selection across web, papers, enterprise, and knowledge layers
-
-Extraction results:
-- No normalized extraction results yet.
 
 Uploaded reference layer:
 - Wolf-Shapeshifting Grimoire: Summary of Sources and Concepts (16 pages; Speculative framework; Needs verification)
@@ -114,9 +81,6 @@ User profiles:
   Spirits: Unassigned
   Identity: Contributor profile for cross-form synthesis, occult mechanics, and source recommendation review.
 
-Extraction jobs:
-- No queued extraction jobs in seed.
-
 Source log:
 
 ## Ovid, Metamorphoses: classical transformation narratives
@@ -128,7 +92,7 @@ Evidence: Primary text
 Citation: Needs verification
 Locator: None yet
 Terms: metamorphosis, mythic transformation, divine agency
-Notes: Use as a baseline for literary and mythological transformation motifs. Extract animal-change structure, agency, reversibility, and moral framing.
+Notes: Use as a baseline for literary and mythological transformation motifs. Review animal-change structure, agency, reversibility, and moral framing.
 
 ## Clinical lycanthropy and animal-identity delusion literature
 Category: Theoretical Concepts
@@ -281,8 +245,8 @@ Source type: PDF
 Evidence: Speculative framework
 Citation: Needs verification
 Locator: data/reference_ingest.json#ref-upload-erydir-core
-Terms: energy, backend core, routing, synthesis, mechanics
-Notes: Used as an internal operational scaffold for prompt intake, profile merging, reference lookup, evidence separation, synthesis, extraction queueing, and export logging. It is not used as visual design.
+Terms: energy, routing, synthesis, mechanics
+Notes: Used as an internal operational scaffold for prompt intake, profile merging, reference lookup, evidence separation, synthesis, source review and export logging. It is not used as visual design.
 
 ## Uploaded PDF: Learning to Shift
 Category: Documents
@@ -293,4 +257,4 @@ Evidence: Experiential claim
 Citation: Needs verification
 Locator: data/reference_ingest.json#ref-upload-learning-to-shift
 Terms: wolf, energy, mental shift, physical shift, phantom shift, fox
-Notes: Background reference for practice vocabulary and experiential claims. Keep outputs profile-aware but preserve uncertainty labels for all transformation mechanics.
+Notes: Background reference for practice vocabulary and experiential claims. Keep review notes profile-aware while preserving uncertainty labels for all transformation mechanics.
