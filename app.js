@@ -5228,38 +5228,59 @@ function renderFileManager() {
   if (!els.fileManagerTree || !els.fileManagerDetail) return;
   const manager = getFileManager();
   const selected = getFileNode(manager.selectedId) || getFileNode(manager.rootId);
-  const currentFolder = getFileNode(manager.currentFolderId) || getFileNode(manager.rootId);
+  let currentFolder = getFileNode(manager.currentFolderId) || getFileNode(manager.rootId);
   if (selected) manager.selectedId = selected.id;
-  if (!currentFolder || currentFolder.kind !== "folder") manager.currentFolderId = manager.rootId;
+  if (!currentFolder || currentFolder.kind !== "folder") {
+    manager.currentFolderId = manager.rootId;
+    currentFolder = getFileNode(manager.currentFolderId) || getFileNode(manager.rootId);
+  }
   els.fileManagerPath.textContent = fileManagerAddressPath(manager.currentFolderId || manager.rootId);
   els.fileManagerStatus.textContent =
     state.fileManagerStatusMessage || `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
   els.fileManagerTree.innerHTML = renderFileExplorerSidebar(manager.rootId);
-  els.fileManagerTree.querySelectorAll("[data-file-sidebar-target]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.fileManagerSidebarActiveLabel = button.dataset.fileSidebarLabel || "";
-      const node = getFileNode(button.dataset.fileSidebarTarget);
-      if (node?.kind === "folder") {
-        openFileManagerFolder(node.id);
-        return;
-      }
-      if (node?.kind === "file") openFileManagerFile(node.id);
-    });
-  });
-  els.fileManagerTree.querySelectorAll("[data-file-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.fileManagerSidebarActiveLabel = "";
-      const node = getFileNode(button.dataset.fileId);
-      if (node?.kind === "folder") {
-        openFileManagerFolder(node.id);
-        return;
-      }
-      openFileManagerFile(node?.id);
-    });
-  });
+  bindFileManagerTreeNavigation();
   renderFileExplorerList(selected, currentFolder);
   renderFileManagerDetail(selected);
   renderPermissionState();
+}
+
+function bindFileManagerTreeNavigation() {
+  if (!els.fileManagerTree) return;
+  els.fileManagerTree.onclick = (event) => {
+    const target = event.target.closest("[data-file-sidebar-target], [data-file-id]");
+    if (!target || !els.fileManagerTree.contains(target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const sidebarTargetId = target.dataset.fileSidebarTarget || "";
+    const treeNodeId = target.dataset.fileId || "";
+    activateFileManagerTreeNode(sidebarTargetId || treeNodeId, {
+      sidebarLabel: sidebarTargetId ? target.dataset.fileSidebarLabel || "" : "",
+    });
+  };
+  els.fileManagerTree.onkeydown = (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const target = event.target.closest("[data-file-sidebar-target], [data-file-id]");
+    if (!target || !els.fileManagerTree.contains(target)) return;
+    event.preventDefault();
+    const sidebarTargetId = target.dataset.fileSidebarTarget || "";
+    const treeNodeId = target.dataset.fileId || "";
+    activateFileManagerTreeNode(sidebarTargetId || treeNodeId, {
+      sidebarLabel: sidebarTargetId ? target.dataset.fileSidebarLabel || "" : "",
+    });
+  };
+}
+
+function activateFileManagerTreeNode(id, { sidebarLabel = "" } = {}) {
+  const node = getFileNode(id);
+  if (!node) return;
+  state.fileManagerSidebarActiveLabel = sidebarLabel;
+  state.fileManagerRecentNodeId = "";
+  state.fileManagerRenameId = "";
+  if (node.kind === "folder") {
+    openFileManagerFolder(node.id);
+    return;
+  }
+  openFileManagerFile(node.id);
 }
 
 function renderFileExplorerList(selected, openFolder = null) {
