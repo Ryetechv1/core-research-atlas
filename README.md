@@ -75,4 +75,10 @@ The Memory panel stores local recovery snapshots in browser storage under `core-
 
 GitHub Pages can host the static app, including the UI, CSE browser, localStorage archive, guest browsing, docs, profiles, and exports.
 
-Python backend routes require a server host such as Render, Vercel Functions, or a local Python process. GitHub Pages cannot run Python routes.
+Python backend routes require a server host such as Render, Vercel Functions, Cloudflare Workers, or a local Python process. GitHub Pages cannot run Python routes.
+
+For team chat across users who are not on the same Wi-Fi, use a public HTTPS sync backend. A ready-to-deploy Cloudflare Worker is included at `cloudflare/team-sync/`. After deployment, paste the Worker URL into the Team tab's Shared team sync server field on all three devices, or open the app with:
+
+```text
+https://ryetechv1.github.io/core-research-atlas/?sync=https://core-research-team-sync.<your-cloudflare-subdomain>.workers.dev
+```
