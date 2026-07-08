@@ -2335,6 +2335,28 @@ a,
   color: #fff !important;
 }
 
+.cloudflare-search-panel {
+  margin-bottom: 14px;
+}
+
+.cloudflare-search-frame {
+  overflow: hidden;
+  min-height: 520px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  background:
+    linear-gradient(145deg, #242424 0%, #050505 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.cloudflare-search-frame chat-page-snippet {
+  display: block;
+  width: 100%;
+  min-height: 520px;
+  color: #fff;
+}
+
 .browser-shell {
   overflow: hidden;
   border: 1px solid transparent;

@@ -41,6 +41,7 @@
       };
     </script>
     <script async src="https://cse.google.com/cse.js?cx=56f7592d1993141c3"></script>
+    <script type="module" src="https://4afc7ed7-768d-4ed9-857f-94db2d87917e.search.ai.cloudflare.com/assets/v0.0.40/search-snippet.es.js"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -412,6 +413,19 @@
                   <div class="google-cse-embed">
                     <div class="gcse-searchbox"></div>
                     <div class="gcse-searchresults"></div>
+                  </div>
+                </section>
+
+                <section class="api-panel cloudflare-search-panel" aria-labelledby="cloudflareSearchTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="cloudflareSearchTitle">Cloudflare AI Search</h2>
+                      <p>Embedded Cloudflare search chat for research queries and site-aware answers.</p>
+                    </div>
+                    <span class="detail-chip">search.ai.cloudflare.com</span>
+                  </div>
+                  <div class="cloudflare-search-frame">
+                    <chat-page-snippet theme="dark"></chat-page-snippet>
                   </div>
                 </section>
 
@@ -810,6 +824,6 @@
       </button>
     </template>
 
-    <script src="app.js?v=20260707-browser-team-sync"></script>
+    <script src="app.js?v=20260707-cloudflare-search"></script>
   </body>
 </html>

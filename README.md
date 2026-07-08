@@ -53,6 +53,13 @@ The Browser panel accepts a URL, domain, or keywords. Keyword input routes throu
 
 Search results and clicked links are mirrored into internal cards where possible. Many public sites block iframe display, so the app keeps URL, preview, and source metadata visible even when a page cannot render in-frame.
 
+The Browser panel also embeds the Cloudflare AI Search snippet:
+
+```html
+<script type="module" src="https://4afc7ed7-768d-4ed9-857f-94db2d87917e.search.ai.cloudflare.com/assets/v0.0.40/search-snippet.es.js"></script>
+<chat-page-snippet theme="dark"></chat-page-snippet>
+```
+
 ## File Import
 
 The Import panel supports common research formats:
