@@ -9,6 +9,8 @@ data/team_chat_runtime.json
 
 # Local QA/browser runtime state
 qa/chrome-*/
+.wrangler/
+**/.wrangler/
 
 # Local OS/editor noise
 .DS_Store
