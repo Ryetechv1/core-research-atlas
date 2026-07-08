@@ -2029,6 +2029,7 @@ function renderOpenAiChat(statusText = "") {
 function openAiChatStatusText(capabilities = state.backendCapabilities) {
   if (state.openAiChatBusy) return "Contacting OpenAI...";
   if (!capabilities.checked) return "Backend not checked";
+  if (isKnownStaticHost()) return "Static host: local atlas mode";
   if (!hasBackendRoute(OPENAI_CHAT_API_PATH, capabilities)) return "OpenAI route unavailable on this host";
   if (!capabilities.openAiChatConfigured) return "Missing backend OPENAI_API_KEY";
   return "OpenAI backend ready";
@@ -2057,8 +2058,33 @@ async function handleOpenAiChatSubmit(event) {
 
   try {
     const capabilities = await ensureBackendCapabilities();
+    if (isKnownStaticHost() || capabilities.platform === "static") {
+      getOpenAiChatMessages().push({
+        id: `openai-static-${Date.now()}`,
+        role: "assistant",
+        owner: "Atlas Local Mode",
+        content: buildStaticHostOpenAiReply(prompt),
+        error: false,
+        errorType: "static_host",
+        createdAt: new Date().toISOString(),
+      });
+      state.archive.openAiChatMessages = getOpenAiChatMessages().slice(-120);
+      persistArchive("Static host atlas response");
+      return;
+    }
     if (!hasBackendRoute(OPENAI_CHAT_API_PATH, capabilities)) {
-      throw new Error("The backend OpenAI chat route is unavailable on this host. Run python server.py or deploy to a backend host with /api/openai-chat.");
+      getOpenAiChatMessages().push({
+        id: `openai-backend-missing-${Date.now()}`,
+        role: "assistant",
+        owner: "Atlas Local Mode",
+        content: buildStaticHostOpenAiReply(prompt),
+        error: false,
+        errorType: "backend_route_missing",
+        createdAt: new Date().toISOString(),
+      });
+      state.archive.openAiChatMessages = getOpenAiChatMessages().slice(-120);
+      persistArchive("Missing backend atlas response");
+      return;
     }
     if (!capabilities.openAiChatConfigured) {
       throw new Error("OPENAI_API_KEY is not configured on the backend host. The key must stay server-side.");
@@ -2267,6 +2293,22 @@ function buildOpenAiFailureReply(data = {}, prompt = "", statusCode = 0) {
     "",
     "Local atlas fallback:",
     buildLocalAtlasReply(prompt),
+  ].join("\n");
+}
+
+function buildStaticHostOpenAiReply(prompt = "") {
+  return [
+    "This page is running on GitHub Pages, which is a static host. Static hosts cannot execute /api/openai-chat, so a real OpenAI call cannot run from this URL without a backend.",
+    "",
+    "I am answering in Atlas Local Mode from the data already inside this app.",
+    "",
+    buildLocalAtlasReply(prompt),
+    "",
+    "To enable real OpenAI replies:",
+    "- Run locally: python server.py --host 127.0.0.1 --port 5177",
+    "- Open: http://127.0.0.1:5177/",
+    "- Or deploy the Python/API backend to Render, Vercel, Railway, Fly.io, or another backend host and set OPENAI_API_KEY there.",
+    "- Do not put OPENAI_API_KEY into GitHub Pages JavaScript; that would expose the key publicly.",
   ].join("\n");
 }
 
