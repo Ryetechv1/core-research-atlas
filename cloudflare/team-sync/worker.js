@@ -5,6 +5,7 @@ const TEAM_CHAT_LIMIT = 200;
 const MAX_BODY_BYTES = 3 * 1024 * 1024;
 const TEAM_SOURCE_APPROVAL_THRESHOLD = 2;
 const TEAM_USER_COUNT = 3;
+const TEAM_VOTABLE_TYPES = new Set(["update", "link", "promote", "recommendation"]);
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -100,6 +101,7 @@ function applyVote(messages, body) {
   }
   const message = messages.find((item) => item.id === id);
   if (!message) return;
+  if (!isTeamMessageVotable(message)) return;
   message.votes = isPlainObject(message.votes) ? message.votes : {};
   message.votes[user] = decision;
   message.status = teamVoteStatus(message.votes, decision, String(message.status || "review"));
@@ -112,6 +114,7 @@ function applyPromote(messages, body) {
   if (!id) throw new Error("Promote action requires an id.");
   const message = messages.find((item) => item.id === id);
   if (!message) return;
+  if (!isTeamMessageVotable(message)) return;
   message.votes = isPlainObject(message.votes) ? message.votes : {};
   message.votes[user] = "add";
   message.status = "added to sources";
@@ -124,7 +127,9 @@ function sanitizeMessage(raw) {
   const text = String(raw.text || "").trim();
   if (!id || !text) throw new Error("Team chat item requires id and text.");
   let type = String(raw.type || "message").trim();
-  if (!["message", "update", "recommendation", "link"].includes(type)) type = "message";
+  if (!["message", "update", "recommendation", "link", "promote"].includes(type)) type = "message";
+  if (type === "recommendation") type = "promote";
+  const defaultStatus = TEAM_VOTABLE_TYPES.has(type) ? "review" : "posted";
   return {
     id: id.slice(0, 96),
     type,
@@ -132,7 +137,7 @@ function sanitizeMessage(raw) {
     title: String(raw.title || "").trim().slice(0, 180),
     text: text.slice(0, 4000),
     url: String(raw.url || "").trim().slice(0, 1200),
-    status: String(raw.status || (type === "recommendation" ? "open" : "posted")).trim().slice(0, 80),
+    status: String(raw.status || defaultStatus).trim().slice(0, 80),
     votes: isPlainObject(raw.votes) ? raw.votes : {},
     fileAttachment: sanitizeFileAttachment(raw.fileAttachment),
     createdAt: String(raw.createdAt || new Date().toISOString()).trim().slice(0, 80),
@@ -172,6 +177,10 @@ function teamVoteStatus(votes, latestDecision, currentStatus = "review") {
   if (rejectVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD) return "rejected";
   if (latestDecision === "add") return `review: ${addVotes}/${TEAM_USER_COUNT} add votes`;
   return `review: ${rejectVotes}/${TEAM_USER_COUNT} reject votes`;
+}
+
+function isTeamMessageVotable(message) {
+  return TEAM_VOTABLE_TYPES.has(String(message?.type || "message").trim().toLowerCase());
 }
 
 function dedupe(messages) {

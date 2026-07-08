@@ -20,6 +20,7 @@ const TEAM_SYNC_URL_KEY = `${STORAGE_KEY}:team-sync-url`;
 const TEAM_SYNC_QUERY_KEYS = ["sync", "teamSync", "teamSyncUrl"];
 const TEAM_CHAT_POLL_MS = 5_000;
 const TEAM_SOURCE_APPROVAL_THRESHOLD = 2;
+const TEAM_VOTABLE_TYPES = new Set(["update", "link", "promote", "recommendation"]);
 const IMPORT_TEXT_SLICE_BYTES = 650_000;
 const MAX_STORED_FILE_BYTES = 1_500_000;
 const PREVIEW_TEXT_LIMIT = 80_000;
@@ -3168,7 +3169,7 @@ function getBrowserContext() {
     .filter((source) => source.id?.startsWith("src-browser-") || String(source.tradition || "").includes("In-app browser"))
     .slice(0, 5);
   const teamBrowserLeads = (state.archive.teamMessages || [])
-    .filter((item) => ["recommendation", "link"].includes(item.type) && item.url && item.status !== "rejected")
+    .filter((item) => isTeamPostVotable(item) && item.url && item.status !== "rejected")
     .slice(0, 5);
   const collabDocs = getCollabDocs()
     .map((doc) => ({
@@ -3770,7 +3771,7 @@ async function handleTeamChatSubmit(event) {
   event.preventDefault();
   if (!ensureCanWrite("post team messages")) return;
   const formData = new FormData(els.teamChatForm);
-  const type = String(formData.get("type") || "message");
+  const type = normalizeTeamPostType(formData.get("type"));
   const rawUrl = String(formData.get("url") || "").trim();
   const url = rawUrl ? normalizeBrowserTarget(rawUrl) : "";
   const text = String(formData.get("text") || "").trim();
@@ -3778,7 +3779,11 @@ async function handleTeamChatSubmit(event) {
   const fileAttachment = upload ? await analyzeTeamFileAttachment(upload) : null;
   const title =
     String(formData.get("title") || "").trim() ||
-    (fileAttachment ? `File review: ${fileAttachment.fileName}` : url ? `Team lead: ${domainFromUrl(url) || url}` : `${type} from ${state.currentUser?.username || "local"}`);
+    (fileAttachment
+      ? `${teamPostTypeLabel(type)} file: ${fileAttachment.fileName}`
+      : url
+        ? `${teamPostTypeLabel(type)} lead: ${domainFromUrl(url) || url}`
+        : `${teamPostTypeLabel(type)} from ${state.currentUser?.username || "local"}`);
   if (!text && !fileAttachment) return;
 
   const item = {
@@ -3788,7 +3793,7 @@ async function handleTeamChatSubmit(event) {
     title,
     text: text || (fileAttachment ? `Review uploaded file: ${fileAttachment.fileName}` : ""),
     url,
-    status: type === "recommendation" || fileAttachment ? "review" : "posted",
+    status: isTeamPostVotable({ type }) ? "review" : "posted",
     votes: {},
     fileAttachment,
     createdAt: new Date().toISOString(),
@@ -3825,6 +3830,9 @@ async function analyzeTeamFileAttachment(file) {
 function useBrowserUrlForTeamPost() {
   if (!ensureCanWrite("draft team posts")) return;
   const context = getBrowserContext();
+  if (els.teamChatForm.elements.type.value === "message") {
+    els.teamChatForm.elements.type.value = "link";
+  }
   els.teamChatForm.elements.url.value = context.currentUrl;
   if (!els.teamChatForm.elements.title.value) {
     els.teamChatForm.elements.title.value = `Browser lead: ${context.currentDomain}`;
@@ -3842,24 +3850,25 @@ function renderTeamChat() {
       state.teamChatBackendAvailable === false
         ? " To sync all 3 users, enter the same shared team sync server URL on every device. GitHub Pages by itself is local-only."
         : "";
-    els.teamChatFeed.innerHTML = `<div class="empty-state">No team posts yet. Share a message, update, link, or source recommendation.${escapeHtml(note)}</div>`;
+    els.teamChatFeed.innerHTML = `<div class="empty-state">No team posts yet. Share a message, update, link, or promotion candidate.${escapeHtml(note)}</div>`;
     return;
   }
 
   els.teamChatFeed.innerHTML = messages
     .map((item) => {
       const { addVotes, rejectVotes } = getTeamVoteCounts(item);
-      const isRecommendation = item.type === "recommendation";
-      const isLink = item.type === "link" || Boolean(item.url);
+      const type = normalizeTeamPostType(item.type);
+      const typeLabel = teamPostTypeLabel(item.type);
+      const hasUrl = Boolean(item.url);
       const hasAttachment = Boolean(item.fileAttachment);
-      const isPromotable = isRecommendation || isLink || hasAttachment;
+      const isPromotable = isTeamPostVotable(item);
       const userVote = item.votes?.[state.currentUser?.username || "local"] || "";
       return `
-        <article class="team-post ${escapeHtml(item.type || "message")}">
+        <article class="team-post ${escapeHtml(type)}">
           <header>
             <div>
               <strong>${escapeHtml(item.title || item.type || "Team post")}</strong>
-              <small>${escapeHtml(item.owner || "local")} / ${escapeHtml(item.type || "message")} / ${new Date(item.createdAt).toLocaleString()}</small>
+              <small>${escapeHtml(item.owner || "local")} / ${escapeHtml(typeLabel)} / ${new Date(item.createdAt).toLocaleString()}</small>
             </div>
             <span class="detail-chip">${escapeHtml(item.status || "posted")}</span>
           </header>
@@ -3882,7 +3891,7 @@ function renderTeamChat() {
           }
           <div class="form-actions">
             ${
-              isLink
+              hasUrl
                 ? `<button class="ghost-button iconless" type="button" data-team-browser="${escapeHtml(item.id)}">Open External</button>`
                 : ""
             }
@@ -3923,6 +3932,26 @@ function findTeamMessage(id) {
   return (state.archive.teamMessages || []).find((item) => item.id === id);
 }
 
+function normalizeTeamPostType(type = "message") {
+  const value = String(type || "message").trim().toLowerCase();
+  if (value === "recommendation") return "promote";
+  if (["message", "update", "link", "promote"].includes(value)) return value;
+  return "message";
+}
+
+function teamPostTypeLabel(type = "message") {
+  const normalized = normalizeTeamPostType(type);
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function isTeamPostVotable(item = {}) {
+  return TEAM_VOTABLE_TYPES.has(String(item.type || "message").trim().toLowerCase());
+}
+
+function isOpenTeamReviewPost(item = {}) {
+  return isTeamPostVotable(item) && !["rejected", "added to sources"].includes(String(item.status || "").trim().toLowerCase());
+}
+
 function getTeamVoteCounts(item = {}) {
   const votes = item.votes || {};
   return {
@@ -3941,9 +3970,13 @@ function updateTeamMessage(id, update) {
 }
 
 function addTeamItemToSources(id) {
-  if (!ensureCanWrite("vote on team recommendations")) return;
+  if (!ensureCanWrite("vote on team posts")) return;
   const item = findTeamMessage(id);
   if (!item) return;
+  if (!isTeamPostVotable(item)) {
+    window.alert("Message posts are general chat only. Use Update, Link, or Promote when a post needs team voting.");
+    return;
+  }
   const votes = { ...(item.votes || {}), [state.currentUser?.username || "local"]: "add" };
   const nextItem = { ...item, votes };
   const { addVotes } = getTeamVoteCounts(nextItem);
@@ -3964,9 +3997,13 @@ function addTeamItemToSources(id) {
 }
 
 function rejectTeamRecommendation(id) {
-  if (!ensureCanWrite("reject team recommendations")) return;
+  if (!ensureCanWrite("reject team posts")) return;
   const item = findTeamMessage(id);
   if (!item) return;
+  if (!isTeamPostVotable(item)) {
+    window.alert("Message posts are general chat only. Use Update, Link, or Promote when a post needs team voting.");
+    return;
+  }
   const votes = { ...(item.votes || {}), [state.currentUser?.username || "local"]: "reject" };
   const { rejectVotes } = getTeamVoteCounts({ ...item, votes });
   updateTeamMessage(id, { status: rejectVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD ? "rejected" : `review: ${rejectVotes}/${AUTH_USERS.length} reject votes`, votes });
@@ -3976,6 +4013,7 @@ function rejectTeamRecommendation(id) {
 function applyTeamConsensusPromotions(messages = state.archive.teamMessages || []) {
   let changed = false;
   messages.forEach((item) => {
+    if (!isTeamPostVotable(item)) return;
     const { addVotes, rejectVotes } = getTeamVoteCounts(item);
     if (addVotes >= TEAM_SOURCE_APPROVAL_THRESHOLD) {
       const source = ensureTeamItemSource(item);
@@ -4844,9 +4882,9 @@ function buildTextDigest(archive) {
     `${archive.browserHistory?.length || 0} captured browser targets`,
     ...((archive.browserHistory || []).slice(0, 8).map((entry) => `- ${entry.url}`)),
     "",
-    "Team Chat and Recommendations:",
+    "Team Chat:",
     `${archive.teamMessages?.length || 0} team posts stored`,
-    `${(archive.teamMessages || []).filter((item) => item.type === "recommendation" && item.status !== "rejected").length} open recommendations`,
+    `${(archive.teamMessages || []).filter(isOpenTeamReviewPost).length} open vote-enabled posts`,
     ...((archive.teamMessages || []).slice(0, 8).map((item) => `- ${item.type}: ${item.title || item.text} (${item.status || "posted"})${item.url ? ` - ${item.url}` : ""}`)),
     "",
     "Collaboration Documents:",
@@ -4961,8 +4999,8 @@ a{color:#111}
 <p>${escapeHtml(String(archive.importedFiles?.length || 0))} imported file logs; ${escapeHtml(String((archive.importedFiles || []).reduce((sum, item) => sum + (item.recordsCreated || 0), 0)))} source records created from uploaded files.</p>
 <h2>In-App Browser</h2>
 <p>${escapeHtml(String(archive.browserHistory?.length || 0))} captured browser targets. Latest: ${escapeHtml(archive.browserHistory?.[0]?.url || "none")}.</p>
-<h2>Team Chat and Recommendations</h2>
-<p>${escapeHtml(String(archive.teamMessages?.length || 0))} team posts stored; ${escapeHtml(String((archive.teamMessages || []).filter((item) => item.type === "recommendation" && item.status !== "rejected").length))} open recommendations.</p>
+<h2>Team Chat</h2>
+<p>${escapeHtml(String(archive.teamMessages?.length || 0))} team posts stored; ${escapeHtml(String((archive.teamMessages || []).filter(isOpenTeamReviewPost).length))} open vote-enabled posts.</p>
 <h2>Collaboration Documents</h2>
 <table>
 <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Owner</th><th>Preview</th></tr></thead>

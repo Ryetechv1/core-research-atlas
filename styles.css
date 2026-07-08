@@ -1078,6 +1078,34 @@ input[type="range"] {
   margin-top: 0;
 }
 
+.team-option-guide {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.team-option-guide article {
+  display: grid;
+  gap: 6px;
+  min-height: 108px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.team-option-guide strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.team-option-guide span {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .team-chat-feed {
   display: grid;
   gap: 10px;
@@ -1127,6 +1155,7 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.team-post.promote,
 .team-post.recommendation {
   background:
     linear-gradient(145deg, #e7e7e7 0%, #696969 50%, #050505 100%) padding-box,
@@ -2521,8 +2550,13 @@ a,
   .content-grid,
   .hero-panel,
   .collab-docs-grid,
-  .memory-bank-summary {
+  .memory-bank-summary,
+  .team-option-guide {
     grid-template-columns: 1fr;
+  }
+
+  .team-option-guide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .inspector {
@@ -2609,6 +2643,7 @@ a,
   .profile-sections,
   .source-info-grid,
   .memory-bank-summary,
+  .team-option-guide,
   .file-preview-meta-grid {
     grid-template-columns: 1fr;
   }

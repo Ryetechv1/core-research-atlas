@@ -515,14 +515,33 @@
               <div class="source-panel">
                 <div class="panel-heading">
                   <div>
-                    <h2>Team Chat and Recommendations</h2>
-                    <p>All three users can post messages, updates, links, and source recommendations for review.</p>
+                    <h2>Team Chat</h2>
+                    <p>General chat stays separate from posts that need team review or source promotion.</p>
                   </div>
                   <div class="panel-heading-actions">
                     <span class="detail-chip" id="teamChatStatus">Sync idle</span>
                     <button class="ghost-button" id="refreshTeamChatButton" type="button">Refresh</button>
                   </div>
                 </div>
+
+                <section class="team-option-guide" aria-label="Team chat option guide">
+                  <article>
+                    <strong>Message</strong>
+                    <span>General team chat. No voting, no source promotion.</span>
+                  </article>
+                  <article>
+                    <strong>Update</strong>
+                    <span>Progress notes or research changes that can be voted into Sources.</span>
+                  </article>
+                  <article>
+                    <strong>Link</strong>
+                    <span>URLs, archive leads, or browser findings that can be opened and promoted.</span>
+                  </article>
+                  <article>
+                    <strong>Promote</strong>
+                    <span>Source candidates or uploaded files submitted for 2-of-3 approval.</span>
+                  </article>
+                </section>
 
                 <form id="teamChatForm" class="team-chat-form api-panel">
                   <div class="form-grid">
@@ -531,13 +550,13 @@
                       <select name="type">
                         <option value="message">Message</option>
                         <option value="update">Update</option>
-                        <option value="recommendation">Recommendation</option>
                         <option value="link">Link</option>
+                        <option value="promote">Promote</option>
                       </select>
                     </label>
                     <label>
                       Title
-                      <input name="title" placeholder="Short title for links or recommendations">
+                      <input name="title" placeholder="Short title for chat, updates, links, or promotion">
                     </label>
                     <label>
                       URL
@@ -546,7 +565,7 @@
                   </div>
                   <label>
                     Message
-                    <textarea name="text" rows="4" placeholder="Post a finding, team update, question, recommendation, source lead, or file note."></textarea>
+                    <textarea name="text" rows="4" placeholder="Post general chat, a team update, a link note, or a promotion reason."></textarea>
                   </label>
                   <label>
                     Optional file upload
@@ -579,7 +598,7 @@
                   <div class="panel-heading compact">
                     <div>
                       <h2 id="teamChatTitle">Live Team Feed</h2>
-                      <p>Recommendations can be rejected or added to Sources. Links can be opened, copied into the browser, or promoted.</p>
+                      <p>Update, Link, and Promote posts can be rejected or added to Sources after 2-of-3 team approval.</p>
                     </div>
                     <span class="detail-chip">3 users</span>
                   </div>
@@ -846,6 +865,6 @@
       </button>
     </template>
 
-    <script src="app.js?v=20260707-team-files-layout"></script>
+    <script src="app.js?v=20260707-team-vote-options"></script>
   </body>
 </html>
