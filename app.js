@@ -956,8 +956,8 @@ function wireEvents() {
   els.cloudIntegrationGrid?.querySelectorAll("[data-cloud-open]").forEach((button) => {
     button.addEventListener("click", () => openExternalUrl(button.dataset.cloudOpen));
   });
-  els.fileNewFolderButton?.addEventListener("click", createFileManagerFolder);
-  els.fileNewTextButton?.addEventListener("click", createFileManagerTextFile);
+  els.fileNewFolderButton?.addEventListener("click", () => createFileManagerFolder());
+  els.fileNewTextButton?.addEventListener("click", () => createFileManagerTextFile());
   els.fileRenameButton?.addEventListener("click", renameFileManagerNode);
   els.fileCopyButton?.addEventListener("click", () => copyFileManagerNode("copy"));
   els.fileMoveButton?.addEventListener("click", () => copyFileManagerNode("move"));
@@ -5348,13 +5348,18 @@ function renderFileTree(parentId, depth) {
   const manager = getFileManager();
   const children = getFileChildren(parentId);
   const current = getFileNode(parentId);
+  const descendantCount = current?.kind === "folder" ? getFileDescendantCount(current.id) : 0;
+  const branchLabel =
+    current?.kind === "folder"
+      ? `${children.length} direct / ${descendantCount} total`
+      : current?.extension || current?.mimeType || "file";
   const currentHtml = current
-    ? `<button class="file-tree-item ${current.kind === "folder" ? "is-folder" : "is-file"}${manager.selectedId === current.id ? " is-active" : ""}${manager.currentFolderId === current.id ? " is-open-folder" : ""}" type="button" draggable="${current.id === manager.rootId ? "false" : "true"}" data-file-id="${escapeHtml(current.id)}" data-drop-folder-id="${escapeHtml(current.kind === "folder" ? current.id : current.parentId)}" style="--depth:${depth}">
+    ? `<button class="file-tree-item ${current.kind === "folder" ? "is-folder" : "is-file"}${children.length ? " has-children" : ""}${manager.selectedId === current.id ? " is-active" : ""}${manager.currentFolderId === current.id ? " is-open-folder" : ""}" type="button" draggable="${current.id === manager.rootId ? "false" : "true"}" data-file-id="${escapeHtml(current.id)}" data-drop-folder-id="${escapeHtml(current.kind === "folder" ? current.id : current.parentId)}" style="--depth:${depth}" title="${escapeHtml(fileManagerPath(current.id))}">
         <span class="file-tree-branch" aria-hidden="true"></span>
         <span class="file-node-icon" aria-hidden="true"></span>
         <span class="file-tree-label">
           <strong>${escapeHtml(current.name)}</strong>
-          <small>${escapeHtml(current.kind === "folder" ? `${children.length} item${children.length === 1 ? "" : "s"}` : current.extension || current.mimeType || "file")}</small>
+          <small>${escapeHtml(branchLabel)}</small>
         </span>
       </button>`
     : "";
@@ -5381,15 +5386,23 @@ function renderFileManagerDetail(node) {
       ${meta}
       <div class="file-detail-actions">
         <button class="primary-button iconless" type="button" data-file-open-folder-detail="${escapeHtml(node.id)}">Open Folder</button>
+        <button class="ghost-button iconless" type="button" data-file-new-folder-inside="${escapeHtml(node.id)}"${writeDisabledAttr()}>New Folder Inside</button>
+        <button class="ghost-button iconless" type="button" data-file-new-text-inside="${escapeHtml(node.id)}"${writeDisabledAttr()}>New TXT Here</button>
         <button class="ghost-button iconless" type="button" data-file-rename-id="${escapeHtml(node.id)}"${writeDisabledAttr()}>Rename</button>
       </div>
       <div class="file-preview-unavailable">
         <strong>${children.length} item${children.length === 1 ? "" : "s"} in this folder.</strong>
-        <span>Select items in the center pane, or open this folder to view its contents.</span>
+        <span>Use New Folder Inside to create a nested branch here, or open this folder to view its contents.</span>
       </div>
     `;
     els.fileManagerDetail.querySelectorAll("[data-file-open-folder-detail]").forEach((button) => {
       button.addEventListener("click", () => openFileManagerFolder(button.dataset.fileOpenFolderDetail));
+    });
+    els.fileManagerDetail.querySelectorAll("[data-file-new-folder-inside]").forEach((button) => {
+      button.addEventListener("click", () => createFileManagerFolder(button.dataset.fileNewFolderInside));
+    });
+    els.fileManagerDetail.querySelectorAll("[data-file-new-text-inside]").forEach((button) => {
+      button.addEventListener("click", () => createFileManagerTextFile(button.dataset.fileNewTextInside));
     });
     els.fileManagerDetail.querySelectorAll("[data-file-rename-id]").forEach((button) => {
       button.addEventListener("click", () => beginFileManagerRename(button.dataset.fileRenameId));
@@ -5591,10 +5604,35 @@ function getSelectedFolderId() {
   return selected?.kind === "folder" ? selected.id : selected?.parentId || getFileManager().rootId;
 }
 
+function getFileManagerCreationFolderId(explicitFolderId = "") {
+  const explicit = explicitFolderId ? getFileNode(explicitFolderId) : null;
+  if (explicit?.kind === "folder") return explicit.id;
+  const selected = getSelectedFileNode();
+  if (selected?.kind === "folder") return selected.id;
+  if (selected?.kind === "file" && selected.parentId) return selected.parentId;
+  return getCurrentFileManagerFolderId();
+}
+
 function getCurrentFileManagerFolderId() {
   const manager = getFileManager();
   const current = getFileNode(manager.currentFolderId);
   return current?.kind === "folder" ? current.id : manager.rootId;
+}
+
+function getFileDescendantCount(folderId) {
+  const manager = getFileManager();
+  const seen = new Set();
+  let count = 0;
+  const walk = (parentId) => {
+    manager.nodes.forEach((node) => {
+      if (node.parentId !== parentId || seen.has(node.id)) return;
+      seen.add(node.id);
+      count += 1;
+      if (node.kind === "folder") walk(node.id);
+    });
+  };
+  walk(folderId);
+  return count;
 }
 
 function fileManagerPath(nodeId) {
@@ -5682,10 +5720,11 @@ function appendFileManagerNode(node, parentId) {
   return normalized;
 }
 
-function createFileManagerFolder() {
+function createFileManagerFolder(parentFolderId = "") {
   if (!ensureCanWrite("create folders")) return;
   const now = new Date().toISOString();
-  const parentId = getCurrentFileManagerFolderId();
+  const parentId = getFileManagerCreationFolderId(parentFolderId);
+  const parent = getFileNode(parentId) || getFileNode(getFileManager().rootId);
   const node = appendFileManagerNode({
     id: `file-folder-${Date.now()}-${Math.round(Math.random() * 99999)}`,
     kind: "folder",
@@ -5695,15 +5734,16 @@ function createFileManagerFolder() {
   }, parentId);
   state.fileManagerRecentNodeId = node.id;
   state.fileManagerRenameId = node.id;
-  state.fileManagerStatusMessage = `Created ${node.name}. Rename it now.`;
+  state.fileManagerStatusMessage = `Created ${node.name} inside ${parent?.name || "this folder"}. Rename it now.`;
   persistFileManager("Created virtual folder");
   focusFileManagerRenameInput(node.id);
 }
 
-function createFileManagerTextFile() {
+function createFileManagerTextFile(parentFolderId = "") {
   if (!ensureCanWrite("create text files")) return;
   const now = new Date().toISOString();
-  const parentId = getCurrentFileManagerFolderId();
+  const parentId = getFileManagerCreationFolderId(parentFolderId);
+  const parent = getFileNode(parentId) || getFileNode(getFileManager().rootId);
   const fileName = nextFileManagerName(parentId, "New Note", ".txt");
   const node = appendFileManagerNode({
     id: `file-text-${Date.now()}-${Math.round(Math.random() * 99999)}`,
@@ -5719,7 +5759,7 @@ function createFileManagerTextFile() {
   }, parentId);
   state.fileManagerRecentNodeId = node.id;
   state.fileManagerRenameId = node.id;
-  state.fileManagerStatusMessage = `Created ${node.name}. Rename it now.`;
+  state.fileManagerStatusMessage = `Created ${node.name} inside ${parent?.name || "this folder"}. Rename it now.`;
   persistFileManager("Created virtual text file");
   focusFileManagerRenameInput(node.id);
 }

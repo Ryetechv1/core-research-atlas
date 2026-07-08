@@ -1820,11 +1820,28 @@ input[type="range"] {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.05));
 }
 
+.file-tree-item.has-children .file-node-icon {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 0 2px rgba(240, 198, 74, 0.1);
+}
+
 .file-tree-branch {
+  position: relative;
   display: block;
   height: 14px;
   border-left: 1px solid #555;
   border-bottom: 1px solid #555;
+}
+
+.file-tree-item.has-children .file-tree-branch::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  bottom: -14px;
+  width: 1px;
+  height: 14px;
+  background: #555;
 }
 
 .file-tree-item[style*="--depth:0"] .file-tree-branch {
@@ -2115,13 +2132,14 @@ input[type="range"] {
 
 .file-explorer-tile-actions {
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
 }
 
 .file-explorer-tile-actions button {
+  flex: 1 1 64px;
   min-width: 0;
   min-height: 30px;
   padding: 0 6px;
@@ -3909,7 +3927,6 @@ a,
 
   .file-explorer-tile-actions {
     grid-column: 1 / -1;
-    grid-template-columns: 1fr;
   }
 
   .file-detail-pane {
