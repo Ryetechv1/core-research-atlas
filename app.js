@@ -10,6 +10,7 @@ const GOOGLE_CSE_ID = "56f7592d1993141c3";
 const GOOGLE_CSE_SCRIPT_URL = `https://cse.google.com/cse.js?cx=${GOOGLE_CSE_ID}`;
 const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gsc.tab=0`;
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
+const CLOUDFLARE_AI_SEARCH_API_URL = "https://4afc7ed7-768d-4ed9-857f-94db2d87917e.search.ai.cloudflare.com/";
 const HEALTH_API_PATH = "/api/health";
 const SEARCH_API_PATH = "/api/search";
 const OPENAI_CHAT_API_PATH = "/api/openai-chat";
@@ -46,6 +47,16 @@ const GOOGLE_CAPABILITIES = [
   { id: "patents", label: "Patents", description: "Google Patents", kind: "google" },
   { id: "translate", label: "Translate", description: "Google Translate", kind: "google" },
 ];
+
+const VIRTUAL_GOOGLE_OS_LOCK = Object.freeze({
+  id: "virtual-google-os-preserved-2026-07-08",
+  protected: true,
+  defaultUrl: BROWSER_DEFAULT_URL,
+  searchBaseUrl: GOOGLE_SEARCH_BASE_URL,
+  cseId: GOOGLE_CSE_ID,
+  csePublicUrl: GOOGLE_CSE_PUBLIC_URL,
+  capabilityIds: GOOGLE_CAPABILITIES.map((capability) => capability.id),
+});
 
 const AUTH_USERS = [
   { username: "UserSeth", password: "User1password", role: "ADMIN", readOnly: false },
@@ -782,6 +793,10 @@ function cacheElements() {
   els.browserPreview = document.getElementById("browserPreview");
   els.browserSearchResults = document.getElementById("browserSearchResults");
   els.browserHistory = document.getElementById("browserHistory");
+  els.cloudflareFallbackForm = document.getElementById("cloudflareFallbackForm");
+  els.cloudflareFallbackInput = document.getElementById("cloudflareFallbackInput");
+  els.cloudflareFallbackStatus = document.getElementById("cloudflareFallbackStatus");
+  els.cloudflareEndpointButton = document.getElementById("cloudflareEndpointButton");
   els.openAiChatForm = document.getElementById("openAiChatForm");
   els.openAiChatTranscript = document.getElementById("openAiChatTranscript");
   els.openAiChatStatus = document.getElementById("openAiChatStatus");
@@ -902,6 +917,8 @@ function wireEvents() {
   });
   els.browserExternalButton.addEventListener("click", openCurrentBrowserTargetExternal);
   els.browserAddSourceButton.addEventListener("click", addCurrentBrowserPageToSources);
+  els.cloudflareFallbackForm?.addEventListener("submit", handleCloudflareFallbackSearch);
+  els.cloudflareEndpointButton?.addEventListener("click", () => openExternalUrl(CLOUDFLARE_AI_SEARCH_API_URL));
   els.openAiChatForm.addEventListener("submit", handleOpenAiChatSubmit);
   els.openAiClearButton.addEventListener("click", clearOpenAiChat);
   els.teamSyncForm.addEventListener("submit", handleTeamSyncSubmit);
@@ -2510,6 +2527,48 @@ function handleBrowserNavigate(event) {
   openInAppBrowser(url, target, { query: extractBrowserQuery(target, url) });
 }
 
+function handleCloudflareFallbackSearch(event) {
+  event.preventDefault();
+  const query = String(new FormData(els.cloudflareFallbackForm).get("query") || "").trim();
+  if (!query) return;
+  if (els.cloudflareFallbackStatus) {
+    els.cloudflareFallbackStatus.textContent =
+      "Cloudflare did not return a usable chat response in the embedded widget, so this query was routed through the locked Virtual Google OS.";
+  }
+  const url = buildGoogleCapabilityUrl("web", query);
+  openInAppBrowser(url, `Cloudflare fallback: ${query}`, {
+    query,
+    preview: {
+      id: `cloudflare-fallback-${Date.now()}`,
+      type: "Cloudflare fallback / Virtual Google OS",
+      title: `Cloudflare fallback: ${query}`,
+      url,
+      summary:
+        "The Cloudflare AI Search widget is preserved above. This fallback keeps research working by routing the same query through the locked Virtual Google OS with visible links, previews, and source actions.",
+      sourceInfo: `Cloudflare fallback via Google CSE ${GOOGLE_CSE_ID}`,
+      links: [
+        { title: "Cloudflare public endpoint", url: CLOUDFLARE_AI_SEARCH_API_URL },
+        ...buildGoogleCapabilityLinks(query),
+      ],
+      details: JSON.stringify(
+        {
+          query,
+          cloudflareApiUrl: CLOUDFLARE_AI_SEARCH_API_URL,
+          expectedCloudflareSetup: [
+            "Public Endpoint enabled",
+            "Chat/completions endpoint enabled for chat-page-snippet",
+            "GitHub Pages host allowed by CORS / Authorized hosts",
+          ],
+          virtualGoogleOsLock: VIRTUAL_GOOGLE_OS_LOCK,
+        },
+        null,
+        2
+      ),
+      score: 1000,
+    },
+  });
+}
+
 function openInAppBrowser(url, label = url, options = {}) {
   const normalizedUrl = normalizeBrowserTarget(url);
   const query = options.query || extractBrowserQuery(label, normalizedUrl);
@@ -2690,7 +2749,7 @@ function renderBrowserOsDock() {
   if (!els.browserOsDock) return;
   const query = extractBrowserQuery(els.inAppBrowserForm?.elements.target?.value || "", state.currentBrowserUrl) || "shapeshifting research";
   if (els.browserOsStatus) {
-    els.browserOsStatus.textContent = `${GOOGLE_CAPABILITIES.length} Google modes`;
+    els.browserOsStatus.textContent = `${VIRTUAL_GOOGLE_OS_LOCK.capabilityIds.length} locked Google modes`;
   }
   els.browserOsDock.innerHTML = GOOGLE_CAPABILITIES.map(
     (capability) => `
@@ -5086,7 +5145,14 @@ function renderFileManager() {
   els.fileManagerStatus.textContent = `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
   els.fileManagerTree.innerHTML = renderFileTree(manager.rootId, 0);
   els.fileManagerTree.querySelectorAll("[data-file-id]").forEach((button) => {
-    button.addEventListener("click", () => selectFileManagerNode(button.dataset.fileId));
+    button.addEventListener("click", () => {
+      const node = getFileNode(button.dataset.fileId);
+      if (node?.kind === "folder") {
+        openFileManagerFolder(node.id);
+        return;
+      }
+      selectFileManagerNode(button.dataset.fileId);
+    });
   });
   renderFileExplorerList(selected);
   renderFileManagerDetail(selected);
@@ -5108,14 +5174,21 @@ function renderFileExplorerList(selected) {
               <strong>${escapeHtml(child.name)}</strong>
               <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
               <span>${escapeHtml(child.kind === "folder" ? `${getFileChildren(child.id).length} item${getFileChildren(child.id).length === 1 ? "" : "s"}` : formatBytes(child.size || 0))}</span>
-              <small>${escapeHtml(new Date(child.updatedAt || Date.now()).toLocaleString())}</small>
+              <small>${escapeHtml(child.kind === "folder" ? "Tap to open" : new Date(child.updatedAt || Date.now()).toLocaleString())}</small>
             </button>
           `;
         })
         .join("")
     : '<div class="file-preview-unavailable"><strong>This folder is empty.</strong><span>Import files, create a folder, or create a TXT note.</span></div>';
   els.fileManagerFolderView.querySelectorAll("[data-file-list-id]").forEach((button) => {
-    button.addEventListener("click", () => selectFileManagerNode(button.dataset.fileListId));
+    button.addEventListener("click", () => {
+      const node = getFileNode(button.dataset.fileListId);
+      if (node?.kind === "folder") {
+        openFileManagerFolder(node.id);
+        return;
+      }
+      selectFileManagerNode(button.dataset.fileListId);
+    });
   });
 }
 
@@ -5215,6 +5288,15 @@ function selectFileManagerNode(id) {
   renderFileManager();
 }
 
+function openFileManagerFolder(id) {
+  const manager = getFileManager();
+  const node = getFileNode(id);
+  if (!node || node.kind !== "folder") return;
+  manager.selectedId = node.id;
+  persistArchive("Opened virtual folder");
+  renderFileManager();
+}
+
 function getFileNode(id) {
   return getFileManager().nodes.find((node) => node.id === id);
 }
@@ -5255,29 +5337,31 @@ function persistFileManager(reason = "File manager update") {
 
 function createFileManagerFolder() {
   if (!ensureCanWrite("create folders")) return;
-  const name = window.prompt("Folder name", "New Folder");
-  if (!name) return;
   const now = new Date().toISOString();
-  getFileManager().nodes.push({
+  const manager = getFileManager();
+  const parentId = getSelectedFolderId();
+  const node = {
     id: `file-folder-${Date.now()}`,
-    parentId: getSelectedFolderId(),
+    parentId,
     kind: "folder",
-    name: name.trim(),
+    name: nextFileManagerName(parentId, "New Folder"),
     createdAt: now,
     updatedAt: now,
-  });
+  };
+  manager.nodes.push(node);
+  manager.selectedId = node.id;
   persistFileManager("Created virtual folder");
 }
 
 function createFileManagerTextFile() {
   if (!ensureCanWrite("create text files")) return;
-  const name = window.prompt("Text file name", "New Note.txt");
-  if (!name) return;
   const now = new Date().toISOString();
-  const fileName = name.trim().endsWith(".txt") ? name.trim() : `${name.trim()}.txt`;
-  getFileManager().nodes.push({
+  const manager = getFileManager();
+  const parentId = getSelectedFolderId();
+  const fileName = nextFileManagerName(parentId, "New Note", ".txt");
+  const node = {
     id: `file-text-${Date.now()}`,
-    parentId: getSelectedFolderId(),
+    parentId,
     kind: "file",
     name: fileName,
     extension: ".txt",
@@ -5287,8 +5371,27 @@ function createFileManagerTextFile() {
     previewKind: "text",
     createdAt: now,
     updatedAt: now,
-  });
+  };
+  manager.nodes.push(node);
+  manager.selectedId = node.id;
   persistFileManager("Created virtual text file");
+}
+
+function nextFileManagerName(parentId, baseName, extension = "") {
+  const cleanBase = String(baseName || "New Item")
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const safeBase = cleanBase || "New Item";
+  const normalizedExtension = extension && extension.startsWith(".") ? extension : extension ? `.${extension}` : "";
+  const taken = new Set(getFileChildren(parentId).map((node) => String(node.name || "").toLowerCase()));
+  let candidate = `${safeBase}${normalizedExtension}`;
+  let index = 2;
+  while (taken.has(candidate.toLowerCase())) {
+    candidate = `${safeBase} ${index}${normalizedExtension}`;
+    index += 1;
+  }
+  return candidate;
 }
 
 function renameFileManagerNode() {

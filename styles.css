@@ -48,11 +48,42 @@ body {
   overflow-x: hidden;
 }
 
+body,
+.app-shell,
+.main-content,
+.workspace,
+.panel-view,
+.content-grid,
+.api-panel,
+.results-panel,
+.browser-preview,
+.browser-result-list,
+.browser-preview-card,
+.browser-result-card,
+.browser-history-item,
+.file-os-window,
+.file-os-stage,
+.file-os-body,
+.file-explorer-content,
+.file-explorer-list,
+.file-detail-pane {
+  min-width: 0;
+  max-width: 100%;
+}
+
+img,
+video,
+iframe,
+canvas {
+  max-width: 100%;
+}
+
 button,
 input,
 select,
 textarea {
   font: inherit;
+  max-width: 100%;
 }
 
 button {
@@ -757,6 +788,7 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
   min-height: 26px;
   max-width: 160px;
   padding: 0 9px;
@@ -766,7 +798,10 @@ textarea:focus {
   color: var(--muted);
   font-size: 11px;
   font-weight: 780;
-  line-height: 1;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
 }
 
 .type-chip {
@@ -899,9 +934,13 @@ input[type="range"] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .result-summary-bar span {
+  min-width: 0;
+  max-width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -909,6 +948,8 @@ input[type="range"] {
   color: var(--muted);
   font-size: 12px;
   font-weight: 760;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .result-card,
@@ -1574,6 +1615,8 @@ input[type="range"] {
 
 .file-os-window {
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid #000;
   border-radius: 8px;
   background: #101010;
@@ -1705,8 +1748,9 @@ input[type="range"] {
 
 .file-os-body {
   display: grid;
-  grid-template-columns: 230px minmax(320px, 1fr) 340px;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr) minmax(240px, 340px);
   gap: 0;
+  min-width: 0;
   min-height: 480px;
 }
 
@@ -1820,6 +1864,7 @@ input[type="range"] {
 
 .file-explorer-content {
   overflow: auto;
+  min-width: 0;
   background: #161616;
 }
 
@@ -1853,14 +1898,16 @@ input[type="range"] {
 .file-explorer-list {
   display: grid;
   gap: 1px;
+  min-width: 0;
   padding: 8px;
 }
 
 .file-explorer-row {
   display: grid;
-  grid-template-columns: 30px minmax(140px, 1.5fr) minmax(110px, 0.9fr) 92px minmax(130px, 1fr);
+  grid-template-columns: 30px minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(56px, 92px) minmax(0, 1fr);
   gap: 10px;
   align-items: center;
+  min-width: 0;
   min-height: 42px;
   padding: 7px 9px;
   border: 1px solid transparent;
@@ -1879,6 +1926,7 @@ input[type="range"] {
 .file-explorer-row strong,
 .file-explorer-row span,
 .file-explorer-row small {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2336,6 +2384,7 @@ input[type="range"] {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
+  min-width: 0;
   max-width: 100%;
   min-height: 30px;
   padding: 6px 8px;
@@ -2351,6 +2400,7 @@ input[type="range"] {
   text-align: left;
   text-decoration: none;
   overflow-wrap: anywhere;
+  word-break: break-word;
   white-space: normal;
 }
 
@@ -2648,6 +2698,8 @@ a,
   display: grid;
   gap: 8px;
   margin-top: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .browser-card-links strong,
@@ -2990,6 +3042,8 @@ a,
 .browser-result-card {
   display: grid;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
   padding: 12px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -3005,6 +3059,14 @@ a,
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.browser-preview-card header > div,
+.browser-result-card header > div {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .browser-preview-card strong,
@@ -3076,6 +3138,8 @@ a,
 .browser-result-url-row {
   display: grid;
   gap: 5px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .browser-result-url-row span {
@@ -3087,6 +3151,8 @@ a,
 
 .result-link-button {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .result-url.is-missing {
@@ -3170,6 +3236,46 @@ a,
   width: 100%;
   min-height: 520px;
   color: #fff;
+}
+
+.cloudflare-fallback-card {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #111;
+  background:
+    linear-gradient(145deg, #f4f4f4 0%, #bcbcbc 58%, #7a7a7a 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.cloudflare-fallback-card label {
+  color: #111;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.cloudflare-fallback-card p {
+  margin: 0;
+  color: #1f1f1f;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.inline-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cloudflare-fallback-card input {
+  color: #111;
+  background: linear-gradient(145deg, #fff, #d7d7d7);
 }
 
 .browser-shell {
@@ -3479,6 +3585,23 @@ a,
   .browser-shell,
   .browser-shell iframe {
     min-height: 420px;
+  }
+
+  .inline-search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .browser-preview-card,
+  .browser-result-card,
+  .browser-history-item,
+  .cloudflare-fallback-card {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .browser-preview-card header,
+  .browser-result-card header {
+    grid-template-columns: 1fr;
   }
 
   .panel-heading-actions {

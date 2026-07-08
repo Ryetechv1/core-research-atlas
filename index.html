@@ -434,6 +434,19 @@
                       chat-query-rewrite="true">
                     </chat-page-snippet>
                   </div>
+                  <form id="cloudflareFallbackForm" class="cloudflare-fallback-card" autocomplete="off">
+                    <label for="cloudflareFallbackInput">Cloudflare fallback query</label>
+                    <div class="inline-search-row">
+                      <input id="cloudflareFallbackInput" name="query" type="search" placeholder="Search through the locked Virtual Google OS">
+                      <button class="primary-button iconless" type="submit">Search</button>
+                    </div>
+                    <p id="cloudflareFallbackStatus">
+                      If Cloudflare returns Load failed, make sure the public endpoint is enabled, the chat endpoint is enabled, and this GitHub Pages host is allowed in CORS.
+                    </p>
+                    <div class="form-actions">
+                      <button id="cloudflareEndpointButton" class="ghost-button iconless" type="button">Open Cloudflare Endpoint</button>
+                    </div>
+                  </form>
                 </section>
 
                 <div class="browser-shell">
