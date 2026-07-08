@@ -5230,10 +5230,10 @@ function renderFileManager() {
   const currentFolder = getFileNode(manager.currentFolderId) || getFileNode(manager.rootId);
   if (selected) manager.selectedId = selected.id;
   if (!currentFolder || currentFolder.kind !== "folder") manager.currentFolderId = manager.rootId;
-  els.fileManagerPath.textContent = fileManagerPath(manager.currentFolderId || manager.rootId);
+  els.fileManagerPath.textContent = fileManagerAddressPath(manager.currentFolderId || manager.rootId);
   els.fileManagerStatus.textContent =
     state.fileManagerStatusMessage || `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
-  els.fileManagerTree.innerHTML = renderFileTree(manager.rootId, 0);
+  els.fileManagerTree.innerHTML = renderFileExplorerSidebar(manager.rootId);
   els.fileManagerTree.querySelectorAll("[data-file-id]").forEach((button) => {
     button.addEventListener("click", () => {
       const node = getFileNode(button.dataset.fileId);
@@ -5259,21 +5259,18 @@ function renderFileExplorerList(selected, openFolder = null) {
   const parentFolder = folder?.parentId ? getFileNode(folder.parentId) : null;
   const paneNavigation = `
     <div class="file-pane-navigation" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}">
+      ${
+        parentFolder
+          ? `<button class="file-pane-up" type="button" data-file-open-folder="${escapeHtml(parentFolder.id)}">Up to ${escapeHtml(parentFolder.name)}</button>`
+          : `<span class="file-pane-up-placeholder">CORE ATLAS</span>`
+      }
       <div class="file-pane-breadcrumb" aria-label="Current folder path">
         ${breadcrumb
           .map(
             (part, index) =>
               `<button class="file-crumb${index === breadcrumb.length - 1 ? " is-current" : ""}" type="button" data-file-crumb-id="${escapeHtml(part.id)}">${escapeHtml(part.name)}</button>`
           )
-          .join('<span class="file-crumb-separator">/</span>')}
-      </div>
-      <div class="file-pane-actions">
-        ${
-          parentFolder
-            ? `<button class="ghost-button iconless file-pane-action" type="button" data-file-open-folder="${escapeHtml(parentFolder.id)}">Up to ${escapeHtml(parentFolder.name)}</button>`
-            : ""
-        }
-        <span>${children.length} item${children.length === 1 ? "" : "s"}</span>
+          .join('<span class="file-crumb-separator">›</span>')}
       </div>
     </div>
   `;
@@ -5285,9 +5282,19 @@ function renderFileExplorerList(selected, openFolder = null) {
         </div>`
       : "";
   if (els.fileExplorerFolderName) els.fileExplorerFolderName.textContent = folder?.name || "CORE Atlas";
+  const tableHeader = `
+    <div class="file-details-header" role="row">
+      <span></span>
+      <span>Name</span>
+      <span>Date modified</span>
+      <span>Type</span>
+      <span>Size</span>
+    </div>
+    <div class="file-group-heading"><span>⌄</span><strong>Today</strong></div>
+  `;
   const childrenHtml = children.length
-    ? `<div class="file-explorer-grid">${children.map((child) => renderFileExplorerTile(child, selected, folder)).join("")}</div>`
-    : `<div class="file-preview-unavailable file-drop-empty" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}"><strong>This folder is empty.</strong><span>Import files, create a folder, create a TXT note, or drop an item here.</span></div>`;
+    ? `<div class="file-details-list" role="grid" aria-label="${escapeHtml(folder?.name || "Folder")} contents">${tableHeader}${children.map((child) => renderFileExplorerTile(child, selected, folder)).join("")}</div>`
+    : `<div class="file-details-list is-empty" role="grid" aria-label="${escapeHtml(folder?.name || "Folder")} contents">${tableHeader}<div class="file-preview-unavailable file-drop-empty" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}"><strong>This folder is empty.</strong><span>Import files, create a folder, create a TXT note, or drop an item here.</span></div></div>`;
   els.fileManagerFolderView.innerHTML = `${paneNavigation}${statusBanner}${childrenHtml}`;
   els.fileManagerFolderView.querySelectorAll("[data-file-crumb-id], [data-file-open-folder]").forEach((button) => {
     button.addEventListener("click", () => openFileManagerFolder(button.dataset.fileCrumbId || button.dataset.fileOpenFolder));
@@ -5357,27 +5364,70 @@ function renderFileExplorerList(selected, openFolder = null) {
 function renderFileExplorerTile(child, selected, folder) {
   const active = child.id === selected?.id;
   const renaming = state.fileManagerRenameId === child.id && !isGuestUser();
-  const itemType = child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file";
-  const itemMeasure = child.kind === "folder" ? `${getFileChildren(child.id).length} item${getFileChildren(child.id).length === 1 ? "" : "s"}` : formatBytes(child.size || 0);
-  const itemAction = child.kind === "folder" ? "Select to rename, double-tap or Open to enter." : "Select to rename, double-tap or Preview to view.";
-  const openLabel = child.kind === "folder" ? "Open" : "Preview";
+  const itemType = child.kind === "folder" ? "File folder" : child.mimeType || child.extension || "file";
+  const itemMeasure = child.kind === "folder" ? "" : formatBytes(child.size || 0);
   const nameMarkup = renaming
     ? `<input class="file-inline-rename" data-file-rename-input="${escapeHtml(child.id)}" value="${escapeHtml(child.name)}" aria-label="Rename ${escapeHtml(child.name)}">`
     : `<strong>${escapeHtml(child.name)}</strong>`;
   return `
-    <article class="file-explorer-tile file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}${child.id === state.fileManagerRecentNodeId ? " is-recent" : ""}${renaming ? " is-renaming" : ""}" role="button" tabindex="0" draggable="true" title="${escapeHtml(child.name)}" data-file-list-id="${escapeHtml(child.id)}" data-drop-folder-id="${escapeHtml(child.kind === "folder" ? child.id : folder.id)}">
-      <span class="file-node-icon" aria-hidden="true"></span>
-      <span class="file-explorer-main">
-        ${nameMarkup}
-        <small>${escapeHtml(itemType)} / ${escapeHtml(itemMeasure)}</small>
-        <em>${escapeHtml(itemAction)}</em>
+    <article class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}${child.id === state.fileManagerRecentNodeId ? " is-recent" : ""}${renaming ? " is-renaming" : ""}" role="row" tabindex="0" draggable="true" title="${escapeHtml(child.name)}" data-file-list-id="${escapeHtml(child.id)}" data-drop-folder-id="${escapeHtml(child.kind === "folder" ? child.id : folder.id)}">
+      <span class="file-row-check" aria-hidden="true">${active ? "✓" : ""}</span>
+      <span class="file-name-cell">
+        <span class="file-node-icon" aria-hidden="true"></span>
+        <span class="file-explorer-main">
+          ${nameMarkup}
+        </span>
       </span>
-      <span class="file-explorer-tile-actions" aria-label="File actions for ${escapeHtml(child.name)}">
-        <button type="button" data-file-select-id="${escapeHtml(child.id)}">Select</button>
-        <button type="button" data-file-open-id="${escapeHtml(child.id)}">${escapeHtml(openLabel)}</button>
-        <button type="button" data-file-rename-id="${escapeHtml(child.id)}"${writeDisabledAttr()}>Rename</button>
-      </span>
+      <span class="file-modified-cell">${escapeHtml(formatFileManagerDate(child.updatedAt || child.createdAt))}</span>
+      <span class="file-type-cell">${escapeHtml(itemType)}</span>
+      <span class="file-size-cell">${escapeHtml(itemMeasure)}</span>
     </article>
+  `;
+}
+
+function renderFileExplorerSidebar(rootId) {
+  const pinned = [
+    ["🏠", "Home"],
+    ["🖼", "Gallery"],
+    ["☁", "Seth - Personal"],
+    ["🖥", "Desktop"],
+    ["↓", "Downloads"],
+    ["▤", "Documents"],
+    ["▧", "Pictures"],
+    ["♫", "Music"],
+    ["▣", "Videos"],
+    ["▤", "Screenshots"],
+    ["▤", "Codex GPT"],
+    ["▤", "CORE ATLAS"],
+  ];
+  const drives = [
+    ["▸", "This PC"],
+    ["▸", "Virtual Drive 1"],
+    ["▸", "Virtual Drive 2"],
+    ["▸", "OS (C:)"],
+    ["▸", "VHD Dev Drive 1"],
+    ["▸", "Network"],
+  ];
+  return `
+    <div class="file-sidebar-section">
+      ${pinned
+        .map(
+          ([icon, label]) =>
+            `<button class="file-sidebar-item${label === "Downloads" ? " is-active" : ""}" type="button" tabindex="-1"><span>${icon}</span><strong>${escapeHtml(label)}</strong></button>`
+        )
+        .join("")}
+    </div>
+    <div class="file-sidebar-section is-tree">
+      ${renderFileTree(rootId, 0)}
+    </div>
+    <div class="file-sidebar-section">
+      ${drives
+        .map(
+          ([icon, label]) =>
+            `<button class="file-sidebar-item" type="button" tabindex="-1"><span>${icon}</span><strong>${escapeHtml(label)}</strong></button>`
+        )
+        .join("")}
+    </div>
   `;
 }
 
@@ -5409,27 +5459,34 @@ function renderFileManagerDetail(node) {
     return;
   }
   const children = node.kind === "folder" ? getFileChildren(node.id) : [];
-  const meta = `
-    <div class="file-detail-meta">
-      <span><strong>Name:</strong> ${escapeHtml(node.name)}</span>
-      <span><strong>Type:</strong> ${escapeHtml(node.kind === "folder" ? "Folder" : node.mimeType || node.extension || "file")}</span>
-      <span><strong>Size:</strong> ${escapeHtml(formatBytes(node.size || 0))}</span>
-      <span><strong>Updated:</strong> ${escapeHtml(new Date(node.updatedAt || Date.now()).toLocaleString())}</span>
+  const typeLabel = node.kind === "folder" ? "File folder" : node.mimeType || node.extension || "file";
+  const detailMeta = `
+    <div class="file-detail-hero">
+      <span class="file-detail-large-icon ${node.kind === "file" ? "is-file" : ""}" aria-hidden="true"></span>
     </div>
+    <h3>${escapeHtml(node.name)}</h3>
+    <section class="file-detail-section">
+      <strong>Details</strong>
+      <dl>
+        <dt>Type</dt>
+        <dd>${escapeHtml(typeLabel)}</dd>
+        <dt>File location</dt>
+        <dd>${escapeHtml(fileManagerWindowsLocation(node.id))}</dd>
+        <dt>Date modified</dt>
+        <dd>${escapeHtml(formatFileManagerDate(node.updatedAt || node.createdAt))}</dd>
+        <dt>Size</dt>
+        <dd>${escapeHtml(node.kind === "folder" ? `${children.length} item${children.length === 1 ? "" : "s"}` : formatBytes(node.size || 0))}</dd>
+      </dl>
+    </section>
   `;
   if (node.kind === "folder") {
     els.fileManagerDetail.innerHTML = `
-      <h3>${escapeHtml(node.name)}</h3>
-      ${meta}
+      ${detailMeta}
       <div class="file-detail-actions">
         <button class="primary-button iconless" type="button" data-file-open-folder-detail="${escapeHtml(node.id)}">Open Folder</button>
         <button class="ghost-button iconless" type="button" data-file-new-folder-inside="${escapeHtml(node.id)}"${writeDisabledAttr()}>New Folder Inside</button>
         <button class="ghost-button iconless" type="button" data-file-new-text-inside="${escapeHtml(node.id)}"${writeDisabledAttr()}>New TXT Here</button>
         <button class="ghost-button iconless" type="button" data-file-rename-id="${escapeHtml(node.id)}"${writeDisabledAttr()}>Rename</button>
-      </div>
-      <div class="file-preview-unavailable">
-        <strong>${children.length} item${children.length === 1 ? "" : "s"} in this folder.</strong>
-        <span>Use New Folder Inside to create a nested branch here, or open this folder to view its contents.</span>
       </div>
     `;
     els.fileManagerDetail.querySelectorAll("[data-file-open-folder-detail]").forEach((button) => {
@@ -5447,8 +5504,7 @@ function renderFileManagerDetail(node) {
     return;
   }
   els.fileManagerDetail.innerHTML = `
-    <h3>${escapeHtml(node.name)}</h3>
-    ${meta}
+    ${detailMeta}
     <div class="file-detail-actions">
       <button class="primary-button iconless" type="button" data-file-open-original="${escapeHtml(node.id)}">Open Original</button>
       <button class="ghost-button iconless" type="button" data-file-share-team="${escapeHtml(node.id)}"${writeDisabledAttr()}>Share to Team Chat</button>
@@ -5682,6 +5738,28 @@ function fileManagerPath(nodeId) {
     cursor = getFileNode(cursor.parentId);
   }
   return `/${names.join("/")}`;
+}
+
+function fileManagerAddressPath(nodeId) {
+  const parts = fileManagerBreadcrumb(nodeId).map((part) => part.name);
+  return ["Downloads", "Example", ...parts].join(" > ");
+}
+
+function fileManagerWindowsLocation(nodeId) {
+  const parts = fileManagerBreadcrumb(nodeId).map((part) => part.name);
+  return `C:\\Users\\alola\\Downloads\\Example\\${parts.join("\\")}`;
+}
+
+function formatFileManagerDate(value) {
+  const date = new Date(value || Date.now());
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function fileManagerBreadcrumb(nodeId) {

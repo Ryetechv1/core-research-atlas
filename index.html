@@ -749,12 +749,28 @@
 
                 <section class="file-os-window" aria-labelledby="fileManagerTitle">
                   <header class="file-os-titlebar">
-                    <div class="file-manager-plaque">
+                    <div class="file-manager-plaque file-os-tab">
+                      <span class="file-tab-icon" aria-hidden="true"></span>
                       <h2 id="fileManagerTitle">File Manager</h2>
+                      <span class="file-tab-close" aria-hidden="true">×</span>
                     </div>
-                    <span class="detail-chip" id="fileManagerStatus">Ready</span>
+                    <span class="file-tab-add" aria-hidden="true">+</span>
+                    <span class="file-window-controls" aria-hidden="true">− □ ×</span>
                   </header>
                   <div class="file-os-stage">
+                    <div class="file-address-row" aria-label="File navigation">
+                      <div class="file-address-controls" aria-hidden="true">
+                        <span>‹</span>
+                        <span>›</span>
+                        <span>⌃</span>
+                        <span>⟳</span>
+                      </div>
+                      <p class="file-os-path" id="fileManagerPath">/CORE Atlas</p>
+                      <label class="file-search-box">
+                        <span class="sr-only">Search CORE ATLAS</span>
+                        <input type="search" placeholder="Search CORE ATLAS" readonly>
+                      </label>
+                    </div>
                     <div class="file-os-command-row">
                       <div class="file-os-primary-actions" aria-label="File import and export">
                         <label class="file-command-button file-import-trigger">
@@ -774,7 +790,6 @@
                       <button class="ghost-button iconless" id="filePasteButton" type="button">Paste</button>
                       <button class="ghost-button iconless" id="fileDeleteButton" type="button">Delete</button>
                     </div>
-                    <p class="file-os-path" id="fileManagerPath">/CORE Atlas</p>
                     <div class="file-os-body">
                       <nav class="file-tree" id="fileManagerTree" aria-label="File tree"></nav>
                       <section class="file-explorer-content" aria-label="Folder contents">
@@ -788,6 +803,10 @@
                         <div id="fileManagerDetail" class="file-manager-detail"></div>
                       </aside>
                     </div>
+                    <footer class="file-os-statusbar">
+                      <span id="fileManagerStatus">Ready</span>
+                      <span class="file-view-toggle" aria-hidden="true">☰ □</span>
+                    </footer>
                   </div>
                 </section>
               </div>
