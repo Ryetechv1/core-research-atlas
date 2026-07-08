@@ -156,7 +156,6 @@
                 <button class="segment" type="button" data-panel="openAiPanel">OpenAI</button>
                 <button class="segment" type="button" data-panel="teamPanel">Team</button>
                 <button class="segment" type="button" data-panel="collabPanel">Docs</button>
-                <button class="segment" type="button" data-panel="filesPanel">Files</button>
                 <button class="segment" type="button" data-panel="memoryPanel">Memory</button>
                 <button class="segment" type="button" data-panel="profilesPanel">Profiles</button>
                 <button class="segment" type="button" data-panel="codexPanel">Codex</button>
@@ -703,110 +702,6 @@
                     <button class="ghost-button" id="exportCollabJsonButton" type="button">JSON</button>
                     <button class="ghost-button" id="printCollabDocButton" type="button">PDF / Print</button>
                     <button class="ghost-button" id="collabDocToSourceButton" type="button">Add to Sources</button>
-                  </div>
-                </section>
-              </div>
-            </section>
-
-            <section id="filesPanel" class="panel-view">
-              <div class="file-os-grid">
-                <section class="api-panel cloud-integration-panel" aria-labelledby="cloudIntegrationTitle">
-                  <div class="panel-heading compact">
-                    <div>
-                      <h2 id="cloudIntegrationTitle">Cloud Storage and Workspace Links</h2>
-                      <p>Open cloud services for import/export handoff while keeping this atlas local-first.</p>
-                    </div>
-                    <span class="detail-chip">Connectors</span>
-                  </div>
-                  <div class="cloud-card-grid" id="cloudIntegrationGrid">
-                    <article>
-                      <strong>Google Drive</strong>
-                      <span>Store research files, PDFs, images, and exports.</span>
-                      <button class="ghost-button iconless" type="button" data-cloud-open="https://drive.google.com/drive/my-drive">Open Drive</button>
-                    </article>
-                    <article>
-                      <strong>MEGA Cloud</strong>
-                      <span>Upload large archive folders and shared files.</span>
-                      <button class="ghost-button iconless" type="button" data-cloud-open="https://mega.nz/fm">Open MEGA</button>
-                    </article>
-                    <article>
-                      <strong>Google Docs</strong>
-                      <span>Draft documents outside the atlas when needed.</span>
-                      <button class="ghost-button iconless" type="button" data-cloud-open="https://docs.google.com/document/u/0/">Open Docs</button>
-                    </article>
-                    <article>
-                      <strong>Google Forms</strong>
-                      <span>Collect team research submissions and votes.</span>
-                      <button class="ghost-button iconless" type="button" data-cloud-open="https://docs.google.com/forms/u/0/">Open Forms</button>
-                    </article>
-                    <article>
-                      <strong>Google Sheets</strong>
-                      <span>Track citations, tags, and source review tables.</span>
-                      <button class="ghost-button iconless" type="button" data-cloud-open="https://docs.google.com/spreadsheets/u/0/">Open Sheets</button>
-                    </article>
-                  </div>
-                </section>
-
-                <section class="file-os-window" aria-labelledby="fileManagerTitle">
-                  <header class="file-os-titlebar">
-                    <div class="file-manager-plaque file-os-tab">
-                      <span class="file-tab-icon" aria-hidden="true"></span>
-                      <h2 id="fileManagerTitle">File Manager</h2>
-                      <span class="file-tab-close" aria-hidden="true">×</span>
-                    </div>
-                    <span class="file-tab-add" aria-hidden="true">+</span>
-                    <span class="file-window-controls" aria-hidden="true">− □ ×</span>
-                  </header>
-                  <div class="file-os-stage">
-                    <div class="file-address-row" aria-label="File navigation">
-                      <div class="file-address-controls" aria-hidden="true">
-                        <span>‹</span>
-                        <span>›</span>
-                        <span>⌃</span>
-                        <span>⟳</span>
-                      </div>
-                      <p class="file-os-path" id="fileManagerPath">/CORE Atlas</p>
-                      <label class="file-search-box">
-                        <span class="sr-only">Search CORE ATLAS</span>
-                        <input type="search" placeholder="Search CORE ATLAS" readonly>
-                      </label>
-                    </div>
-                    <div class="file-os-command-row">
-                      <div class="file-os-primary-actions" aria-label="File import and export">
-                        <label class="file-command-button file-import-trigger">
-                          Import Files
-                          <input id="fileManagerImportInput" type="file" multiple hidden>
-                        </label>
-                        <button class="file-command-button" id="fileExportButton" type="button">Export Files</button>
-                      </div>
-                      <button class="file-share-button" id="fileShareTeamButton" type="button">Share File to Team Chat</button>
-                    </div>
-                    <div class="file-os-toolbar" aria-label="File manager actions">
-                      <button class="ghost-button iconless" id="fileNewFolderButton" type="button">New Folder</button>
-                      <button class="ghost-button iconless" id="fileNewTextButton" type="button">New TXT</button>
-                      <button class="ghost-button iconless" id="fileRenameButton" type="button">Rename</button>
-                      <button class="ghost-button iconless" id="fileCopyButton" type="button">Copy</button>
-                      <button class="ghost-button iconless" id="fileMoveButton" type="button">Move</button>
-                      <button class="ghost-button iconless" id="filePasteButton" type="button">Paste</button>
-                      <button class="ghost-button iconless" id="fileDeleteButton" type="button">Delete</button>
-                    </div>
-                    <div class="file-os-body">
-                      <nav class="file-tree" id="fileManagerTree" aria-label="File tree"></nav>
-                      <section class="file-explorer-content" aria-label="Folder contents">
-                        <header class="file-explorer-header">
-                          <span>Contents</span>
-                          <strong id="fileExplorerFolderName">CORE Atlas</strong>
-                        </header>
-                        <div class="file-explorer-list" id="fileManagerFolderView" aria-live="polite"></div>
-                      </section>
-                      <aside class="file-detail-pane" aria-label="Selected file detail">
-                        <div id="fileManagerDetail" class="file-manager-detail"></div>
-                      </aside>
-                    </div>
-                    <footer class="file-os-statusbar">
-                      <span id="fileManagerStatus">Ready</span>
-                      <span class="file-view-toggle" aria-hidden="true">☰ □</span>
-                    </footer>
                   </div>
                 </section>
               </div>

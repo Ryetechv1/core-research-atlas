@@ -30,7 +30,6 @@ The static UI can also be opened directly with `index.html`, but backend routes 
 - `api/` - Vercel-style Python route handlers.
 - `scripts/google_search.py` - Google Custom Search helper.
 - `scripts/file_import_extract.py` - upload reader for text, JSON, Markdown, code, HTML, DOCX, PDF best-effort, ZIP, and image metadata.
-- `scripts/mini_file_explorer.py` - Tkinter folder picker and command-line scanner that exports `workspace_tree.json` for File Manager import.
 - `scripts/export_pack.py` - regenerates the downloadable integration files in `dist/`.
 - `data/research_seed.json` - starter archive data.
 
@@ -68,24 +67,6 @@ The Import panel supports common research formats:
 `.txt`, `.json`, `.py`, `.js`, `.css`, `.md`, `.html`, `.doc`, `.docx`, `.pdf`, `.csv`, `.xml`, `.yaml`, `.yml`, `.zip`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.svg`, `.bmp`, `.tif`, `.tiff`, `.heic`, `.avif`
 
 Imports can create Source records and file logs. ChatGPT export structures are detected so useful conversation data can be reviewed inside the atlas.
-
-## File Manager Workspace Tree
-
-The File Manager can import a `workspace_tree.json` produced by the local mini explorer helper. This recreates the scanned folder/file hierarchy inside the app's virtual Explorer tree.
-
-GUI picker:
-
-```powershell
-python scripts/mini_file_explorer.py
-```
-
-Direct scan:
-
-```powershell
-python scripts/mini_file_explorer.py --path "C:\Users\alola\Downloads\Example"
-```
-
-Then import the generated `workspace_tree.json` through File Manager > Import Files.
 
 ## Collaboration
 
