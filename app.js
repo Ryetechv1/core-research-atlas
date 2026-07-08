@@ -821,6 +821,7 @@ function cacheElements() {
   els.filePasteButton = document.getElementById("filePasteButton");
   els.fileDeleteButton = document.getElementById("fileDeleteButton");
   els.fileExportButton = document.getElementById("fileExportButton");
+  els.fileShareTeamButton = document.getElementById("fileShareTeamButton");
   els.fileManagerImportInput = document.getElementById("fileManagerImportInput");
   els.createMemorySnapshotButton = document.getElementById("createMemorySnapshotButton");
   els.exportMemoryBankButton = document.getElementById("exportMemoryBankButton");
@@ -932,6 +933,7 @@ function wireEvents() {
   els.filePasteButton?.addEventListener("click", pasteFileManagerNode);
   els.fileDeleteButton?.addEventListener("click", deleteFileManagerNode);
   els.fileExportButton?.addEventListener("click", exportFileManagerNode);
+  els.fileShareTeamButton?.addEventListener("click", shareSelectedFileToTeamChat);
   els.fileManagerImportInput?.addEventListener("change", handleFileManagerImport);
   els.createMemorySnapshotButton.addEventListener("click", () => createManualMemorySnapshot("Manual user snapshot"));
   els.exportMemoryBankButton.addEventListener("click", exportMemoryBank);
@@ -1148,6 +1150,7 @@ function renderPermissionState() {
     "filePasteButton",
     "fileDeleteButton",
     "fileExportButton",
+    "fileShareTeamButton",
     "fileManagerImportInput",
   ].forEach((id) => {
     const control = document.getElementById(id);
@@ -1522,10 +1525,41 @@ function openSourceInBrowser(sourceId) {
   if (!source) return;
   previewSourceInBrowser(sourceId);
   if (isInternalSourceLocator(source)) {
-    openSourceFilePreview(sourceId);
+    if (!openSourceOriginalFile(source)) {
+      openSourceFilePreview(sourceId);
+    }
     return;
   }
   if (source.url) openExternalUrl(source.url);
+}
+
+function openSourceOriginalFile(source = {}) {
+  if (source.fileAttachment) {
+    return openStoredFilePage(source.fileAttachment, { title: source.title, origin: "Team source log", url: source.url });
+  }
+  if (source.importId) {
+    const imported = findImportedFile(source.importId);
+    if (imported) return openStoredFilePage(imported, { title: source.title, origin: "Imported source log", url: source.url });
+  }
+  if (source.url?.startsWith("local-collab-doc://")) {
+    const doc = getCollabDocFromUrl(source.url);
+    if (doc) {
+      return openStoredFilePage(
+        {
+          fileName: `${doc.title || "collaboration-doc"}.html`,
+          extension: ".html",
+          mimeType: "text/html",
+          size: String(doc.contentHtml || "").length,
+          previewKind: "text",
+          textExcerpt: collabDocToText(doc),
+          summary: `${doc.type || "Document"} / ${doc.status || "Draft"} / ${doc.owner || "Unassigned"}`,
+          storedPreview: true,
+        },
+        { title: source.title, origin: "Collaboration document source" }
+      );
+    }
+  }
+  return false;
 }
 
 function isInternalSourceLocator(source = {}) {
@@ -1639,6 +1673,13 @@ function openFilePreviewDialog(file, context = {}) {
   els.filePreviewBody.querySelectorAll("[data-preview-external]").forEach((button) => {
     button.addEventListener("click", () => openExternalUrl(button.dataset.previewExternal));
   });
+  els.filePreviewBody.querySelectorAll("[data-preview-original]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!openStoredFilePage(file, context)) {
+        window.alert("The original file bytes were not stored for this source. Re-import the file while it is under the stored preview size limit to open it directly.");
+      }
+    });
+  });
 }
 
 function closeFilePreviewDialog() {
@@ -1655,7 +1696,11 @@ function renderFilePreviewContent(file = {}, context = {}) {
   const summary = file.summary || "No summary stored.";
   const warnings = Array.isArray(file.warnings) ? file.warnings : [];
   const url = context.url || file.url || "";
+  const hasOriginal = Boolean(dataUrl || isTextOriginalFile(file, kind) || /^https?:\/\//i.test(url));
   const warningHtml = warnings.length ? `<ul>${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>` : "";
+  const originalButton = hasOriginal
+    ? `<button class="primary-button iconless" type="button" data-preview-original>Open Original File</button>`
+    : "";
   const meta = `
     <div class="file-preview-meta-grid">
       <span><strong>Name:</strong> ${escapeHtml(file.fileName || context.title || "Untitled")}</span>
@@ -1665,6 +1710,7 @@ function renderFilePreviewContent(file = {}, context = {}) {
     </div>
     <p>${escapeHtml(summary)}</p>
     ${warningHtml}
+    ${originalButton}
   `;
   if (kind === "web" && url) {
     return `${meta}<button class="primary-button iconless" type="button" data-preview-external="${escapeHtml(url)}">Open External</button>`;
@@ -1678,6 +1724,91 @@ function renderFilePreviewContent(file = {}, context = {}) {
     return `${meta}<pre class="file-preview-text">${escapeHtml(clampText(decoded, PREVIEW_TEXT_LIMIT))}</pre>`;
   }
   return `${meta}<pre class="file-preview-text">${escapeHtml(text || JSON.stringify(file, null, 2))}</pre>`;
+}
+
+function openStoredFilePage(file = {}, context = {}) {
+  const kind = file.previewKind || previewKindForFile(file);
+  const dataUrl = file.dataUrl || "";
+  const url = context.url || file.url || "";
+  if (!dataUrl && /^https?:\/\//i.test(url)) {
+    openExternalUrl(url);
+    return true;
+  }
+  const text = isTextOriginalFile(file, kind) ? decodeDataUrlText(dataUrl) || file.text || file.textExcerpt || "" : "";
+  if (!dataUrl && !text) return false;
+
+  saveCurrentUserLocation();
+  const title = context.title || file.fileName || "Source file";
+  const fileName = file.fileName || title;
+  const type = file.mimeType || file.extension || kind;
+  const summary = file.summary || context.origin || "Stored atlas file";
+  const escapedDataUrl = escapeHtml(dataUrl);
+  const escapedName = escapeHtml(fileName);
+  let viewer = "";
+
+  if (dataUrl && kind === "pdf") {
+    viewer = `<iframe class="original-viewer-frame" title="${escapedName}" src="${escapedDataUrl}"></iframe>`;
+  } else if (dataUrl && kind === "image") {
+    viewer = `<img class="original-viewer-media" src="${escapedDataUrl}" alt="${escapedName}">`;
+  } else if (dataUrl && kind === "video") {
+    viewer = `<video class="original-viewer-media" controls src="${escapedDataUrl}"></video>`;
+  } else if (dataUrl && kind === "audio") {
+    viewer = `<audio class="original-viewer-audio" controls src="${escapedDataUrl}"></audio>`;
+  } else if (text) {
+    viewer = `<pre class="original-viewer-text">${escapeHtml(text)}</pre>`;
+  } else if (dataUrl) {
+    viewer = `<a class="original-download" href="${escapedDataUrl}" download="${escapedName}">Open or download ${escapedName}</a>`;
+  }
+
+  const downloadLink = dataUrl
+    ? `<a class="original-download" href="${escapedDataUrl}" download="${escapedName}">Download Original</a>`
+    : "";
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #050505, #303030 55%, #f5f5f5); color: #fff; font-family: Inter, system-ui, sans-serif; }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px; border-bottom: 1px solid rgba(255,255,255,.28); background: rgba(0,0,0,.46); }
+    h1 { margin: 0; font-size: 18px; line-height: 1.25; }
+    p { margin: 4px 0 0; color: rgba(255,255,255,.76); font-size: 13px; }
+    main { display: grid; gap: 14px; min-height: calc(100vh - 84px); padding: 16px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+    .meta span, .original-download { border: 1px solid #fff; border-radius: 8px; padding: 8px 10px; color: #111; background: linear-gradient(145deg, #fff, #cfcfcf); font-size: 12px; font-weight: 760; text-decoration: none; }
+    .original-viewer-frame { width: 100%; min-height: 78vh; border: 1px solid #fff; border-radius: 8px; background: #fff; }
+    .original-viewer-media { display: block; width: min(100%, 1100px); max-height: 78vh; margin: 0 auto; border: 1px solid #fff; border-radius: 8px; background: #111; object-fit: contain; }
+    .original-viewer-audio { width: min(100%, 760px); margin: 0 auto; }
+    .original-viewer-text { overflow: auto; min-height: 70vh; margin: 0; padding: 16px; border: 1px solid #fff; border-radius: 8px; color: #111; background: #fff; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>${escapeHtml(title)}</h1>
+      <p>${escapeHtml(summary)}</p>
+    </div>
+    <div class="meta">
+      <span>${escapeHtml(type)}</span>
+      <span>${escapeHtml(formatBytes(file.size || 0))}</span>
+      ${downloadLink}
+    </div>
+  </header>
+  <main>${viewer}</main>
+</body>
+</html>`;
+  const pageUrl = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  const opened = window.open(pageUrl, "_blank");
+  window.setTimeout(() => URL.revokeObjectURL(pageUrl), 90_000);
+  return Boolean(opened);
+}
+
+function isTextOriginalFile(file = {}, kind = file.previewKind || previewKindForFile(file)) {
+  const extension = String(file.extension || extensionFromFileName(file.fileName)).toLowerCase();
+  const mime = String(file.mimeType || "").toLowerCase();
+  return kind === "text" || mime.startsWith("text/") || [".txt", ".json", ".py", ".js", ".css", ".md", ".markdown", ".html", ".htm", ".csv", ".xml", ".yaml", ".yml"].includes(extension);
 }
 
 function decodeDataUrlText(dataUrl) {
@@ -4804,9 +4935,13 @@ function renderFileTree(parentId, depth) {
   const children = getFileChildren(parentId);
   const current = getFileNode(parentId);
   const currentHtml = current
-    ? `<button class="file-tree-item${manager.selectedId === current.id ? " is-active" : ""}" type="button" data-file-id="${escapeHtml(current.id)}" style="--depth:${depth}">
-        <span>${current.kind === "folder" ? "Folder" : "File"}</span>
-        <strong>${escapeHtml(current.name)}</strong>
+    ? `<button class="file-tree-item ${current.kind === "folder" ? "is-folder" : "is-file"}${manager.selectedId === current.id ? " is-active" : ""}" type="button" data-file-id="${escapeHtml(current.id)}" style="--depth:${depth}">
+        <span class="file-tree-branch" aria-hidden="true"></span>
+        <span class="file-node-icon" aria-hidden="true"></span>
+        <span class="file-tree-label">
+          <strong>${escapeHtml(current.name)}</strong>
+          <small>${escapeHtml(current.kind === "folder" ? `${children.length} item${children.length === 1 ? "" : "s"}` : current.extension || current.mimeType || "file")}</small>
+        </span>
       </button>`
     : "";
   return `${currentHtml}${children.map((child) => renderFileTree(child.id, depth + 1)).join("")}`;
@@ -4837,6 +4972,7 @@ function renderFileManagerDetail(node) {
                 .map(
                   (child) => `
                     <button class="file-folder-tile" type="button" data-file-tile="${escapeHtml(child.id)}">
+                      <span class="file-folder-tile-icon ${child.kind === "folder" ? "is-folder" : "is-file"}" aria-hidden="true"></span>
                       <strong>${escapeHtml(child.name)}</strong>
                       <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
                     </button>
@@ -4855,10 +4991,20 @@ function renderFileManagerDetail(node) {
   els.fileManagerDetail.innerHTML = `
     <h3>${escapeHtml(node.name)}</h3>
     ${meta}
+    <div class="file-detail-actions">
+      <button class="primary-button iconless" type="button" data-file-open-original="${escapeHtml(node.id)}">Open Original</button>
+      <button class="ghost-button iconless" type="button" data-file-share-team="${escapeHtml(node.id)}"${writeDisabledAttr()}>Share to Team Chat</button>
+    </div>
     ${renderFileNodePreview(node)}
   `;
   const editor = els.fileManagerDetail.querySelector("[data-file-text-editor]");
   editor?.addEventListener("input", () => updateFileManagerTextFile(node.id, editor.value));
+  els.fileManagerDetail.querySelectorAll("[data-file-open-original]").forEach((button) => {
+    button.addEventListener("click", () => openFileManagerNodeOriginal(button.dataset.fileOpenOriginal));
+  });
+  els.fileManagerDetail.querySelectorAll("[data-file-share-team]").forEach((button) => {
+    button.addEventListener("click", () => shareFileManagerNodeToTeam(button.dataset.fileShareTeam));
+  });
 }
 
 function renderFileNodePreview(node) {
@@ -5103,6 +5249,85 @@ function exportFileManagerNode() {
     return;
   }
   download(`${slugify(node.name)}.json`, "application/json", JSON.stringify(node, null, 2));
+}
+
+function openFileManagerNodeOriginal(nodeId) {
+  const node = getFileNode(nodeId);
+  if (!node || node.kind !== "file") return;
+  if (!openStoredFilePage(fileManagerNodeToPreviewFile(node), { title: node.name, origin: fileManagerPath(node.id) })) {
+    window.alert("This file manager item only has metadata. Import the original file under the stored preview limit to open it directly.");
+  }
+}
+
+function shareSelectedFileToTeamChat() {
+  const node = getSelectedFileNode();
+  if (!node || node.kind !== "file") {
+    window.alert("Select a file before sharing to Team Chat.");
+    return;
+  }
+  shareFileManagerNodeToTeam(node.id);
+}
+
+function shareFileManagerNodeToTeam(nodeId) {
+  if (!ensureCanWrite("share files to Team Chat")) return;
+  const node = getFileNode(nodeId);
+  if (!node || node.kind !== "file") return;
+  const attachment = fileManagerNodeToTeamAttachment(node);
+  const item = {
+    id: `team-${Date.now()}-${Math.round(Math.random() * 999)}`,
+    type: "promote",
+    owner: state.currentUser?.username || "local",
+    title: `File Manager share: ${node.name}`,
+    text: `Shared from ${fileManagerPath(node.id)} for team review and possible source promotion.`,
+    url: "",
+    status: "review",
+    votes: {},
+    reactions: {},
+    fileAttachment: attachment,
+    createdAt: new Date().toISOString(),
+  };
+  state.archive.teamMessages = mergeTeamMessages([item], state.archive.teamMessages || []).slice(0, 200);
+  broadcastTeamMessages();
+  persistArchive("Shared file manager item to team chat");
+  postTeamChatPayload({ action: "post", item });
+  state.activePanel = "teamPanel";
+  saveUserLocation({ panel: "teamPanel" });
+  render();
+}
+
+function fileManagerNodeToPreviewFile(node = {}) {
+  return {
+    fileName: node.name,
+    extension: node.extension,
+    mimeType: node.mimeType,
+    size: node.size,
+    previewKind: node.previewKind || previewKindForFile(node),
+    dataUrl: node.dataUrl || "",
+    text: node.text || "",
+    textExcerpt: node.text || decodeDataUrlText(node.dataUrl),
+    summary: `${node.kind === "folder" ? "Folder" : "Virtual file"} stored in the CORE Atlas file manager.`,
+    storedPreview: Boolean(node.dataUrl || node.text),
+    warnings: node.dataUrl || node.text ? [] : ["Original bytes are not stored for this file manager item."],
+  };
+}
+
+function fileManagerNodeToTeamAttachment(node = {}) {
+  const preview = fileManagerNodeToPreviewFile(node);
+  return {
+    id: `team-file-${Date.now()}-${Math.round(Math.random() * 999)}`,
+    fileName: preview.fileName,
+    extension: preview.extension,
+    mimeType: preview.mimeType,
+    size: preview.size,
+    previewKind: preview.previewKind,
+    summary: preview.summary,
+    keywords: extractKeywords(`${preview.fileName} ${preview.textExcerpt || ""}`),
+    textExcerpt: clampText(preview.textExcerpt || preview.text || "", PREVIEW_TEXT_LIMIT),
+    dataUrl: preview.dataUrl,
+    storedPreview: preview.storedPreview,
+    warnings: preview.warnings,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function renderProfiles() {
