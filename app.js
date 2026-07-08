@@ -32,6 +32,7 @@ const FILE_STORE_OBJECT_STORE = "files";
 const FILE_STORE_DB_VERSION = 1;
 const FILE_STORE_MAX_BYTES = 50_000_000;
 const PREVIEW_TEXT_LIMIT = 80_000;
+const FILE_MANAGER_DRAG_MIME = "application/x-core-atlas-file-id";
 const GUEST_SESSION_VALUE = "Guest";
 const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
 
@@ -239,6 +240,7 @@ const DEFAULT_COLLAB_DOCS = [
 const DEFAULT_FILE_MANAGER = {
   rootId: "file-root",
   selectedId: "file-root",
+  currentFolderId: "file-root",
   nodes: [
     {
       id: "file-root",
@@ -5144,7 +5146,11 @@ function normalizeFileManager(manager = DEFAULT_FILE_MANAGER) {
   const nodes = mergeById(base.nodes, incomingNodes).map(normalizeFileNode);
   if (!nodes.some((node) => node.id === base.rootId)) nodes.unshift(normalizeFileNode(base.nodes[0]));
   const selectedId = nodes.some((node) => node.id === manager.selectedId) ? manager.selectedId : base.rootId;
-  return { rootId: base.rootId, selectedId, nodes };
+  const currentFolder = nodes.find((node) => node.id === manager.currentFolderId && node.kind === "folder");
+  const selected = nodes.find((node) => node.id === selectedId);
+  const selectedFolder = selected?.kind === "folder" ? selected : nodes.find((node) => node.id === selected?.parentId && node.kind === "folder");
+  const currentFolderId = currentFolder?.id || selectedFolder?.id || base.rootId;
+  return { rootId: base.rootId, selectedId, currentFolderId, nodes };
 }
 
 function normalizeFileNode(node = {}) {
@@ -5171,8 +5177,10 @@ function renderFileManager() {
   if (!els.fileManagerTree || !els.fileManagerDetail) return;
   const manager = getFileManager();
   const selected = getFileNode(manager.selectedId) || getFileNode(manager.rootId);
+  const currentFolder = getFileNode(manager.currentFolderId) || getFileNode(manager.rootId);
   if (selected) manager.selectedId = selected.id;
-  els.fileManagerPath.textContent = fileManagerPath(selected?.id || manager.rootId);
+  if (!currentFolder || currentFolder.kind !== "folder") manager.currentFolderId = manager.rootId;
+  els.fileManagerPath.textContent = fileManagerPath(manager.currentFolderId || manager.rootId);
   els.fileManagerStatus.textContent =
     state.fileManagerStatusMessage || `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
   els.fileManagerTree.innerHTML = renderFileTree(manager.rootId, 0);
@@ -5186,32 +5194,42 @@ function renderFileManager() {
       openFileManagerFile(node?.id);
     });
   });
-  renderFileExplorerList(selected);
+  renderFileExplorerList(selected, currentFolder);
   renderFileManagerDetail(selected);
   renderPermissionState();
 }
 
-function renderFileExplorerList(selected) {
+function renderFileExplorerList(selected, openFolder = null) {
   if (!els.fileManagerFolderView) return;
-  const folder = selected?.kind === "folder" ? selected : getFileNode(selected?.parentId) || getFileNode(getFileManager().rootId);
+  const manager = getFileManager();
+  const folder = openFolder?.kind === "folder" ? openFolder : getFileNode(manager.currentFolderId) || getFileNode(manager.rootId);
   const children = folder ? getFileChildren(folder.id) : [];
+  const clipboardNode = state.fileClipboard?.id ? getFileNode(state.fileClipboard.id) : null;
+  const statusBanner =
+    state.fileManagerStatusMessage || clipboardNode
+      ? `<div class="file-manager-activity" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}">
+          ${state.fileManagerStatusMessage ? `<strong>${escapeHtml(state.fileManagerStatusMessage)}</strong>` : ""}
+          ${clipboardNode ? `<span>${escapeHtml(state.fileClipboard.mode === "move" ? "Move ready" : "Copy ready")}: ${escapeHtml(clipboardNode.name)}. Tap Paste to place it in ${escapeHtml(folder?.name || "this folder")}.</span>` : ""}
+        </div>`
+      : "";
   if (els.fileExplorerFolderName) els.fileExplorerFolderName.textContent = folder?.name || "CORE Atlas";
-  els.fileManagerFolderView.innerHTML = children.length
+  const childrenHtml = children.length
     ? children
         .map((child) => {
           const active = child.id === selected?.id;
           return `
-            <button class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}" type="button" data-file-list-id="${escapeHtml(child.id)}">
+            <button class="file-explorer-row ${child.kind === "folder" ? "is-folder" : "is-file"}${active ? " is-active" : ""}" type="button" draggable="true" data-file-list-id="${escapeHtml(child.id)}" data-drop-folder-id="${escapeHtml(child.kind === "folder" ? child.id : folder.id)}">
               <span class="file-node-icon" aria-hidden="true"></span>
               <strong>${escapeHtml(child.name)}</strong>
               <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
               <span>${escapeHtml(child.kind === "folder" ? `${getFileChildren(child.id).length} item${getFileChildren(child.id).length === 1 ? "" : "s"}` : formatBytes(child.size || 0))}</span>
-              <small>${escapeHtml(child.kind === "folder" ? "Tap to open" : new Date(child.updatedAt || Date.now()).toLocaleString())}</small>
+              <small>${escapeHtml(child.kind === "folder" ? "Tap to open / drop here" : "Tap to preview / drag to move")}</small>
             </button>
           `;
         })
         .join("")
-    : '<div class="file-preview-unavailable"><strong>This folder is empty.</strong><span>Import files, create a folder, or create a TXT note.</span></div>';
+    : `<div class="file-preview-unavailable file-drop-empty" data-drop-folder-id="${escapeHtml(folder?.id || manager.rootId)}"><strong>This folder is empty.</strong><span>Import files, create a folder, create a TXT note, or drop an item here.</span></div>`;
+  els.fileManagerFolderView.innerHTML = `${statusBanner}${childrenHtml}`;
   els.fileManagerFolderView.querySelectorAll("[data-file-list-id]").forEach((button) => {
     button.addEventListener("click", () => {
       const node = getFileNode(button.dataset.fileListId);
@@ -5222,6 +5240,7 @@ function renderFileExplorerList(selected) {
       openFileManagerFile(node?.id);
     });
   });
+  wireFileManagerDragAndDrop();
 }
 
 function renderFileTree(parentId, depth) {
@@ -5229,7 +5248,7 @@ function renderFileTree(parentId, depth) {
   const children = getFileChildren(parentId);
   const current = getFileNode(parentId);
   const currentHtml = current
-    ? `<button class="file-tree-item ${current.kind === "folder" ? "is-folder" : "is-file"}${manager.selectedId === current.id ? " is-active" : ""}" type="button" data-file-id="${escapeHtml(current.id)}" style="--depth:${depth}">
+    ? `<button class="file-tree-item ${current.kind === "folder" ? "is-folder" : "is-file"}${manager.selectedId === current.id ? " is-active" : ""}${manager.currentFolderId === current.id ? " is-open-folder" : ""}" type="button" draggable="${current.id === manager.rootId ? "false" : "true"}" data-file-id="${escapeHtml(current.id)}" data-drop-folder-id="${escapeHtml(current.kind === "folder" ? current.id : current.parentId)}" style="--depth:${depth}">
         <span class="file-tree-branch" aria-hidden="true"></span>
         <span class="file-node-icon" aria-hidden="true"></span>
         <span class="file-tree-label">
@@ -5314,8 +5333,11 @@ async function hydrateFileManagerPreviewFromStore(node = {}) {
 
 function selectFileManagerNode(id) {
   const manager = getFileManager();
-  if (!getFileNode(id)) return;
-  manager.selectedId = id;
+  const node = getFileNode(id);
+  if (!node) return;
+  manager.selectedId = node.id;
+  if (node.kind === "folder") manager.currentFolderId = node.id;
+  if (node.kind === "file" && node.parentId) manager.currentFolderId = node.parentId;
   state.fileManagerStatusMessage = "";
   persistArchive("File manager selection");
   renderFileManager();
@@ -5326,6 +5348,7 @@ function openFileManagerFolder(id) {
   const node = getFileNode(id);
   if (!node || node.kind !== "folder") return;
   manager.selectedId = node.id;
+  manager.currentFolderId = node.id;
   state.fileManagerStatusMessage = `Opened ${node.name}`;
   persistArchive("Opened virtual folder");
   renderFileManager();
@@ -5336,6 +5359,7 @@ function openFileManagerFile(id) {
   const node = getFileNode(id);
   if (!node || node.kind !== "file") return;
   manager.selectedId = node.id;
+  if (node.parentId) manager.currentFolderId = node.parentId;
   state.fileManagerStatusMessage = `Opening ${node.name}`;
   persistArchive("Opened virtual file");
   renderFileManager();
@@ -5345,6 +5369,89 @@ function openFileManagerFile(id) {
 function setFileManagerStatus(message) {
   state.fileManagerStatusMessage = message;
   if (els.fileManagerStatus) els.fileManagerStatus.textContent = message;
+}
+
+function wireFileManagerDragAndDrop() {
+  if (!els.fileManagerFolderView || !els.fileManagerTree) return;
+  const manager = getFileManager();
+  const draggableItems = document.querySelectorAll("[data-file-list-id], .file-tree-item[data-file-id]");
+  draggableItems.forEach((item) => {
+    const id = item.dataset.fileListId || item.dataset.fileId;
+    const node = getFileNode(id);
+    item.draggable = Boolean(node && node.id !== manager.rootId && !isGuestUser());
+    item.addEventListener("dragstart", (event) => {
+      if (!node || node.id === manager.rootId || isGuestUser()) {
+        event.preventDefault();
+        return;
+      }
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData(FILE_MANAGER_DRAG_MIME, node.id);
+      event.dataTransfer.setData("text/plain", node.id);
+      item.classList.add("is-dragging");
+      setFileManagerStatus(`Dragging ${node.name}`);
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("is-dragging");
+      document.querySelectorAll(".is-drop-target").forEach((target) => target.classList.remove("is-drop-target"));
+    });
+  });
+
+  const dropTargets = document.querySelectorAll("[data-drop-folder-id]");
+  dropTargets.forEach((target) => {
+    target.addEventListener("dragenter", (event) => {
+      if (canAcceptFileDrop(event, target.dataset.dropFolderId)) {
+        event.preventDefault();
+        target.classList.add("is-drop-target");
+      }
+    });
+    target.addEventListener("dragover", (event) => {
+      if (!canAcceptFileDrop(event, target.dataset.dropFolderId)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      target.classList.add("is-drop-target");
+    });
+    target.addEventListener("dragleave", () => {
+      target.classList.remove("is-drop-target");
+    });
+    target.addEventListener("drop", (event) => {
+      if (!canAcceptFileDrop(event, target.dataset.dropFolderId)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const nodeId = event.dataTransfer.getData(FILE_MANAGER_DRAG_MIME) || event.dataTransfer.getData("text/plain");
+      target.classList.remove("is-drop-target");
+      moveFileManagerNodeToFolder(nodeId, target.dataset.dropFolderId);
+    });
+  });
+}
+
+function canAcceptFileDrop(event, targetFolderId) {
+  if (isGuestUser()) return false;
+  const target = getFileNode(targetFolderId);
+  if (!target || target.kind !== "folder") return false;
+  const types = Array.from(event.dataTransfer?.types || []);
+  return types.includes(FILE_MANAGER_DRAG_MIME) || types.includes("text/plain");
+}
+
+function moveFileManagerNodeToFolder(nodeId, targetFolderId) {
+  if (!ensureCanWrite("move files and folders")) return false;
+  const manager = getFileManager();
+  const node = getFileNode(nodeId);
+  const target = getFileNode(targetFolderId);
+  if (!node || !target || target.kind !== "folder" || node.id === manager.rootId) {
+    setFileManagerStatus("That item cannot be moved.");
+    return false;
+  }
+  if (node.id === target.id || node.parentId === target.id || isFileDescendant(target.id, node.id)) {
+    setFileManagerStatus(`Cannot move ${node.name} there.`);
+    return false;
+  }
+  node.parentId = target.id;
+  node.updatedAt = new Date().toISOString();
+  manager.selectedId = node.id;
+  manager.currentFolderId = target.id;
+  state.fileManagerStatusMessage = `Moved ${node.name} to ${target.name}`;
+  persistFileManager("Drag moved virtual file node");
+  return true;
 }
 
 function getFileNode(id) {
@@ -5365,6 +5472,12 @@ function getSelectedFileNode() {
 function getSelectedFolderId() {
   const selected = getSelectedFileNode();
   return selected?.kind === "folder" ? selected.id : selected?.parentId || getFileManager().rootId;
+}
+
+function getCurrentFileManagerFolderId() {
+  const manager = getFileManager();
+  const current = getFileNode(manager.currentFolderId);
+  return current?.kind === "folder" ? current.id : manager.rootId;
 }
 
 function fileManagerPath(nodeId) {
@@ -5389,7 +5502,7 @@ function createFileManagerFolder() {
   if (!ensureCanWrite("create folders")) return;
   const now = new Date().toISOString();
   const manager = getFileManager();
-  const parentId = getSelectedFolderId();
+  const parentId = getCurrentFileManagerFolderId();
   const node = {
     id: `file-folder-${Date.now()}`,
     parentId,
@@ -5400,6 +5513,7 @@ function createFileManagerFolder() {
   };
   manager.nodes.push(node);
   manager.selectedId = node.id;
+  manager.currentFolderId = parentId;
   state.fileManagerStatusMessage = `Created ${node.name}`;
   persistFileManager("Created virtual folder");
 }
@@ -5408,7 +5522,7 @@ function createFileManagerTextFile() {
   if (!ensureCanWrite("create text files")) return;
   const now = new Date().toISOString();
   const manager = getFileManager();
-  const parentId = getSelectedFolderId();
+  const parentId = getCurrentFileManagerFolderId();
   const fileName = nextFileManagerName(parentId, "New Note", ".txt");
   const node = {
     id: `file-text-${Date.now()}`,
@@ -5425,6 +5539,7 @@ function createFileManagerTextFile() {
   };
   manager.nodes.push(node);
   manager.selectedId = node.id;
+  manager.currentFolderId = parentId;
   state.fileManagerStatusMessage = `Created ${node.name}`;
   persistFileManager("Created virtual text file");
 }
@@ -5479,7 +5594,7 @@ function pasteFileManagerNode() {
     setFileManagerStatus("Copy or move a file/folder before pasting.");
     return;
   }
-  const targetFolderId = getSelectedFolderId();
+  const targetFolderId = getCurrentFileManagerFolderId();
   const node = getFileNode(clipboard.id);
   if (!node || node.id === getFileManager().rootId || node.id === targetFolderId || isFileDescendant(targetFolderId, node.id)) {
     setFileManagerStatus("That item cannot be pasted into the selected folder.");
@@ -5538,6 +5653,7 @@ function deleteFileManagerNode() {
   }
   manager.nodes = manager.nodes.filter((item) => !ids.has(item.id));
   manager.selectedId = node.parentId || manager.rootId;
+  manager.currentFolderId = node.parentId || manager.rootId;
   state.fileManagerStatusMessage = `Deleted ${node.name}`;
   persistFileManager("Deleted virtual file node");
 }
@@ -5546,11 +5662,12 @@ async function handleFileManagerImport(event) {
   if (!ensureCanWrite("import files into the manager")) return;
   const files = [...(event.target.files || [])];
   if (!files.length) return;
-  const parentId = getSelectedFolderId();
+  const parentId = getCurrentFileManagerFolderId();
   const nodes = await Promise.all(files.map((file) => fileManagerNodeFromUpload(file, parentId)));
   const manager = getFileManager();
   manager.nodes.push(...nodes);
   manager.selectedId = nodes[0]?.id || manager.selectedId;
+  manager.currentFolderId = parentId;
   event.target.value = "";
   state.fileManagerStatusMessage = `Imported ${nodes.length} file${nodes.length === 1 ? "" : "s"}`;
   persistFileManager(`Imported ${nodes.length} virtual file${nodes.length === 1 ? "" : "s"}`);
