@@ -727,6 +727,7 @@ const state = {
   fileManagerStatusMessage: "",
   fileManagerRecentNodeId: "",
   fileManagerRenameId: "",
+  fileManagerSidebarActiveLabel: "",
   fileManagerDraftNode: null,
   filePreviewObjectUrls: [],
   backendCapabilities: {
@@ -5234,8 +5235,20 @@ function renderFileManager() {
   els.fileManagerStatus.textContent =
     state.fileManagerStatusMessage || `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
   els.fileManagerTree.innerHTML = renderFileExplorerSidebar(manager.rootId);
+  els.fileManagerTree.querySelectorAll("[data-file-sidebar-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.fileManagerSidebarActiveLabel = button.dataset.fileSidebarLabel || "";
+      const node = getFileNode(button.dataset.fileSidebarTarget);
+      if (node?.kind === "folder") {
+        openFileManagerFolder(node.id);
+        return;
+      }
+      if (node?.kind === "file") openFileManagerFile(node.id);
+    });
+  });
   els.fileManagerTree.querySelectorAll("[data-file-id]").forEach((button) => {
     button.addEventListener("click", () => {
+      state.fileManagerSidebarActiveLabel = "";
       const node = getFileNode(button.dataset.fileId);
       if (node?.kind === "folder") {
         openFileManagerFolder(node.id);
@@ -5386,6 +5399,7 @@ function renderFileExplorerTile(child, selected, folder) {
 }
 
 function renderFileExplorerSidebar(rootId) {
+  const manager = getFileManager();
   const pinned = [
     ["🏠", "Home"],
     ["🖼", "Gallery"],
@@ -5412,8 +5426,11 @@ function renderFileExplorerSidebar(rootId) {
     <div class="file-sidebar-section">
       ${pinned
         .map(
-          ([icon, label]) =>
-            `<button class="file-sidebar-item${label === "Downloads" ? " is-active" : ""}" type="button" tabindex="-1"><span>${icon}</span><strong>${escapeHtml(label)}</strong></button>`
+          ([icon, label]) => {
+            const targetId = fileManagerSidebarTarget(label, rootId);
+            const active = state.fileManagerSidebarActiveLabel === label && (targetId === manager.currentFolderId || targetId === manager.selectedId);
+            return `<button class="file-sidebar-item${active ? " is-active" : ""}" type="button" data-file-sidebar-label="${escapeHtml(label)}" data-file-sidebar-target="${escapeHtml(targetId)}" title="${escapeHtml(fileManagerPath(targetId))}"><span>${icon}</span><strong>${escapeHtml(label)}</strong></button>`;
+          }
         )
         .join("")}
     </div>
@@ -5424,11 +5441,37 @@ function renderFileExplorerSidebar(rootId) {
       ${drives
         .map(
           ([icon, label]) =>
-            `<button class="file-sidebar-item" type="button" tabindex="-1"><span>${icon}</span><strong>${escapeHtml(label)}</strong></button>`
+            `<button class="file-sidebar-item${state.fileManagerSidebarActiveLabel === label && manager.currentFolderId === rootId ? " is-active" : ""}" type="button" data-file-sidebar-label="${escapeHtml(label)}" data-file-sidebar-target="${escapeHtml(rootId)}" title="${escapeHtml(fileManagerPath(rootId))}"><span>${icon}</span><strong>${escapeHtml(label)}</strong></button>`
         )
         .join("")}
     </div>
   `;
+}
+
+function fileManagerSidebarTarget(label, rootId) {
+  const targetNames = {
+    Home: ["CORE Atlas"],
+    Gallery: ["Gallery", "Pictures", "Images", "Media", "Imports"],
+    "Seth - Personal": ["Users", "Profiles", "Team Shared"],
+    Desktop: ["CORE Atlas"],
+    Downloads: ["CORE Atlas"],
+    Documents: ["Documents", "Docs", "Sources", "Drafts", "Notes"],
+    Pictures: ["Pictures", "Images", "Media", "Imports"],
+    Music: ["Music", "Audio", "Media", "Imports"],
+    Videos: ["Videos", "Media", "Imports"],
+    Screenshots: ["Screenshots", "Images", "Imports"],
+    "Codex GPT": ["Codex GPT", "Codex", "Drafts", "Notes"],
+    "CORE ATLAS": ["CORE Atlas"],
+  };
+  const names = targetNames[label] || ["CORE Atlas"];
+  const manager = getFileManager();
+  const normalizedNames = names.map((name) => name.toLowerCase());
+  const directChild = manager.nodes.find(
+    (node) => node.kind === "folder" && node.parentId === rootId && normalizedNames.includes(node.name.toLowerCase())
+  );
+  if (directChild) return directChild.id;
+  const anyFolder = manager.nodes.find((node) => node.kind === "folder" && normalizedNames.includes(node.name.toLowerCase()));
+  return anyFolder?.id || rootId;
 }
 
 function renderFileTree(parentId, depth) {
