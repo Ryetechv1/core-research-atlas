@@ -3,7 +3,7 @@ services:
     name: core-research-atlas
     runtime: python
     plan: starter
-    buildCommand: python -m py_compile server.py scripts/file_import_extract.py scripts/google_search.py
+    buildCommand: python -m py_compile server.py scripts/file_import_extract.py scripts/google_search.py scripts/openai_chat.py api/openai_chat.py
     startCommand: python server.py --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     autoDeployTrigger: commit

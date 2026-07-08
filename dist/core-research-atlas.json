@@ -1,7 +1,7 @@
 {
   "project": {
     "name": "CORE Shapeshifting Research Atlas",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "epistemicPolicy": "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     "corePrompt": "Shapeshifting is modeled here as an interdisciplinary research construct spanning molecular, chemical, biological, physiological, psychological, metaphysical, occult, esoteric, and spiritual mechanics. The atlas stores claims under a Core Manifestation Template / Holographic Blueprint vocabulary while preserving source context and certainty level.",
     "aiConnectorNote": "Separate AI assistant, retrieval console, and crawler surfaces have been removed. The atlas focuses on source logging, in-app browsing, imports, profiles, team collaboration, documents, and memory snapshots."
@@ -151,6 +151,7 @@
   "browserHistory": [],
   "browserSearchResults": [],
   "browserPreview": null,
+  "openAiChatMessages": [],
   "sourceSchema": {
     "required": [
       "id",
@@ -684,6 +685,13 @@
       "auth": "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY",
       "searchEngineId": "56f7592d1993141c3",
       "status": "Preferred backend search path when hosted on a server with an API key; otherwise the app falls back to embedded CSE result cards."
+    },
+    "openAiResponsesChat": {
+      "provider": "OpenAI Responses API",
+      "localEndpoint": "/api/openai-chat",
+      "model": "gpt-5.5",
+      "auth": "Server-side OPENAI_API_KEY",
+      "status": "Optional backend chat that synthesizes atlas, browser, team, docs, profile, and memory context."
     }
   },
   "teamMessages": [],

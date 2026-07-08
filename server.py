@@ -21,6 +21,7 @@ from typing import Any
 from scripts.file_import_extract import FileImportError, extract_uploaded_file
 from scripts.google_search import GoogleSearchApiError, GoogleSearchConfigError, fallback_search_url, search_google
 from scripts.multipart_upload import MultipartUploadError, read_uploaded_file
+from scripts.openai_chat import OpenAIChatApiError, OpenAIChatConfigError, openai_chat_response
 
 
 ROOT = Path(__file__).resolve().parent
@@ -65,11 +66,13 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
                         or os.environ.get("GOOGLE_CSE_API_KEY")
                         or os.environ.get("CUSTOM_SEARCH_API_KEY")
                     ),
+                    "openAiChatConfigured": bool(os.environ.get("OPENAI_API_KEY")),
                     "routes": [
                         "/api/health",
                         "/api/search",
                         "/api/import-file",
                         "/api/team-chat",
+                        "/api/openai-chat",
                     ],
                 }
             )
@@ -88,6 +91,9 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/team-chat":
             self.handle_team_chat()
+            return
+        if self.path == "/api/openai-chat":
+            self.handle_openai_chat()
             return
         self.write_json({"ok": False, "error": "Unknown API route."}, HTTPStatus.NOT_FOUND)
 
@@ -149,6 +155,26 @@ class CoreResearchHandler(SimpleHTTPRequestHandler):
             self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
         self.write_json({"ok": True, "messages": messages})
+
+    def handle_openai_chat(self) -> None:
+        load_local_env()
+        try:
+            body = self.read_json_body()
+            response = openai_chat_response(
+                body.get("messages") or [],
+                body.get("context") if isinstance(body.get("context"), dict) else None,
+                body.get("options") if isinstance(body.get("options"), dict) else None,
+            )
+        except OpenAIChatConfigError as error:
+            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.SERVICE_UNAVAILABLE)
+            return
+        except ValueError as error:
+            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+        except (OpenAIChatApiError, json.JSONDecodeError) as error:
+            self.write_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_GATEWAY)
+            return
+        self.write_json({"ok": True, **response})
 
     def read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))

@@ -1132,6 +1132,81 @@ input[type="range"] {
     var(--border-gradient) border-box;
 }
 
+.openai-chat-form {
+  margin-top: 0;
+}
+
+.openai-chat-transcript {
+  display: grid;
+  gap: 10px;
+  max-height: 620px;
+  overflow: auto;
+}
+
+.openai-chat-message {
+  display: grid;
+  gap: 10px;
+  max-width: 94%;
+  padding: 13px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  background:
+    linear-gradient(145deg, #efefef 0%, #777 54%, #1a1a1a 100%) padding-box,
+    var(--border-gradient) border-box;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
+}
+
+.openai-chat-message.user {
+  justify-self: end;
+  background:
+    linear-gradient(145deg, #a8a8a8 0%, #4a4a4a 58%, #070707 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.openai-chat-message.error {
+  background:
+    linear-gradient(145deg, #ffffff 0%, #676767 45%, #000 100%) padding-box,
+    var(--border-gradient) border-box;
+}
+
+.openai-chat-message header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.openai-chat-message strong,
+.openai-chat-message small,
+.openai-message-body,
+.openai-meta {
+  color: #fff;
+}
+
+.openai-chat-message small,
+.openai-meta {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+}
+
+.openai-message-body {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.inline-check {
+  align-self: end;
+  min-height: 54px;
+}
+
+.inline-link {
+  margin: 0 2px;
+  vertical-align: baseline;
+}
+
 .vote-row {
   display: flex;
   flex-wrap: wrap;

@@ -19,6 +19,10 @@
       "dest": "/api/team_chat.py"
     },
     {
+      "src": "/api/openai-chat",
+      "dest": "/api/openai_chat.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }

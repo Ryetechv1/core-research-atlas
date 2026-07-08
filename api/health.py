@@ -20,11 +20,13 @@ class handler(BaseHTTPRequestHandler):
                     or os.environ.get("GOOGLE_CSE_API_KEY")
                     or os.environ.get("CUSTOM_SEARCH_API_KEY")
                 ),
+                "openAiChatConfigured": bool(os.environ.get("OPENAI_API_KEY")),
                 "routes": [
                     "/api/health",
                     "/api/search",
                     "/api/import-file",
                     "/api/team-chat",
+                    "/api/openai-chat",
                 ],
             },
         )

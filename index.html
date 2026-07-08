@@ -152,6 +152,7 @@
                 <button class="segment is-active" type="button" data-panel="sourcePanel">Sources</button>
                 <button class="segment" type="button" data-panel="importPanel">Import</button>
                 <button class="segment" type="button" data-panel="browserPanel">Browser</button>
+                <button class="segment" type="button" data-panel="openAiPanel">OpenAI</button>
                 <button class="segment" type="button" data-panel="teamPanel">Team</button>
                 <button class="segment" type="button" data-panel="collabPanel">Docs</button>
                 <button class="segment" type="button" data-panel="memoryPanel">Memory</button>
@@ -423,6 +424,64 @@
                     </div>
                   </div>
                   <div id="browserHistory" class="browser-history" aria-live="polite"></div>
+                </section>
+              </div>
+            </section>
+
+            <section id="openAiPanel" class="panel-view">
+              <div class="source-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>OpenAI GPT-5.5 Chat</h2>
+                    <p>Optional server-side Responses API chat that uses the current atlas, browser leads, team posts, docs, profiles, and memory context.</p>
+                  </div>
+                  <span class="detail-chip" id="openAiChatStatus">Backend not checked</span>
+                </div>
+
+                <form id="openAiChatForm" class="api-panel openai-chat-form">
+                  <label>
+                    Prompt
+                    <textarea name="prompt" rows="5" required placeholder="Ask for a source-aware synthesis, comparison, outline, citation plan, or browser-context answer."></textarea>
+                  </label>
+                  <div class="form-grid">
+                    <label>
+                      Reasoning effort
+                      <select name="reasoningEffort">
+                        <option value="high" selected>High</option>
+                        <option value="xhigh">Extra high</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="none">None</option>
+                      </select>
+                    </label>
+                    <label>
+                      Verbosity
+                      <select name="verbosity">
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </label>
+                    <label class="check-tile inline-check">
+                      <input name="includeContext" type="checkbox" checked>
+                      <span>Include current app and browser context</span>
+                    </label>
+                  </div>
+                  <div class="form-actions">
+                    <button class="primary-button" type="submit">Send</button>
+                    <button class="ghost-button" id="openAiClearButton" type="button">Clear Chat</button>
+                  </div>
+                </form>
+
+                <section class="results-panel" aria-labelledby="openAiTranscriptTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="openAiTranscriptTitle">Chat Transcript</h2>
+                      <p>Messages are stored in the local archive and included in memory snapshots for signed-in users.</p>
+                    </div>
+                    <span class="detail-chip">Server-side key only</span>
+                  </div>
+                  <div id="openAiChatTranscript" class="openai-chat-transcript" aria-live="polite"></div>
                 </section>
               </div>
             </section>

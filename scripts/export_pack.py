@@ -56,6 +56,7 @@ def write_txt(seed: dict) -> None:
     core = seed.get("backendCore", {})
     cse_api = seed.get("externalApis", {}).get("googleProgrammableSearch", {})
     google_json_api = seed.get("externalApis", {}).get("googleCustomSearchJson", {})
+    openai_api = seed.get("externalApis", {}).get("openAiResponsesChat", {})
     lines = [
         project["name"],
         f"Version: {project['version']}",
@@ -80,6 +81,13 @@ def write_txt(seed: dict) -> None:
         f"Local endpoint: {google_json_api.get('localEndpoint', '/api/search')}",
         f"Authentication: {google_json_api.get('auth', 'Server-side GOOGLE_CUSTOM_SEARCH_API_KEY')}",
         f"Status: {google_json_api.get('status', 'Preferred backend search path with CSE fallback.')}",
+        "",
+        "OpenAI Responses Chat:",
+        f"Local endpoint: {openai_api.get('localEndpoint', '/api/openai-chat')}",
+        f"Model: {openai_api.get('model', 'gpt-5.5')}",
+        f"Authentication: {openai_api.get('auth', 'Server-side OPENAI_API_KEY')}",
+        f"Status: {openai_api.get('status', 'Optional backend chat.')}",
+        f"Stored messages: {len(seed.get('openAiChatMessages', []))}",
         "",
         "File Import Layer:",
         f"Imported file logs: {len(seed.get('importedFiles', []))}",
@@ -156,6 +164,7 @@ def write_html(seed: dict) -> None:
     core = seed.get("backendCore", {})
     cse_api = seed.get("externalApis", {}).get("googleProgrammableSearch", {})
     google_json_api = seed.get("externalApis", {}).get("googleCustomSearchJson", {})
+    openai_api = seed.get("externalApis", {}).get("openAiResponsesChat", {})
     reference_rows = []
     for reference in seed.get("referenceLibrary", []):
         reference_rows.append(
@@ -210,6 +219,8 @@ th{{background:#edf1ed}}
 <p>Search engine ID: {html.escape(cse_api.get("searchEngineId", "56f7592d1993141c3"))}. Script URL: {html.escape(cse_api.get("scriptUrl", "https://cse.google.com/cse.js?cx=56f7592d1993141c3"))}. Public URL: {html.escape(cse_api.get("publicUrl", "https://cse.google.com/cse?cx=56f7592d1993141c3#gsc.tab=0"))}.</p>
 <h2>Google Custom Search JSON API</h2>
 <p>Local endpoint: {html.escape(google_json_api.get("localEndpoint", "/api/search"))}. Authentication: {html.escape(google_json_api.get("auth", "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY"))}. Status: {html.escape(google_json_api.get("status", "Preferred backend search path with CSE fallback."))}</p>
+<h2>OpenAI Responses Chat</h2>
+<p>Local endpoint: {html.escape(openai_api.get("localEndpoint", "/api/openai-chat"))}. Model: {html.escape(openai_api.get("model", "gpt-5.5"))}. Authentication: {html.escape(openai_api.get("auth", "Server-side OPENAI_API_KEY"))}. Stored messages: {html.escape(str(len(seed.get("openAiChatMessages", []))))}.</p>
 <h2>File Import Layer</h2>
 <p>{html.escape(str(len(seed.get("importedFiles", []))))} imported file logs; {html.escape(str(sum(item.get("recordsCreated", 0) for item in seed.get("importedFiles", []))))} source records created from uploaded files.</p>
 <h2>In-App Browser</h2>

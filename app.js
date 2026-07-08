@@ -11,6 +11,7 @@ const GOOGLE_CSE_PUBLIC_URL = `https://cse.google.com/cse?cx=${GOOGLE_CSE_ID}#gs
 const BROWSER_DEFAULT_URL = GOOGLE_CSE_PUBLIC_URL;
 const HEALTH_API_PATH = "/api/health";
 const SEARCH_API_PATH = "/api/search";
+const OPENAI_CHAT_API_PATH = "/api/openai-chat";
 const TEAM_CHAT_STORAGE_KEY = `${STORAGE_KEY}:team-chat`;
 const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
 const TEAM_CHAT_POLL_MS = 5_000;
@@ -198,7 +199,7 @@ const DEFAULT_COLLAB_DOCS = [
 const SEED_DATA = {
   project: {
     name: "CORE Shapeshifting Research Atlas",
-    version: "0.6.0",
+    version: "0.8.0",
     epistemicPolicy:
       "Catalog supernatural, occult, metaphysical, cultural, and speculative biological claims with explicit evidence labels. Do not treat metaphysical claims as established biomedical fact.",
     corePrompt:
@@ -223,6 +224,13 @@ const SEED_DATA = {
       auth: "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY",
       searchEngineId: GOOGLE_CSE_ID,
       status: "Preferred backend search path when hosted on a server with an API key; otherwise the app falls back to embedded CSE result cards.",
+    },
+    openAiResponsesChat: {
+      provider: "OpenAI Responses API",
+      localEndpoint: OPENAI_CHAT_API_PATH,
+      model: "gpt-5.5",
+      auth: "Server-side OPENAI_API_KEY",
+      status: "Optional backend chat that synthesizes atlas, browser, team, docs, profile, and memory context.",
     },
     nvidiaAIQResearch: {
       provider: "NVIDIA AI-Q Research",
@@ -319,6 +327,7 @@ const SEED_DATA = {
   browserHistory: [],
   browserSearchResults: [],
   browserPreview: null,
+  openAiChatMessages: [],
   teamMessages: [],
   collabDocs: DEFAULT_COLLAB_DOCS,
   sources: [
@@ -607,9 +616,11 @@ const state = {
     available: false,
     routes: [],
     googleSearchConfigured: false,
+    openAiChatConfigured: false,
     platform: "static",
   },
   importBusy: false,
+  openAiChatBusy: false,
   activeMemorySnapshotId: "",
   teamChatPollTimer: null,
 };
@@ -666,6 +677,10 @@ function cacheElements() {
   els.browserPreview = document.getElementById("browserPreview");
   els.browserSearchResults = document.getElementById("browserSearchResults");
   els.browserHistory = document.getElementById("browserHistory");
+  els.openAiChatForm = document.getElementById("openAiChatForm");
+  els.openAiChatTranscript = document.getElementById("openAiChatTranscript");
+  els.openAiChatStatus = document.getElementById("openAiChatStatus");
+  els.openAiClearButton = document.getElementById("openAiClearButton");
   els.teamChatForm = document.getElementById("teamChatForm");
   els.teamChatFeed = document.getElementById("teamChatFeed");
   els.teamChatStatus = document.getElementById("teamChatStatus");
@@ -750,6 +765,8 @@ function wireEvents() {
   });
   els.browserExternalButton.addEventListener("click", openCurrentBrowserTargetExternal);
   els.browserAddSourceButton.addEventListener("click", addCurrentBrowserPageToSources);
+  els.openAiChatForm.addEventListener("submit", handleOpenAiChatSubmit);
+  els.openAiClearButton.addEventListener("click", clearOpenAiChat);
   els.teamChatForm.addEventListener("submit", handleTeamChatSubmit);
   els.refreshTeamChatButton.addEventListener("click", () => syncTeamChat({ renderAfter: true }));
   els.useBrowserForTeamPostButton.addEventListener("click", useBrowserUrlForTeamPost);
@@ -905,6 +922,7 @@ function renderPermissionState() {
   const readOnlyFormIds = [
     "addSourceForm",
     "fileImportForm",
+    "openAiChatForm",
     "teamChatForm",
     "profileForm",
   ];
@@ -922,6 +940,7 @@ function renderPermissionState() {
     "exportHtmlButton",
     "copyBriefButton",
     "browserAddSourceButton",
+    "openAiClearButton",
     "selectChatGptFilesButton",
     "saveFilesToChatGptButton",
     "clearImportedFilesButton",
@@ -984,6 +1003,7 @@ function render() {
   renderFramework();
   renderImportPanel();
   renderBrowserPanel();
+  renderOpenAiChat();
   renderTeamChat();
   renderCollabDocs();
   renderMemoryBank();
@@ -1959,6 +1979,239 @@ function renderBrowserCardLinks(item) {
   `;
 }
 
+function getOpenAiChatMessages() {
+  state.archive.openAiChatMessages = Array.isArray(state.archive.openAiChatMessages) ? state.archive.openAiChatMessages : [];
+  return state.archive.openAiChatMessages;
+}
+
+function renderOpenAiChat(statusText = "") {
+  if (!els.openAiChatTranscript) return;
+  const capabilities = state.backendCapabilities;
+  if (els.openAiChatStatus) {
+    els.openAiChatStatus.textContent = statusText || openAiChatStatusText(capabilities);
+  }
+  const submitButton = els.openAiChatForm?.querySelector("button[type='submit']");
+  if (submitButton) {
+    submitButton.disabled = state.openAiChatBusy || isGuestUser();
+    submitButton.textContent = state.openAiChatBusy ? "Sending..." : "Send";
+  }
+  if (els.openAiClearButton) {
+    els.openAiClearButton.disabled = isGuestUser() || state.openAiChatBusy || !getOpenAiChatMessages().length;
+  }
+
+  const messages = getOpenAiChatMessages();
+  els.openAiChatTranscript.innerHTML = messages.length
+    ? messages
+        .slice(-80)
+        .map(
+          (message) => `
+            <article class="openai-chat-message ${message.role === "user" ? "user" : "assistant"}${message.error ? " error" : ""}">
+              <header>
+                <strong>${escapeHtml(message.role === "user" ? message.owner || "You" : "OpenAI GPT-5.5")}</strong>
+                <small>${escapeHtml(message.createdAt ? new Date(message.createdAt).toLocaleString() : "")}</small>
+              </header>
+              <div class="openai-message-body">${renderLinkedText(message.content || "")}</div>
+              ${
+                message.model
+                  ? `<small class="openai-meta">${escapeHtml(message.model)} / ${escapeHtml(message.reasoningEffort || "high")} / ${escapeHtml(message.verbosity || "medium")}</small>`
+                  : ""
+              }
+            </article>
+          `
+        )
+        .join("")
+    : '<div class="empty-state">No OpenAI chat messages yet. Ask a question after running the Python backend with OPENAI_API_KEY configured.</div>';
+  els.openAiChatTranscript.querySelectorAll("[data-open-ai-url]").forEach((button) => {
+    button.addEventListener("click", () => openInAppBrowser(button.dataset.openAiUrl, button.textContent.trim() || button.dataset.openAiUrl));
+  });
+}
+
+function openAiChatStatusText(capabilities = state.backendCapabilities) {
+  if (state.openAiChatBusy) return "Contacting OpenAI...";
+  if (!capabilities.checked) return "Backend not checked";
+  if (!hasBackendRoute(OPENAI_CHAT_API_PATH, capabilities)) return "OpenAI route unavailable on this host";
+  if (!capabilities.openAiChatConfigured) return "Missing backend OPENAI_API_KEY";
+  return "OpenAI backend ready";
+}
+
+async function handleOpenAiChatSubmit(event) {
+  event.preventDefault();
+  if (!ensureCanWrite("use OpenAI chat")) return;
+  const formData = new FormData(els.openAiChatForm);
+  const prompt = String(formData.get("prompt") || "").trim();
+  if (!prompt) return;
+
+  const messages = getOpenAiChatMessages();
+  const userMessage = {
+    id: `openai-user-${Date.now()}`,
+    role: "user",
+    owner: state.currentUser?.username || "local",
+    content: prompt,
+    createdAt: new Date().toISOString(),
+  };
+  messages.push(userMessage);
+  state.archive.openAiChatMessages = messages.slice(-120);
+  state.openAiChatBusy = true;
+  persistArchive("OpenAI chat prompt");
+  renderOpenAiChat("Contacting backend...");
+
+  try {
+    const capabilities = await ensureBackendCapabilities();
+    if (!hasBackendRoute(OPENAI_CHAT_API_PATH, capabilities)) {
+      throw new Error("The backend OpenAI chat route is unavailable on this host. Run python server.py or deploy to a backend host with /api/openai-chat.");
+    }
+    if (!capabilities.openAiChatConfigured) {
+      throw new Error("OPENAI_API_KEY is not configured on the backend host. The key must stay server-side.");
+    }
+
+    const response = await fetch(OPENAI_CHAT_API_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: state.archive.openAiChatMessages.slice(-16).map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+        options: {
+          reasoningEffort: String(formData.get("reasoningEffort") || "high"),
+          verbosity: String(formData.get("verbosity") || "medium"),
+        },
+        context: formData.get("includeContext") === "on" ? buildOpenAiChatContext(prompt) : null,
+      }),
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || `OpenAI chat route returned HTTP ${response.status}.`);
+    }
+    getOpenAiChatMessages().push({
+      id: `openai-assistant-${Date.now()}`,
+      role: "assistant",
+      owner: "OpenAI GPT-5.5",
+      content: data.reply || "No response text returned.",
+      model: data.model || "gpt-5.5",
+      reasoningEffort: data.reasoningEffort || String(formData.get("reasoningEffort") || "high"),
+      verbosity: data.verbosity || String(formData.get("verbosity") || "medium"),
+      createdAt: new Date().toISOString(),
+    });
+    state.archive.openAiChatMessages = getOpenAiChatMessages().slice(-120);
+    els.openAiChatForm.reset();
+    persistArchive("OpenAI chat response");
+  } catch (error) {
+    getOpenAiChatMessages().push({
+      id: `openai-error-${Date.now()}`,
+      role: "assistant",
+      owner: "OpenAI GPT-5.5",
+      content: `OpenAI chat is not available: ${error.message}`,
+      error: true,
+      createdAt: new Date().toISOString(),
+    });
+    state.archive.openAiChatMessages = getOpenAiChatMessages().slice(-120);
+    persistArchive("OpenAI chat unavailable notice");
+  } finally {
+    state.openAiChatBusy = false;
+    renderOpenAiChat();
+  }
+}
+
+function buildOpenAiChatContext(prompt) {
+  const browser = getBrowserContext();
+  const sourceCandidates = rankSources(`${prompt} ${browser.searchText}`).slice(0, 8);
+  const topSources = (sourceCandidates.length ? sourceCandidates : state.archive.sources.slice(0, 8)).map((source) => ({
+    id: source.id,
+    title: source.title,
+    category: source.category,
+    species: source.species,
+    domain: source.domain,
+    sourceType: source.sourceType,
+    url: source.url,
+    evidenceTier: source.evidenceTier,
+    citationStatus: source.citationStatus,
+    terms: source.terms,
+    notes: clampText(source.notes, 450),
+  }));
+  const memoryBank = getMemoryBank();
+  return {
+    project: {
+      name: state.archive.project.name,
+      version: state.archive.project.version,
+      epistemicPolicy: state.archive.project.epistemicPolicy,
+      corePrompt: clampText(state.archive.project.corePrompt, 900),
+    },
+    activeUser: state.currentUser?.username || "local",
+    activeProfile: getProfile(state.activeProfileUsername) || null,
+    allProfileSummaries: (state.archive.profiles || []).map((profile) => ({
+      username: profile.username,
+      role: profile.role,
+      animalForm: profile.animalForm,
+      animalSpirits: profile.animalSpirits,
+      identityStatement: profile.identityStatement,
+    })),
+    browser: {
+      summary: browserContextSummary(browser),
+      currentUrl: browser.currentUrl,
+      preview: browser.preview,
+      virtualResults: (browser.virtualResults || []).slice(0, 8),
+    },
+    topSources,
+    references: getReferenceLibrary().map((reference) => ({
+      id: reference.id,
+      title: reference.title,
+      fileName: reference.fileName,
+      sourceType: reference.sourceType,
+      evidenceTier: reference.evidenceTier,
+      citationStatus: reference.citationStatus,
+      backendUse: reference.backendUse,
+      detectedTerms: reference.detectedTerms,
+    })),
+    recentTeamMessages: (state.archive.teamMessages || []).slice(0, 12),
+    collaborationDocs: getCollabDocs().slice(0, 8).map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      type: doc.type,
+      status: doc.status,
+      owner: doc.owner,
+      textPreview: clampText(stripHtml(doc.contentHtml || ""), 700),
+    })),
+    importedFiles: (state.archive.importedFiles || []).slice(0, 8).map((file) => ({
+      fileName: file.fileName,
+      parser: file.parser,
+      summary: file.summary,
+      warnings: file.warnings,
+      recordsCreated: file.recordsCreated,
+    })),
+    memory: {
+      snapshotCount: memoryBank.snapshots?.length || 0,
+      latest: memoryBank.snapshots?.[0]
+        ? {
+            reason: memoryBank.snapshots[0].reason,
+            owner: memoryBank.snapshots[0].owner,
+            createdAt: memoryBank.snapshots[0].createdAt,
+            counts: memoryBank.snapshots[0].counts,
+          }
+        : null,
+    },
+  };
+}
+
+function clearOpenAiChat() {
+  if (!ensureCanWrite("clear OpenAI chat messages")) return;
+  if (!getOpenAiChatMessages().length) return;
+  const confirmed = window.confirm("Clear the local OpenAI chat transcript?");
+  if (!confirmed) return;
+  state.archive.openAiChatMessages = [];
+  persistArchive("OpenAI chat cleared");
+  renderOpenAiChat();
+}
+
+function renderLinkedText(value) {
+  return escapeHtml(value)
+    .replace(
+      /(https?:\/\/[^\s<]+)/g,
+      (url) => `<button class="link-button inline-link" type="button" data-open-ai-url="${escapeHtml(url)}">${escapeHtml(url)}</button>`
+    )
+    .replace(/\n/g, "<br>");
+}
+
 function replayBufferedCseEvents() {
   const buffered = Array.isArray(window.coreCseEvents) ? window.coreCseEvents.splice(0) : [];
   buffered.forEach((event) => {
@@ -2646,6 +2899,7 @@ function staticHostCapabilities() {
     available: false,
     routes: [],
     googleSearchConfigured: false,
+    openAiChatConfigured: false,
     platform: "static",
   };
 }
@@ -2669,10 +2923,12 @@ async function detectBackendCapabilities({ renderAfter = true } = {}) {
         available: response.ok && data.ok !== false,
         routes: Array.isArray(data.routes) ? data.routes : [],
         googleSearchConfigured: Boolean(data.googleSearchConfigured),
+        openAiChatConfigured: Boolean(data.openAiChatConfigured),
         platform: data.platform || (response.ok ? "local-python" : "static"),
       };
       if (renderAfter) {
         renderTeamChat();
+        renderOpenAiChat();
       }
       return state.backendCapabilities;
     })
@@ -2680,6 +2936,7 @@ async function detectBackendCapabilities({ renderAfter = true } = {}) {
       state.backendCapabilities = staticHostCapabilities();
       if (renderAfter) {
         renderTeamChat();
+        renderOpenAiChat();
       }
       return state.backendCapabilities;
     });
@@ -3564,6 +3821,10 @@ function normalizeArchive(input) {
     ...base.externalApis.googleCustomSearchJson,
     ...(archive.externalApis.googleCustomSearchJson || {}),
   };
+  archive.externalApis.openAiResponsesChat = {
+    ...base.externalApis.openAiResponsesChat,
+    ...(archive.externalApis.openAiResponsesChat || {}),
+  };
   archive.externalApis.nvidiaAIQResearch = {
     ...base.externalApis.nvidiaAIQResearch,
     ...(archive.externalApis.nvidiaAIQResearch || {}),
@@ -3597,6 +3858,7 @@ function normalizeArchive(input) {
   archive.browserHistory = archive.browserHistory || [];
   archive.browserSearchResults = archive.browserSearchResults || [];
   archive.browserPreview = archive.browserPreview || null;
+  archive.openAiChatMessages = Array.isArray(archive.openAiChatMessages) ? archive.openAiChatMessages : [];
   archive.teamMessages = archive.teamMessages || [];
   archive.collabDocs = mergeById(DEFAULT_COLLAB_DOCS, archive.collabDocs || []).map((doc) => ({
     type: "Research Brief",
@@ -3674,6 +3936,7 @@ function archiveCounts(archive) {
   return {
     sources: archive.sources?.length || 0,
     importedFiles: archive.importedFiles?.length || 0,
+    openAiChatMessages: archive.openAiChatMessages?.length || 0,
     teamMessages: archive.teamMessages?.length || 0,
     collabDocs: archive.collabDocs?.length || 0,
     profiles: archive.profiles?.length || 0,
@@ -3700,7 +3963,7 @@ function renderMemoryBank() {
             <button class="memory-snapshot-item${selected?.id === snapshot.id ? " is-active" : ""}" type="button" data-memory-id="${escapeHtml(snapshot.id)}">
               <strong>${escapeHtml(snapshot.reason || "Archive update")}</strong>
               <span>${escapeHtml(snapshot.owner || "local")} / ${new Date(snapshot.createdAt).toLocaleString()}</span>
-              <small>${snapshot.counts.sources} sources / ${snapshot.counts.teamMessages} team posts / ${snapshot.counts.collabDocs} docs / ${snapshot.counts.importedFiles} uploads</small>
+              <small>${snapshot.counts.sources} sources / ${snapshot.counts.teamMessages} team posts / ${snapshot.counts.collabDocs} docs / ${snapshot.counts.importedFiles} uploads / ${snapshot.counts.openAiChatMessages || 0} OpenAI messages</small>
             </button>
           `
         )
@@ -3802,6 +4065,7 @@ async function copyOrDownload(filename, contents) {
 function buildTextDigest(archive) {
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
+  const openAiApi = archive.externalApis?.openAiResponsesChat || SEED_DATA.externalApis.openAiResponsesChat;
   const memoryBank = getMemoryBank();
   const lines = [
     archive.project.name,
@@ -3828,6 +4092,13 @@ function buildTextDigest(archive) {
     `Local endpoint: ${googleJsonApi.localEndpoint || SEARCH_API_PATH}`,
     `Authentication: ${googleJsonApi.auth || "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY"}`,
     `Status: ${googleJsonApi.status || "Preferred backend search path with CSE fallback."}`,
+    "",
+    "OpenAI Responses Chat:",
+    `Local endpoint: ${openAiApi.localEndpoint || OPENAI_CHAT_API_PATH}`,
+    `Model: ${openAiApi.model || "gpt-5.5"}`,
+    `Authentication: ${openAiApi.auth || "Server-side OPENAI_API_KEY"}`,
+    `Status: ${openAiApi.status || "Optional backend chat."}`,
+    `${archive.openAiChatMessages?.length || 0} local OpenAI chat messages stored`,
     "",
     "File Import Layer:",
     `${archive.importedFiles?.length || 0} imported file logs`,
@@ -3885,6 +4156,7 @@ function buildTextDigest(archive) {
 function buildHtmlDigest(archive) {
   const cseApi = archive.externalApis?.googleProgrammableSearch || SEED_DATA.externalApis.googleProgrammableSearch;
   const googleJsonApi = archive.externalApis?.googleCustomSearchJson || SEED_DATA.externalApis.googleCustomSearchJson;
+  const openAiApi = archive.externalApis?.openAiResponsesChat || SEED_DATA.externalApis.openAiResponsesChat;
   const rows = archive.sources
     .map(
       (source) => `
@@ -3948,6 +4220,8 @@ a{color:#111}
 <p>Search engine ID: ${escapeHtml(cseApi.searchEngineId || GOOGLE_CSE_ID)}. Script URL: ${escapeHtml(cseApi.scriptUrl || GOOGLE_CSE_SCRIPT_URL)}. Public URL: ${escapeHtml(cseApi.publicUrl || GOOGLE_CSE_PUBLIC_URL)}.</p>
 <h2>Google Custom Search JSON API</h2>
 <p>Local endpoint: ${escapeHtml(googleJsonApi.localEndpoint || SEARCH_API_PATH)}. Authentication: ${escapeHtml(googleJsonApi.auth || "Server-side GOOGLE_CUSTOM_SEARCH_API_KEY")}. Status: ${escapeHtml(googleJsonApi.status || "Preferred backend search path with CSE fallback.")}</p>
+<h2>OpenAI Responses Chat</h2>
+<p>Local endpoint: ${escapeHtml(openAiApi.localEndpoint || OPENAI_CHAT_API_PATH)}. Model: ${escapeHtml(openAiApi.model || "gpt-5.5")}. Authentication: ${escapeHtml(openAiApi.auth || "Server-side OPENAI_API_KEY")}. Stored messages: ${escapeHtml(String(archive.openAiChatMessages?.length || 0))}.</p>
 <h2>File Import Layer</h2>
 <p>${escapeHtml(String(archive.importedFiles?.length || 0))} imported file logs; ${escapeHtml(String((archive.importedFiles || []).reduce((sum, item) => sum + (item.recordsCreated || 0), 0)))} source records created from uploaded files.</p>
 <h2>In-App Browser</h2>
