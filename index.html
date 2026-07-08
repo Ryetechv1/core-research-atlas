@@ -156,6 +156,7 @@
                 <button class="segment" type="button" data-panel="openAiPanel">OpenAI</button>
                 <button class="segment" type="button" data-panel="teamPanel">Team</button>
                 <button class="segment" type="button" data-panel="collabPanel">Docs</button>
+                <button class="segment" type="button" data-panel="filesPanel">Files</button>
                 <button class="segment" type="button" data-panel="memoryPanel">Memory</button>
                 <button class="segment" type="button" data-panel="profilesPanel">Profiles</button>
                 <button class="segment" type="button" data-panel="codexPanel">Codex</button>
@@ -185,6 +186,8 @@
                     <p>Starter records are intentionally marked for verification or research expansion.</p>
                   </div>
                   <div class="panel-heading-actions">
+                    <span class="detail-chip" id="sourceFeedStatus">Live feed ready</span>
+                    <button class="ghost-button iconless" id="refreshSourcesButton" type="button">Refresh Sources</button>
                     <label class="compact-filter">
                       Type
                       <select id="sourceTypeFilter"></select>
@@ -688,6 +691,77 @@
               </div>
             </section>
 
+            <section id="filesPanel" class="panel-view">
+              <div class="file-os-grid">
+                <section class="api-panel cloud-integration-panel" aria-labelledby="cloudIntegrationTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="cloudIntegrationTitle">Cloud Storage and Workspace Links</h2>
+                      <p>Open cloud services for import/export handoff while keeping this atlas local-first.</p>
+                    </div>
+                    <span class="detail-chip">Connectors</span>
+                  </div>
+                  <div class="cloud-card-grid" id="cloudIntegrationGrid">
+                    <article>
+                      <strong>Google Drive</strong>
+                      <span>Store research files, PDFs, images, and exports.</span>
+                      <button class="ghost-button iconless" type="button" data-cloud-open="https://drive.google.com/drive/my-drive">Open Drive</button>
+                    </article>
+                    <article>
+                      <strong>MEGA Cloud</strong>
+                      <span>Upload large archive folders and shared files.</span>
+                      <button class="ghost-button iconless" type="button" data-cloud-open="https://mega.nz/fm">Open MEGA</button>
+                    </article>
+                    <article>
+                      <strong>Google Docs</strong>
+                      <span>Draft documents outside the atlas when needed.</span>
+                      <button class="ghost-button iconless" type="button" data-cloud-open="https://docs.google.com/document/u/0/">Open Docs</button>
+                    </article>
+                    <article>
+                      <strong>Google Forms</strong>
+                      <span>Collect team research submissions and votes.</span>
+                      <button class="ghost-button iconless" type="button" data-cloud-open="https://docs.google.com/forms/u/0/">Open Forms</button>
+                    </article>
+                    <article>
+                      <strong>Google Sheets</strong>
+                      <span>Track citations, tags, and source review tables.</span>
+                      <button class="ghost-button iconless" type="button" data-cloud-open="https://docs.google.com/spreadsheets/u/0/">Open Sheets</button>
+                    </article>
+                  </div>
+                </section>
+
+                <section class="file-os-window" aria-labelledby="fileManagerTitle">
+                  <header>
+                    <div>
+                      <h2 id="fileManagerTitle">Virtual File Manager</h2>
+                      <p id="fileManagerPath">/CORE Atlas</p>
+                    </div>
+                    <span class="detail-chip" id="fileManagerStatus">Ready</span>
+                  </header>
+                  <div class="file-os-toolbar" aria-label="File manager actions">
+                    <button class="ghost-button iconless" id="fileNewFolderButton" type="button">New Folder</button>
+                    <button class="ghost-button iconless" id="fileNewTextButton" type="button">New TXT</button>
+                    <button class="ghost-button iconless" id="fileRenameButton" type="button">Rename</button>
+                    <button class="ghost-button iconless" id="fileCopyButton" type="button">Copy</button>
+                    <button class="ghost-button iconless" id="fileMoveButton" type="button">Move</button>
+                    <button class="ghost-button iconless" id="filePasteButton" type="button">Paste</button>
+                    <button class="ghost-button iconless" id="fileDeleteButton" type="button">Delete</button>
+                    <button class="ghost-button iconless" id="fileExportButton" type="button">Export</button>
+                    <label class="ghost-button iconless file-import-trigger">
+                      Import
+                      <input id="fileManagerImportInput" type="file" multiple hidden>
+                    </label>
+                  </div>
+                  <div class="file-os-body">
+                    <nav class="file-tree" id="fileManagerTree" aria-label="File tree"></nav>
+                    <section class="file-detail-pane" aria-label="Selected file detail">
+                      <div id="fileManagerDetail" class="file-manager-detail"></div>
+                    </section>
+                  </div>
+                </section>
+              </div>
+            </section>
+
             <section id="memoryPanel" class="panel-view">
               <div class="source-panel">
                 <div class="panel-heading">
@@ -853,18 +927,26 @@
     </div>
 
     <template id="sourceRowTemplate">
-      <button class="source-row" type="button">
-        <span class="species-token"></span>
-        <span class="source-main">
-          <strong></strong>
-          <small></small>
+      <article class="source-row">
+        <button class="source-row-select" type="button">
+          <span class="species-token"></span>
+          <span class="source-main">
+            <strong></strong>
+            <small></small>
+            <span class="source-tag-row">
+              <span class="tier-chip"></span>
+              <span class="type-chip"></span>
+              <span class="status-chip"></span>
+            </span>
+          </span>
+        </button>
+        <span class="source-row-actions">
+          <button class="source-mini-action" type="button" data-source-view>View</button>
+          <button class="source-mini-action danger" type="button" data-source-remove hidden>Remove</button>
         </span>
-        <span class="tier-chip"></span>
-        <span class="type-chip"></span>
-        <span class="status-chip"></span>
-      </button>
+      </article>
     </template>
 
-    <script src="app.js?v=20260707-team-vote-options"></script>
+    <script src="app.js?v=20260707-source-live-files"></script>
   </body>
 </html>

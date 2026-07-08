@@ -85,6 +85,8 @@ async function applyAction(env, payload) {
     applyVote(messages, body);
   } else if (action === "promote") {
     applyPromote(messages, body);
+  } else if (action === "react") {
+    applyReaction(messages, body);
   } else {
     throw new Error("Unknown team chat action.");
   }
@@ -121,6 +123,20 @@ function applyPromote(messages, body) {
   if (sourceId) message.sourceId = sourceId.slice(0, 120);
 }
 
+function applyReaction(messages, body) {
+  const id = String(body.id || "").trim();
+  const user = String(body.user || "local").trim() || "local";
+  const reaction = String(body.reaction || "").trim();
+  if (!id || !["like", "dislike", ""].includes(reaction)) {
+    throw new Error("Team chat reaction must include an id and reaction of like, dislike, or empty.");
+  }
+  const message = messages.find((item) => item.id === id);
+  if (!message) return;
+  message.reactions = isPlainObject(message.reactions) ? message.reactions : {};
+  if (reaction) message.reactions[user] = reaction;
+  else delete message.reactions[user];
+}
+
 function sanitizeMessage(raw) {
   if (!isPlainObject(raw)) throw new Error("Team chat item must be an object.");
   const id = String(raw.id || crypto.randomUUID()).trim();
@@ -139,6 +155,7 @@ function sanitizeMessage(raw) {
     url: String(raw.url || "").trim().slice(0, 1200),
     status: String(raw.status || defaultStatus).trim().slice(0, 80),
     votes: isPlainObject(raw.votes) ? raw.votes : {},
+    reactions: isPlainObject(raw.reactions) ? raw.reactions : {},
     fileAttachment: sanitizeFileAttachment(raw.fileAttachment),
     createdAt: String(raw.createdAt || new Date().toISOString()).trim().slice(0, 80),
   };

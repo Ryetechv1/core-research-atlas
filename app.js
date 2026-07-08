@@ -16,9 +16,12 @@ const OPENAI_CHAT_API_PATH = "/api/openai-chat";
 const TEAM_CHAT_API_PATH = "/api/team-chat";
 const TEAM_CHAT_STORAGE_KEY = `${STORAGE_KEY}:team-chat`;
 const TEAM_CHAT_CHANNEL_NAME = "core-team-chat-sync";
+const SOURCE_FEED_STORAGE_KEY = `${STORAGE_KEY}:source-feed`;
+const SOURCE_FEED_CHANNEL_NAME = "core-source-feed-sync";
 const TEAM_SYNC_URL_KEY = `${STORAGE_KEY}:team-sync-url`;
 const TEAM_SYNC_QUERY_KEYS = ["sync", "teamSync", "teamSyncUrl"];
 const TEAM_CHAT_POLL_MS = 5_000;
+const SOURCE_FEED_REFRESH_MS = 6_000;
 const TEAM_SOURCE_APPROVAL_THRESHOLD = 2;
 const TEAM_VOTABLE_TYPES = new Set(["update", "link", "promote", "recommendation"]);
 const IMPORT_TEXT_SLICE_BYTES = 650_000;
@@ -218,6 +221,58 @@ const DEFAULT_COLLAB_DOCS = [
   },
 ];
 
+const DEFAULT_FILE_MANAGER = {
+  rootId: "file-root",
+  selectedId: "file-root",
+  nodes: [
+    {
+      id: "file-root",
+      parentId: "",
+      kind: "folder",
+      name: "CORE Atlas",
+      createdAt: new Date("2026-07-04T00:00:00").toISOString(),
+      updatedAt: new Date("2026-07-04T00:00:00").toISOString(),
+    },
+    {
+      id: "file-sources",
+      parentId: "file-root",
+      kind: "folder",
+      name: "Sources",
+      createdAt: new Date("2026-07-04T00:00:00").toISOString(),
+      updatedAt: new Date("2026-07-04T00:00:00").toISOString(),
+    },
+    {
+      id: "file-imports",
+      parentId: "file-root",
+      kind: "folder",
+      name: "Imports",
+      createdAt: new Date("2026-07-04T00:00:00").toISOString(),
+      updatedAt: new Date("2026-07-04T00:00:00").toISOString(),
+    },
+    {
+      id: "file-team",
+      parentId: "file-root",
+      kind: "folder",
+      name: "Team Shared",
+      createdAt: new Date("2026-07-04T00:00:00").toISOString(),
+      updatedAt: new Date("2026-07-04T00:00:00").toISOString(),
+    },
+    {
+      id: "file-readme",
+      parentId: "file-root",
+      kind: "file",
+      name: "README.txt",
+      extension: ".txt",
+      mimeType: "text/plain",
+      size: 218,
+      text: "Use this virtual file manager to organize source packets, imports, research notes, exported documents, and cloud handoff plans. Files are stored in this browser archive unless exported or uploaded elsewhere.",
+      previewKind: "text",
+      createdAt: new Date("2026-07-04T00:00:00").toISOString(),
+      updatedAt: new Date("2026-07-04T00:00:00").toISOString(),
+    },
+  ],
+};
+
 const SEED_DATA = {
   project: {
     name: "CORE Shapeshifting Research Atlas",
@@ -263,6 +318,17 @@ const SEED_DATA = {
         "Intent-routed shallow research with source citation",
         "Async deep research jobs",
         "Source registry selection across web, papers, enterprise, and knowledge layers",
+      ],
+    },
+    cloudStorageWorkspace: {
+      provider: "Cloud storage and document workspace",
+      status: "External launch integrations for import/export handoff from the Files tab.",
+      services: [
+        { name: "Google Drive", url: "https://drive.google.com/drive/my-drive", purpose: "Cloud file storage" },
+        { name: "MEGA Cloud", url: "https://mega.nz/fm", purpose: "Large archive storage" },
+        { name: "Google Docs", url: "https://docs.google.com/document/u/0/", purpose: "Document drafting" },
+        { name: "Google Forms", url: "https://docs.google.com/forms/u/0/", purpose: "Team intake forms" },
+        { name: "Google Sheets", url: "https://docs.google.com/spreadsheets/u/0/", purpose: "Citation and review tables" },
       ],
     },
   },
@@ -352,6 +418,7 @@ const SEED_DATA = {
   openAiChatMessages: [],
   teamMessages: [],
   collabDocs: DEFAULT_COLLAB_DOCS,
+  fileManager: DEFAULT_FILE_MANAGER,
   sources: [
     {
       id: "src-ovid-metamorphoses",
@@ -634,6 +701,10 @@ const state = {
   teamChatChannel: null,
   teamChatBackendAvailable: null,
   teamSyncBaseUrl: getInitialTeamSyncBaseUrl(),
+  sourceFeedChannel: null,
+  sourceFeedTimer: null,
+  fileClipboard: null,
+  fileManagerSaveTimer: null,
   backendCapabilities: {
     checked: false,
     checking: null,
@@ -657,6 +728,7 @@ document.addEventListener("DOMContentLoaded", () => {
   populateFormOptions();
   loadTeamMessagesFromLocalStorage();
   startTeamChatBroadcast();
+  startSourceFeedMonitor();
   initAuth();
   render();
   startTeamChatPolling();
@@ -673,6 +745,8 @@ function cacheElements() {
   els.speciesFilters = document.getElementById("speciesFilters");
   els.sourceTypeFilter = document.getElementById("sourceTypeFilter");
   els.sourceList = document.getElementById("sourceList");
+  els.sourceFeedStatus = document.getElementById("sourceFeedStatus");
+  els.refreshSourcesButton = document.getElementById("refreshSourcesButton");
   els.sourceCount = document.getElementById("sourceCount");
   els.verifiedCount = document.getElementById("verifiedCount");
   els.theoryCount = document.getElementById("theoryCount");
@@ -734,6 +808,20 @@ function cacheElements() {
   els.exportCollabJsonButton = document.getElementById("exportCollabJsonButton");
   els.printCollabDocButton = document.getElementById("printCollabDocButton");
   els.collabDocToSourceButton = document.getElementById("collabDocToSourceButton");
+  els.cloudIntegrationGrid = document.getElementById("cloudIntegrationGrid");
+  els.fileManagerPath = document.getElementById("fileManagerPath");
+  els.fileManagerStatus = document.getElementById("fileManagerStatus");
+  els.fileManagerTree = document.getElementById("fileManagerTree");
+  els.fileManagerDetail = document.getElementById("fileManagerDetail");
+  els.fileNewFolderButton = document.getElementById("fileNewFolderButton");
+  els.fileNewTextButton = document.getElementById("fileNewTextButton");
+  els.fileRenameButton = document.getElementById("fileRenameButton");
+  els.fileCopyButton = document.getElementById("fileCopyButton");
+  els.fileMoveButton = document.getElementById("fileMoveButton");
+  els.filePasteButton = document.getElementById("filePasteButton");
+  els.fileDeleteButton = document.getElementById("fileDeleteButton");
+  els.fileExportButton = document.getElementById("fileExportButton");
+  els.fileManagerImportInput = document.getElementById("fileManagerImportInput");
   els.createMemorySnapshotButton = document.getElementById("createMemorySnapshotButton");
   els.exportMemoryBankButton = document.getElementById("exportMemoryBankButton");
   els.memoryBankSummary = document.getElementById("memoryBankSummary");
@@ -771,6 +859,12 @@ function wireEvents() {
   els.sourceTypeFilter.addEventListener("change", (event) => {
     state.activeSourceType = event.target.value;
     renderSources();
+  });
+
+  els.refreshSourcesButton?.addEventListener("click", () => refreshSourceFeed("Manual source refresh"));
+  window.addEventListener("focus", () => refreshSourceFeed("Window focus refresh"));
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshSourceFeed("Visibility refresh");
   });
 
   els.toggleAddFormButton.addEventListener("click", () => {
@@ -827,6 +921,18 @@ function wireEvents() {
   els.exportCollabJsonButton.addEventListener("click", () => exportActiveCollabDoc("json"));
   els.printCollabDocButton.addEventListener("click", printActiveCollabDoc);
   els.collabDocToSourceButton.addEventListener("click", addActiveCollabDocToSources);
+  els.cloudIntegrationGrid?.querySelectorAll("[data-cloud-open]").forEach((button) => {
+    button.addEventListener("click", () => openExternalUrl(button.dataset.cloudOpen));
+  });
+  els.fileNewFolderButton?.addEventListener("click", createFileManagerFolder);
+  els.fileNewTextButton?.addEventListener("click", createFileManagerTextFile);
+  els.fileRenameButton?.addEventListener("click", renameFileManagerNode);
+  els.fileCopyButton?.addEventListener("click", () => copyFileManagerNode("copy"));
+  els.fileMoveButton?.addEventListener("click", () => copyFileManagerNode("move"));
+  els.filePasteButton?.addEventListener("click", pasteFileManagerNode);
+  els.fileDeleteButton?.addEventListener("click", deleteFileManagerNode);
+  els.fileExportButton?.addEventListener("click", exportFileManagerNode);
+  els.fileManagerImportInput?.addEventListener("change", handleFileManagerImport);
   els.createMemorySnapshotButton.addEventListener("click", () => createManualMemorySnapshot("Manual user snapshot"));
   els.exportMemoryBankButton.addEventListener("click", exportMemoryBank);
   els.profileForm.addEventListener("submit", handleSaveProfile);
@@ -1034,6 +1140,20 @@ function renderPermissionState() {
     });
   });
   [
+    "fileNewFolderButton",
+    "fileNewTextButton",
+    "fileRenameButton",
+    "fileCopyButton",
+    "fileMoveButton",
+    "filePasteButton",
+    "fileDeleteButton",
+    "fileExportButton",
+    "fileManagerImportInput",
+  ].forEach((id) => {
+    const control = document.getElementById(id);
+    if (control) control.disabled = guest;
+  });
+  [
     "toggleAddFormButton",
     "resetButton",
     "exportJsonButton",
@@ -1109,6 +1229,7 @@ function render() {
   renderTeamSyncSettings();
   renderTeamChat();
   renderCollabDocs();
+  renderFileManager();
   renderMemoryBank();
   renderProfiles();
   renderReferenceLibrary();
@@ -1155,8 +1276,102 @@ function renderNavigation() {
   els.sourceTypeFilter.value = state.activeSourceType;
 }
 
+function startSourceFeedMonitor() {
+  loadSourceFeedFromLocalStorage();
+  if ("BroadcastChannel" in window) {
+    state.sourceFeedChannel = new BroadcastChannel(SOURCE_FEED_CHANNEL_NAME);
+    state.sourceFeedChannel.addEventListener("message", (event) => {
+      if (event.data?.type !== "source-feed" || !Array.isArray(event.data.sources)) return;
+      mergeSourceFeed(event.data.sources, "Cross-tab source update", { replace: true });
+    });
+  }
+  window.addEventListener("storage", (event) => {
+    if (event.key === SOURCE_FEED_STORAGE_KEY && event.newValue) {
+      try {
+        const payload = JSON.parse(event.newValue);
+        if (Array.isArray(payload.sources)) mergeSourceFeed(payload.sources, "Stored source feed update", { replace: true });
+      } catch {
+        setSourceFeedStatus("Source feed storage skipped malformed update");
+      }
+    }
+    if (event.key === STORAGE_KEY && event.newValue) {
+      refreshSourceFeed("Archive storage update");
+    }
+  });
+  refreshSourceFeed("App access refresh");
+  if (state.sourceFeedTimer) window.clearInterval(state.sourceFeedTimer);
+  state.sourceFeedTimer = window.setInterval(() => refreshSourceFeed("Live source feed refresh"), SOURCE_FEED_REFRESH_MS);
+}
+
+function setSourceFeedStatus(text) {
+  if (els.sourceFeedStatus) els.sourceFeedStatus.textContent = text;
+}
+
+function loadSourceFeedFromLocalStorage() {
+  try {
+    const payload = JSON.parse(window.localStorage.getItem(SOURCE_FEED_STORAGE_KEY) || "{}");
+    if (Array.isArray(payload.sources)) mergeSourceFeed(payload.sources, "Source feed restored");
+  } catch {
+    window.localStorage.removeItem(SOURCE_FEED_STORAGE_KEY);
+  }
+}
+
+function refreshSourceFeed(reason = "Source refresh") {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const archive = normalizeArchive(JSON.parse(saved));
+      mergeSourceFeed(archive.sources || [], reason, { replace: true });
+    }
+    renderSources();
+    renderNavigation();
+    renderMetrics();
+    setSourceFeedStatus(`Live ${new Date().toLocaleTimeString()}`);
+  } catch {
+    setSourceFeedStatus("Live feed recovered from current memory");
+    renderSources();
+  }
+}
+
+function mergeSourceFeed(incomingSources = [], reason = "Source feed update", { replace = false } = {}) {
+  const before = state.archive.sources?.length || 0;
+  state.archive.sources = replace
+    ? incomingSources.map(normalizeSourceRecord)
+    : mergeById(state.archive.sources || [], incomingSources.map(normalizeSourceRecord));
+  const after = state.archive.sources.length;
+  if (!state.selectedId && after) state.selectedId = state.archive.sources[0].id;
+  if (after !== before) persistArchive(reason);
+  renderSources();
+  renderNavigation();
+  renderMetrics();
+  setSourceFeedStatus(`${after} tracked / ${new Date().toLocaleTimeString()}`);
+}
+
+function broadcastSourceFeed(reason = "Source feed update") {
+  if (isGuestUser()) return;
+  const sources = (state.archive.sources || []).map(normalizeSourceRecord);
+  try {
+    window.localStorage.setItem(
+      SOURCE_FEED_STORAGE_KEY,
+      JSON.stringify({ sources, updatedAt: new Date().toISOString(), reason })
+    );
+  } catch {
+    // The source feed still remains in the main archive if this cache cannot be written.
+  }
+  state.sourceFeedChannel?.postMessage({ type: "source-feed", sources, reason });
+  setSourceFeedStatus(`${sources.length} tracked / ${new Date().toLocaleTimeString()}`);
+}
+
 function renderSources() {
-  const sources = getFilteredSources();
+  let sources = [];
+  try {
+    state.archive.sources = (state.archive.sources || []).map(normalizeSourceRecord);
+    sources = getFilteredSources();
+  } catch {
+    els.sourceList.innerHTML = '<div class="empty-state">Source logs recovered after a malformed record. Refresh Sources to retry.</div>';
+    setSourceFeedStatus("Source feed recovered");
+    return;
+  }
   els.sourceList.innerHTML = "";
 
   if (!sources.length) {
@@ -1180,11 +1395,20 @@ function renderSources() {
     tier.classList.add(tierClass(source.evidenceTier));
     row.querySelector(".type-chip").textContent = source.sourceType || "URL";
     row.querySelector(".status-chip").textContent = source.citationStatus;
-    row.addEventListener("click", () => {
+    row.querySelector(".source-row-select").addEventListener("click", () => {
       state.selectedId = source.id;
       saveUserLocation({ selectedId: state.selectedId, panel: "sourcePanel" });
       renderSources();
     });
+    row.querySelector("[data-source-view]").addEventListener("click", () => {
+      state.selectedId = source.id;
+      saveUserLocation({ selectedId: state.selectedId, panel: "sourcePanel" });
+      renderSources();
+      openSourceInBrowser(source.id);
+    });
+    const removeButton = row.querySelector("[data-source-remove]");
+    removeButton.hidden = !canRemoveSourceLogs();
+    removeButton.addEventListener("click", () => removeSourceLog(source.id));
     els.sourceList.append(row);
   });
 
@@ -1223,8 +1447,9 @@ function renderSelected(source) {
       <pre class="source-log-pre">${escapeHtml(formatSourceLog(source))}</pre>
     </details>
     <div class="form-actions">
-      ${source.url || source.importId || source.fileAttachment ? `<button class="primary-button iconless" type="button" data-source-open="${escapeHtml(source.id)}">${source.importId || source.fileAttachment ? "Preview File" : "Open External"}</button>` : ""}
+      ${source.url || source.importId || source.fileAttachment || source.referenceId ? `<button class="primary-button iconless" type="button" data-source-open="${escapeHtml(source.id)}">${isInternalSourceLocator(source) ? "Preview File" : "Open External"}</button>` : ""}
       <button class="ghost-button iconless" type="button" data-source-preview="${escapeHtml(source.id)}">Full Source Info</button>
+      ${canRemoveSourceLogs() ? `<button class="ghost-button iconless danger-action" type="button" data-source-delete="${escapeHtml(source.id)}">Remove Source Log</button>` : ""}
     </div>
   `;
   els.selectedRecord.querySelectorAll("[data-source-open]").forEach((button) => {
@@ -1233,6 +1458,28 @@ function renderSelected(source) {
   els.selectedRecord.querySelectorAll("[data-source-preview]").forEach((button) => {
     button.addEventListener("click", () => previewSourceInBrowser(button.dataset.sourcePreview));
   });
+  els.selectedRecord.querySelectorAll("[data-source-delete]").forEach((button) => {
+    button.addEventListener("click", () => removeSourceLog(button.dataset.sourceDelete));
+  });
+}
+
+function canRemoveSourceLogs() {
+  return state.currentUser?.username === "UserSeth" && !isGuestUser();
+}
+
+function removeSourceLog(sourceId) {
+  if (!canRemoveSourceLogs()) {
+    window.alert("Only UserSeth can remove source logs.");
+    return;
+  }
+  const source = state.archive.sources.find((item) => item.id === sourceId);
+  if (!source) return;
+  const confirmed = window.confirm(`Remove source log "${source.title}"? This only removes it from the atlas archive.`);
+  if (!confirmed) return;
+  state.archive.sources = state.archive.sources.filter((item) => item.id !== sourceId);
+  if (state.selectedId === sourceId) state.selectedId = state.archive.sources[0]?.id || null;
+  persistArchive("Source log removed");
+  render();
 }
 
 function sourceLogLocator(source) {
@@ -1274,11 +1521,23 @@ function openSourceInBrowser(sourceId) {
   const source = state.archive.sources.find((item) => item.id === sourceId);
   if (!source) return;
   previewSourceInBrowser(sourceId);
-  if (source.url?.startsWith("import://") || source.importId || source.fileAttachment) {
+  if (isInternalSourceLocator(source)) {
     openSourceFilePreview(sourceId);
     return;
   }
   if (source.url) openExternalUrl(source.url);
+}
+
+function isInternalSourceLocator(source = {}) {
+  return Boolean(
+    source.fileAttachment ||
+      source.importId ||
+      source.referenceId ||
+      source.url?.startsWith("import://") ||
+      source.url?.startsWith("team-file://") ||
+      source.url?.startsWith("local-collab-doc://") ||
+      source.url?.startsWith("data/reference_ingest.json")
+  );
 }
 
 function previewSourceInBrowser(sourceId) {
@@ -1314,6 +1573,44 @@ function openSourceFilePreview(sourceId) {
     const imported = findImportedFile(source.importId);
     if (imported) {
       openFilePreviewDialog(imported, { title: source.title, origin: "Imported source log", url: source.url });
+      return;
+    }
+  }
+  if (source.referenceId) {
+    const reference = getReferenceLibrary().find((item) => item.id === source.referenceId);
+    if (reference) {
+      openFilePreviewDialog(
+        {
+          fileName: reference.fileName || reference.title,
+          extension: ".pdf",
+          mimeType: "application/pdf",
+          size: 0,
+          previewKind: "data",
+          summary: `${reference.title}. ${reference.backendUse || reference.role || ""}`,
+          textExcerpt: JSON.stringify(reference, null, 2),
+          storedPreview: false,
+        },
+        { title: source.title, origin: "Uploaded reference metadata", url: source.url }
+      );
+      return;
+    }
+  }
+  if (source.url?.startsWith("local-collab-doc://")) {
+    const doc = getCollabDocFromUrl(source.url);
+    if (doc) {
+      openFilePreviewDialog(
+        {
+          fileName: `${doc.title || "collaboration-doc"}.txt`,
+          extension: ".txt",
+          mimeType: "text/plain",
+          size: stripHtml(doc.contentHtml || "").length,
+          previewKind: "text",
+          summary: `${doc.type || "Document"} / ${doc.status || "Draft"} / ${doc.owner || "Unassigned"}`,
+          textExcerpt: collabDocToText(doc),
+          storedPreview: true,
+        },
+        { title: source.title, origin: "Collaboration document source" }
+      );
       return;
     }
   }
@@ -3795,6 +4092,7 @@ async function handleTeamChatSubmit(event) {
     url,
     status: isTeamPostVotable({ type }) ? "review" : "posted",
     votes: {},
+    reactions: {},
     fileAttachment,
     createdAt: new Date().toISOString(),
   };
@@ -3863,6 +4161,8 @@ function renderTeamChat() {
       const hasAttachment = Boolean(item.fileAttachment);
       const isPromotable = isTeamPostVotable(item);
       const userVote = item.votes?.[state.currentUser?.username || "local"] || "";
+      const reactionCounts = getTeamReactionCounts(item);
+      const userReaction = item.reactions?.[state.currentUser?.username || "local"] || "";
       return `
         <article class="team-post ${escapeHtml(type)}">
           <header>
@@ -3906,6 +4206,10 @@ function renderTeamChat() {
                 : ""
             }
           </div>
+          <div class="reaction-row" aria-label="Team post reactions">
+            <button class="reaction-button${userReaction === "like" ? " is-active" : ""}" type="button" data-team-react-like="${escapeHtml(item.id)}"${writeDisabledAttr()}>Like ${reactionCounts.likes}</button>
+            <button class="reaction-button${userReaction === "dislike" ? " is-active" : ""}" type="button" data-team-react-dislike="${escapeHtml(item.id)}"${writeDisabledAttr()}>Dislike ${reactionCounts.dislikes}</button>
+          </div>
         </article>
       `;
     })
@@ -3925,6 +4229,12 @@ function renderTeamChat() {
   });
   els.teamChatFeed.querySelectorAll("[data-team-file-preview]").forEach((button) => {
     button.addEventListener("click", () => openTeamFilePreview(button.dataset.teamFilePreview));
+  });
+  els.teamChatFeed.querySelectorAll("[data-team-react-like]").forEach((button) => {
+    button.addEventListener("click", () => reactToTeamMessage(button.dataset.teamReactLike, "like"));
+  });
+  els.teamChatFeed.querySelectorAll("[data-team-react-dislike]").forEach((button) => {
+    button.addEventListener("click", () => reactToTeamMessage(button.dataset.teamReactDislike, "dislike"));
   });
 }
 
@@ -3958,6 +4268,29 @@ function getTeamVoteCounts(item = {}) {
     addVotes: Object.values(votes).filter((vote) => vote === "add").length,
     rejectVotes: Object.values(votes).filter((vote) => vote === "reject").length,
   };
+}
+
+function getTeamReactionCounts(item = {}) {
+  const reactions = item.reactions || {};
+  return {
+    likes: Object.values(reactions).filter((reaction) => reaction === "like").length,
+    dislikes: Object.values(reactions).filter((reaction) => reaction === "dislike").length,
+  };
+}
+
+function reactToTeamMessage(id, reaction) {
+  if (!ensureCanWrite("react to team messages")) return;
+  const item = findTeamMessage(id);
+  if (!item || !["like", "dislike"].includes(reaction)) return;
+  const username = state.currentUser?.username || "local";
+  const reactions = { ...(item.reactions || {}) };
+  if (reactions[username] === reaction) {
+    delete reactions[username];
+  } else {
+    reactions[username] = reaction;
+  }
+  updateTeamMessage(id, { reactions });
+  postTeamChatPayload({ action: "react", id, reaction: reactions[username] || "", user: username });
 }
 
 function updateTeamMessage(id, update) {
@@ -4418,6 +4751,360 @@ function slugify(value) {
     .slice(0, 70) || "core-doc";
 }
 
+function getFileManager() {
+  state.archive.fileManager = normalizeFileManager(state.archive.fileManager || DEFAULT_FILE_MANAGER);
+  return state.archive.fileManager;
+}
+
+function normalizeFileManager(manager = DEFAULT_FILE_MANAGER) {
+  const base = clone(DEFAULT_FILE_MANAGER);
+  const incomingNodes = Array.isArray(manager.nodes) ? manager.nodes : [];
+  const nodes = mergeById(base.nodes, incomingNodes).map(normalizeFileNode);
+  if (!nodes.some((node) => node.id === base.rootId)) nodes.unshift(normalizeFileNode(base.nodes[0]));
+  const selectedId = nodes.some((node) => node.id === manager.selectedId) ? manager.selectedId : base.rootId;
+  return { rootId: base.rootId, selectedId, nodes };
+}
+
+function normalizeFileNode(node = {}) {
+  const kind = node.kind === "folder" ? "folder" : "file";
+  const now = new Date().toISOString();
+  return {
+    id: String(node.id || `file-${Date.now()}-${Math.round(Math.random() * 999)}`),
+    parentId: String(node.parentId || ""),
+    kind,
+    name: String(node.name || (kind === "folder" ? "Untitled Folder" : "Untitled.txt")),
+    extension: String(node.extension || (kind === "file" ? ".txt" : "")),
+    mimeType: String(node.mimeType || (kind === "file" ? "text/plain" : "")),
+    size: Number(node.size || 0),
+    text: String(node.text || ""),
+    dataUrl: String(node.dataUrl || ""),
+    previewKind: String(node.previewKind || (kind === "folder" ? "folder" : "text")),
+    createdAt: String(node.createdAt || now),
+    updatedAt: String(node.updatedAt || node.createdAt || now),
+  };
+}
+
+function renderFileManager() {
+  if (!els.fileManagerTree || !els.fileManagerDetail) return;
+  const manager = getFileManager();
+  const selected = getFileNode(manager.selectedId) || getFileNode(manager.rootId);
+  if (selected) manager.selectedId = selected.id;
+  els.fileManagerPath.textContent = fileManagerPath(selected?.id || manager.rootId);
+  els.fileManagerStatus.textContent = `${manager.nodes.length} item${manager.nodes.length === 1 ? "" : "s"}`;
+  els.fileManagerTree.innerHTML = renderFileTree(manager.rootId, 0);
+  els.fileManagerTree.querySelectorAll("[data-file-id]").forEach((button) => {
+    button.addEventListener("click", () => selectFileManagerNode(button.dataset.fileId));
+  });
+  renderFileManagerDetail(selected);
+  renderPermissionState();
+}
+
+function renderFileTree(parentId, depth) {
+  const manager = getFileManager();
+  const children = getFileChildren(parentId);
+  const current = getFileNode(parentId);
+  const currentHtml = current
+    ? `<button class="file-tree-item${manager.selectedId === current.id ? " is-active" : ""}" type="button" data-file-id="${escapeHtml(current.id)}" style="--depth:${depth}">
+        <span>${current.kind === "folder" ? "Folder" : "File"}</span>
+        <strong>${escapeHtml(current.name)}</strong>
+      </button>`
+    : "";
+  return `${currentHtml}${children.map((child) => renderFileTree(child.id, depth + 1)).join("")}`;
+}
+
+function renderFileManagerDetail(node) {
+  if (!node) {
+    els.fileManagerDetail.innerHTML = '<div class="empty-state">Select a folder or file.</div>';
+    return;
+  }
+  const children = node.kind === "folder" ? getFileChildren(node.id) : [];
+  const meta = `
+    <div class="file-detail-meta">
+      <span><strong>Name:</strong> ${escapeHtml(node.name)}</span>
+      <span><strong>Type:</strong> ${escapeHtml(node.kind === "folder" ? "Folder" : node.mimeType || node.extension || "file")}</span>
+      <span><strong>Size:</strong> ${escapeHtml(formatBytes(node.size || 0))}</span>
+      <span><strong>Updated:</strong> ${escapeHtml(new Date(node.updatedAt || Date.now()).toLocaleString())}</span>
+    </div>
+  `;
+  if (node.kind === "folder") {
+    els.fileManagerDetail.innerHTML = `
+      <h3>${escapeHtml(node.name)}</h3>
+      ${meta}
+      <div class="file-folder-grid">
+        ${
+          children.length
+            ? children
+                .map(
+                  (child) => `
+                    <button class="file-folder-tile" type="button" data-file-tile="${escapeHtml(child.id)}">
+                      <strong>${escapeHtml(child.name)}</strong>
+                      <span>${escapeHtml(child.kind === "folder" ? "Folder" : child.mimeType || child.extension || "file")}</span>
+                    </button>
+                  `
+                )
+                .join("")
+            : '<div class="empty-state">This folder is empty. Import files or create a TXT note.</div>'
+        }
+      </div>
+    `;
+    els.fileManagerDetail.querySelectorAll("[data-file-tile]").forEach((button) => {
+      button.addEventListener("click", () => selectFileManagerNode(button.dataset.fileTile));
+    });
+    return;
+  }
+  els.fileManagerDetail.innerHTML = `
+    <h3>${escapeHtml(node.name)}</h3>
+    ${meta}
+    ${renderFileNodePreview(node)}
+  `;
+  const editor = els.fileManagerDetail.querySelector("[data-file-text-editor]");
+  editor?.addEventListener("input", () => updateFileManagerTextFile(node.id, editor.value));
+}
+
+function renderFileNodePreview(node) {
+  if (node.previewKind === "image" && node.dataUrl) return `<img class="file-preview-media" src="${escapeHtml(node.dataUrl)}" alt="${escapeHtml(node.name)}">`;
+  if (node.previewKind === "video" && node.dataUrl) return `<video class="file-preview-media" controls src="${escapeHtml(node.dataUrl)}"></video>`;
+  if (node.previewKind === "audio" && node.dataUrl) return `<audio class="file-preview-audio" controls src="${escapeHtml(node.dataUrl)}"></audio>`;
+  if (node.previewKind === "pdf" && node.dataUrl) return `<iframe class="file-preview-document" title="${escapeHtml(node.name)}" src="${escapeHtml(node.dataUrl)}"></iframe>`;
+  if (node.previewKind === "text" || node.extension === ".txt") {
+    return `<textarea class="file-text-editor" data-file-text-editor rows="14">${escapeHtml(node.text || decodeDataUrlText(node.dataUrl) || "")}</textarea>`;
+  }
+  const fallback = node.text || node.dataUrl ? "Preview stored. Export or open this file from the manager." : "Metadata-only file record.";
+  return `<pre class="file-preview-text">${escapeHtml(fallback)}</pre>`;
+}
+
+function selectFileManagerNode(id) {
+  const manager = getFileManager();
+  if (!getFileNode(id)) return;
+  manager.selectedId = id;
+  persistArchive("File manager selection");
+  renderFileManager();
+}
+
+function getFileNode(id) {
+  return getFileManager().nodes.find((node) => node.id === id);
+}
+
+function getFileChildren(parentId) {
+  return getFileManager()
+    .nodes.filter((node) => node.parentId === parentId)
+    .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "folder" ? -1 : 1));
+}
+
+function getSelectedFileNode() {
+  const manager = getFileManager();
+  return getFileNode(manager.selectedId) || getFileNode(manager.rootId);
+}
+
+function getSelectedFolderId() {
+  const selected = getSelectedFileNode();
+  return selected?.kind === "folder" ? selected.id : selected?.parentId || getFileManager().rootId;
+}
+
+function fileManagerPath(nodeId) {
+  const names = [];
+  let cursor = getFileNode(nodeId);
+  const seen = new Set();
+  while (cursor && !seen.has(cursor.id)) {
+    seen.add(cursor.id);
+    names.unshift(cursor.name);
+    cursor = getFileNode(cursor.parentId);
+  }
+  return `/${names.join("/")}`;
+}
+
+function persistFileManager(reason = "File manager update") {
+  getFileManager();
+  persistArchive(reason);
+  renderFileManager();
+}
+
+function createFileManagerFolder() {
+  if (!ensureCanWrite("create folders")) return;
+  const name = window.prompt("Folder name", "New Folder");
+  if (!name) return;
+  const now = new Date().toISOString();
+  getFileManager().nodes.push({
+    id: `file-folder-${Date.now()}`,
+    parentId: getSelectedFolderId(),
+    kind: "folder",
+    name: name.trim(),
+    createdAt: now,
+    updatedAt: now,
+  });
+  persistFileManager("Created virtual folder");
+}
+
+function createFileManagerTextFile() {
+  if (!ensureCanWrite("create text files")) return;
+  const name = window.prompt("Text file name", "New Note.txt");
+  if (!name) return;
+  const now = new Date().toISOString();
+  const fileName = name.trim().endsWith(".txt") ? name.trim() : `${name.trim()}.txt`;
+  getFileManager().nodes.push({
+    id: `file-text-${Date.now()}`,
+    parentId: getSelectedFolderId(),
+    kind: "file",
+    name: fileName,
+    extension: ".txt",
+    mimeType: "text/plain",
+    size: 0,
+    text: "",
+    previewKind: "text",
+    createdAt: now,
+    updatedAt: now,
+  });
+  persistFileManager("Created virtual text file");
+}
+
+function renameFileManagerNode() {
+  if (!ensureCanWrite("rename files and folders")) return;
+  const node = getSelectedFileNode();
+  if (!node || node.id === getFileManager().rootId) return;
+  const name = window.prompt("New name", node.name);
+  if (!name) return;
+  node.name = name.trim();
+  node.updatedAt = new Date().toISOString();
+  persistFileManager("Renamed virtual file node");
+}
+
+function copyFileManagerNode(mode = "copy") {
+  if (!ensureCanWrite(`${mode} files and folders`)) return;
+  const node = getSelectedFileNode();
+  if (!node || node.id === getFileManager().rootId) return;
+  state.fileClipboard = { id: node.id, mode };
+  els.fileManagerStatus.textContent = `${mode === "move" ? "Moving" : "Copied"} ${node.name}`;
+}
+
+function pasteFileManagerNode() {
+  if (!ensureCanWrite("paste files and folders")) return;
+  const clipboard = state.fileClipboard;
+  if (!clipboard) return;
+  const targetFolderId = getSelectedFolderId();
+  const node = getFileNode(clipboard.id);
+  if (!node || node.id === getFileManager().rootId || node.id === targetFolderId || isFileDescendant(targetFolderId, node.id)) return;
+  if (clipboard.mode === "move") {
+    node.parentId = targetFolderId;
+    node.updatedAt = new Date().toISOString();
+    state.fileClipboard = null;
+  } else {
+    cloneFileNodeTree(node.id, targetFolderId);
+  }
+  persistFileManager(`${clipboard.mode === "move" ? "Moved" : "Copied"} virtual file node`);
+}
+
+function cloneFileNodeTree(sourceId, parentId) {
+  const source = getFileNode(sourceId);
+  if (!source) return null;
+  const now = new Date().toISOString();
+  const cloned = { ...source, id: `file-copy-${Date.now()}-${Math.round(Math.random() * 9999)}`, parentId, name: `Copy of ${source.name}`, createdAt: now, updatedAt: now };
+  getFileManager().nodes.push(cloned);
+  getFileChildren(sourceId).forEach((child) => cloneFileNodeTree(child.id, cloned.id));
+  return cloned;
+}
+
+function isFileDescendant(candidateId, ancestorId) {
+  let cursor = getFileNode(candidateId);
+  while (cursor) {
+    if (cursor.parentId === ancestorId) return true;
+    cursor = getFileNode(cursor.parentId);
+  }
+  return false;
+}
+
+function deleteFileManagerNode() {
+  if (!ensureCanWrite("delete files and folders")) return;
+  const node = getSelectedFileNode();
+  const manager = getFileManager();
+  if (!node || node.id === manager.rootId) return;
+  const confirmed = window.confirm(`Delete "${node.name}" and all nested contents?`);
+  if (!confirmed) return;
+  const ids = new Set([node.id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    manager.nodes.forEach((item) => {
+      if (ids.has(item.parentId) && !ids.has(item.id)) {
+        ids.add(item.id);
+        changed = true;
+      }
+    });
+  }
+  manager.nodes = manager.nodes.filter((item) => !ids.has(item.id));
+  manager.selectedId = node.parentId || manager.rootId;
+  persistFileManager("Deleted virtual file node");
+}
+
+async function handleFileManagerImport(event) {
+  if (!ensureCanWrite("import files into the manager")) return;
+  const files = [...(event.target.files || [])];
+  if (!files.length) return;
+  const parentId = getSelectedFolderId();
+  const nodes = await Promise.all(files.map((file) => fileManagerNodeFromUpload(file, parentId)));
+  getFileManager().nodes.push(...nodes);
+  event.target.value = "";
+  persistFileManager(`Imported ${nodes.length} virtual file${nodes.length === 1 ? "" : "s"}`);
+}
+
+async function fileManagerNodeFromUpload(file, parentId) {
+  const extension = `.${(file.name.split(".").pop() || "").toLowerCase()}`;
+  const previewKind = previewKindForFile({ fileName: file.name, extension, mimeType: file.type });
+  const canStoreData = file.size <= MAX_STORED_FILE_BYTES;
+  const textLike = previewKind === "text";
+  const text = textLike ? await readFileTextSlice(file, PREVIEW_TEXT_LIMIT) : "";
+  const dataUrl = canStoreData && !textLike ? await readFileAsDataUrl(file) : "";
+  return {
+    id: `file-import-${Date.now()}-${Math.round(Math.random() * 9999)}`,
+    parentId,
+    kind: "file",
+    name: file.name,
+    extension,
+    mimeType: file.type || inferSourceType(file.name),
+    size: file.size,
+    text,
+    dataUrl,
+    previewKind,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function updateFileManagerTextFile(id, text) {
+  const node = getFileNode(id);
+  if (!node || node.kind !== "file") return;
+  node.text = text;
+  node.size = text.length;
+  node.updatedAt = new Date().toISOString();
+  window.clearTimeout(state.fileManagerSaveTimer);
+  state.fileManagerSaveTimer = window.setTimeout(() => persistArchive("Edited virtual text file"), 700);
+}
+
+function exportFileManagerNode() {
+  const node = getSelectedFileNode();
+  if (!node) return;
+  if (node.kind === "folder") {
+    const ids = new Set([node.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      getFileManager().nodes.forEach((item) => {
+        if (ids.has(item.parentId) && !ids.has(item.id)) {
+          ids.add(item.id);
+          changed = true;
+        }
+      });
+    }
+    const payload = getFileManager().nodes.filter((item) => ids.has(item.id));
+    download(`${slugify(node.name)}-folder.json`, "application/json", JSON.stringify(payload, null, 2));
+    return;
+  }
+  if (node.text || node.previewKind === "text") {
+    download(node.name, node.mimeType || "text/plain", node.text || decodeDataUrlText(node.dataUrl));
+    return;
+  }
+  download(`${slugify(node.name)}.json`, "application/json", JSON.stringify(node, null, 2));
+}
+
 function renderProfiles() {
   els.profileTabs.innerHTML = state.archive.profiles
     .map(
@@ -4561,6 +5248,27 @@ function loadArchive() {
   }
 }
 
+function normalizeSourceRecord(source = {}) {
+  const record = typeof source === "object" && source ? source : {};
+  const id = String(record.id || `src-${Date.now()}-${Math.round(Math.random() * 999)}`).slice(0, 140);
+  return {
+    ...record,
+    id,
+    title: String(record.title || "Untitled source"),
+    category: record.category === "Simulations" ? "Theoretical Concepts" : String(record.category || "Documents"),
+    species: String(record.species || "Cross-form"),
+    domain: record.domain === "Simulation" ? "Theoretical Biology" : String(record.domain || "Metaphysics"),
+    sourceType: String(record.sourceType || "URL"),
+    url: String(record.url || ""),
+    evidenceTier: String(record.evidenceTier || "Speculative framework"),
+    citationStatus: String(record.citationStatus || "Needs verification"),
+    tradition: String(record.tradition || "Unspecified"),
+    terms: Array.isArray(record.terms) ? record.terms.map((term) => String(term)).filter(Boolean) : [],
+    notes: String(record.notes || "No notes yet."),
+    coreLinks: Array.isArray(record.coreLinks) ? record.coreLinks.map((link) => String(link)).filter(Boolean) : [],
+  };
+}
+
 function normalizeArchive(input) {
   const base = clone(SEED_DATA);
   const archive = { ...base, ...clone(input || {}) };
@@ -4602,6 +5310,14 @@ function normalizeArchive(input) {
     ...base.externalApis.nvidiaAIQResearch,
     ...(archive.externalApis.nvidiaAIQResearch || {}),
   };
+  archive.externalApis.cloudStorageWorkspace = {
+    ...base.externalApis.cloudStorageWorkspace,
+    ...(archive.externalApis.cloudStorageWorkspace || {}),
+    services:
+      archive.externalApis.cloudStorageWorkspace?.services?.length
+        ? archive.externalApis.cloudStorageWorkspace.services
+        : base.externalApis.cloudStorageWorkspace.services,
+  };
   archive.referenceLibrary = mergeById(base.referenceLibrary, archive.referenceLibrary || []).map((reference) => ({
     sourceType: "PDF",
     pageCount: 0,
@@ -4614,15 +5330,7 @@ function normalizeArchive(input) {
   archive.categories = (archive.categories?.length ? archive.categories : base.categories).filter((category) => category !== "Simulations");
   archive.domains = (archive.domains?.length ? archive.domains : base.domains).filter((domain) => domain !== "Simulation");
   archive.sourceTypes = archive.sourceTypes?.length ? archive.sourceTypes : SOURCE_TYPES;
-  archive.sources = mergeById(base.sources, archive.sources || []).map((source) => ({
-    sourceType: "URL",
-    url: "",
-    terms: [],
-    coreLinks: [],
-    ...source,
-    category: source.category === "Simulations" ? "Theoretical Concepts" : source.category,
-    domain: source.domain === "Simulation" ? "Theoretical Biology" : source.domain,
-  }));
+  archive.sources = mergeById(base.sources, archive.sources || []).map(normalizeSourceRecord);
   archive.profiles = DEFAULT_PROFILES.map((profile) => ({
     ...profile,
     ...(archive.profiles || []).find((item) => item.username === profile.username),
@@ -4640,6 +5348,7 @@ function normalizeArchive(input) {
     contentHtml: "<p>Start drafting here.</p>",
     ...doc,
   }));
+  archive.fileManager = normalizeFileManager(archive.fileManager || base.fileManager);
   return archive;
 }
 
@@ -4650,6 +5359,7 @@ function persistArchive(reason = "Archive update") {
     const previous = window.localStorage.getItem(STORAGE_KEY);
     if (previous) window.localStorage.setItem(STORAGE_BACKUP_KEY, previous);
     window.localStorage.setItem(STORAGE_KEY, encoded);
+    broadcastSourceFeed(reason);
     rememberArchive(reason);
   } catch (error) {
     try {
@@ -4712,6 +5422,7 @@ function archiveCounts(archive) {
     openAiChatMessages: archive.openAiChatMessages?.length || 0,
     teamMessages: archive.teamMessages?.length || 0,
     collabDocs: archive.collabDocs?.length || 0,
+    fileManagerItems: archive.fileManager?.nodes?.length || 0,
     profiles: archive.profiles?.length || 0,
   };
 }
@@ -4736,7 +5447,7 @@ function renderMemoryBank() {
             <button class="memory-snapshot-item${selected?.id === snapshot.id ? " is-active" : ""}" type="button" data-memory-id="${escapeHtml(snapshot.id)}">
               <strong>${escapeHtml(snapshot.reason || "Archive update")}</strong>
               <span>${escapeHtml(snapshot.owner || "local")} / ${new Date(snapshot.createdAt).toLocaleString()}</span>
-              <small>${snapshot.counts.sources} sources / ${snapshot.counts.teamMessages} team posts / ${snapshot.counts.collabDocs} docs / ${snapshot.counts.importedFiles} uploads / ${snapshot.counts.openAiChatMessages || 0} OpenAI messages</small>
+              <small>${snapshot.counts.sources} sources / ${snapshot.counts.teamMessages} team posts / ${snapshot.counts.collabDocs} docs / ${snapshot.counts.fileManagerItems || 0} files / ${snapshot.counts.importedFiles} uploads / ${snapshot.counts.openAiChatMessages || 0} OpenAI messages</small>
             </button>
           `
         )
@@ -4882,6 +5593,11 @@ function buildTextDigest(archive) {
     `${archive.browserHistory?.length || 0} captured browser targets`,
     ...((archive.browserHistory || []).slice(0, 8).map((entry) => `- ${entry.url}`)),
     "",
+    "Cloud and File Workspace:",
+    `${archive.externalApis?.cloudStorageWorkspace?.services?.length || 0} cloud/document launch integrations`,
+    `${archive.fileManager?.nodes?.length || 0} virtual file manager items`,
+    ...((archive.externalApis?.cloudStorageWorkspace?.services || []).map((service) => `- ${service.name}: ${service.url}`)),
+    "",
     "Team Chat:",
     `${archive.teamMessages?.length || 0} team posts stored`,
     `${(archive.teamMessages || []).filter(isOpenTeamReviewPost).length} open vote-enabled posts`,
@@ -4999,6 +5715,8 @@ a{color:#111}
 <p>${escapeHtml(String(archive.importedFiles?.length || 0))} imported file logs; ${escapeHtml(String((archive.importedFiles || []).reduce((sum, item) => sum + (item.recordsCreated || 0), 0)))} source records created from uploaded files.</p>
 <h2>In-App Browser</h2>
 <p>${escapeHtml(String(archive.browserHistory?.length || 0))} captured browser targets. Latest: ${escapeHtml(archive.browserHistory?.[0]?.url || "none")}.</p>
+<h2>Cloud and File Workspace</h2>
+<p>${escapeHtml(String(archive.externalApis?.cloudStorageWorkspace?.services?.length || 0))} cloud/document launch integrations; ${escapeHtml(String(archive.fileManager?.nodes?.length || 0))} virtual file manager items.</p>
 <h2>Team Chat</h2>
 <p>${escapeHtml(String(archive.teamMessages?.length || 0))} team posts stored; ${escapeHtml(String((archive.teamMessages || []).filter(isOpenTeamReviewPost).length))} open vote-enabled posts.</p>
 <h2>Collaboration Documents</h2>

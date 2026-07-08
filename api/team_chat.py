@@ -71,6 +71,21 @@ def apply_action(body: dict[str, Any]) -> list[dict[str, Any]]:
                 if source_id:
                     message["sourceId"] = source_id
                 break
+    elif action == "react":
+        item_id = str(body.get("id", "")).strip()
+        user = str(body.get("user", "local")).strip() or "local"
+        reaction = str(body.get("reaction", "")).strip()
+        if reaction not in {"like", "dislike", ""}:
+            raise ValueError("Team chat reaction must be like, dislike, or empty.")
+        for message in MESSAGES:
+            if message.get("id") == item_id:
+                reactions = message.setdefault("reactions", {})
+                if isinstance(reactions, dict):
+                    if reaction:
+                        reactions[user] = reaction
+                    else:
+                        reactions.pop(user, None)
+                break
     else:
         raise ValueError("Unknown team chat action.")
     MESSAGES = dedupe(MESSAGES)[:TEAM_CHAT_LIMIT]
@@ -124,6 +139,7 @@ def sanitize_message(raw: Any) -> dict[str, Any]:
         "url": str(raw.get("url", "")).strip()[:1200],
         "status": str(raw.get("status", default_status)).strip()[:80],
         "votes": raw.get("votes") if isinstance(raw.get("votes"), dict) else {},
+        "reactions": raw.get("reactions") if isinstance(raw.get("reactions"), dict) else {},
         "fileAttachment": sanitize_file_attachment(raw.get("fileAttachment")),
         "createdAt": str(raw.get("createdAt", "")).strip()[:80],
     }
