@@ -32,6 +32,25 @@ const FILE_STORE_OBJECT_STORE = "files";
 const FILE_STORE_DB_VERSION = 1;
 const FILE_STORE_MAX_BYTES = 50_000_000;
 const PREVIEW_TEXT_LIMIT = 80_000;
+const FILE_EXPLORER_STORAGE_KEY = `${STORAGE_KEY}:file-explorer-workspace`;
+const FILE_EXPLORER_PREVIEW_BYTES = 1_000_000;
+const FILE_EXPLORER_PREVIEW_LINES = 500;
+const FILE_EXPLORER_TEXT_EXTENSIONS = new Set([
+  ".txt",
+  ".md",
+  ".markdown",
+  ".json",
+  ".py",
+  ".js",
+  ".css",
+  ".html",
+  ".htm",
+  ".csv",
+  ".xml",
+  ".yaml",
+  ".yml",
+  ".log",
+]);
 const BENGUIAT_FONT_STACK = "'ITC Benguiat', 'ITC Benguiat Std', 'ITC Benguiat Book', 'Benguiat', 'Benguiat Std', 'Benguiat Book', 'Bookman Old Style', Georgia, serif";
 const GUEST_SESSION_VALUE = "Guest";
 const GUEST_USER = { username: "Guest", password: "", role: "Guest", readOnly: true };
@@ -646,6 +665,34 @@ const SEED_DATA = {
   ],
 };
 
+const DEFAULT_FILE_EXPLORER_TREE = {
+  id: "virtual-root",
+  name: "CORE ATLAS",
+  kind: "directory",
+  createdAt: "2026-07-08T00:00:00.000Z",
+  modifiedAt: "2026-07-08T00:00:00.000Z",
+  children: [
+    { id: "virtual-users", name: "Users", kind: "directory", createdAt: "2026-07-08T00:00:00.000Z", modifiedAt: "2026-07-08T00:00:00.000Z", children: [] },
+    { id: "virtual-contents", name: "Contents", kind: "directory", createdAt: "2026-07-08T00:00:00.000Z", modifiedAt: "2026-07-08T00:00:00.000Z", children: [] },
+    { id: "virtual-logs", name: "Logs", kind: "directory", createdAt: "2026-07-08T00:00:00.000Z", modifiedAt: "2026-07-08T00:00:00.000Z", children: [] },
+    { id: "virtual-updates", name: "Updates", kind: "directory", createdAt: "2026-07-08T00:00:00.000Z", modifiedAt: "2026-07-08T00:00:00.000Z", children: [] },
+    { id: "virtual-review", name: "Review", kind: "directory", createdAt: "2026-07-08T00:00:00.000Z", modifiedAt: "2026-07-08T00:00:00.000Z", children: [] },
+    { id: "virtual-drafts", name: "Drafts", kind: "directory", createdAt: "2026-07-08T00:00:00.000Z", modifiedAt: "2026-07-08T00:00:00.000Z", children: [] },
+    { id: "virtual-imports", name: "Imports", kind: "directory", createdAt: "2026-07-08T00:00:00.000Z", modifiedAt: "2026-07-08T00:00:00.000Z", children: [] },
+    {
+      id: "virtual-readme",
+      name: "README.txt",
+      kind: "file",
+      type: "text/plain",
+      size: 238,
+      createdAt: "2026-07-08T00:00:00.000Z",
+      modifiedAt: "2026-07-08T00:00:00.000Z",
+      content:
+        "CORE ATLAS virtual file workspace.\n\nUse Select Folder on Chrome or Edge desktop for a real local folder. On mobile or unsupported browsers, create folders and TXT notes here in the virtual workspace.",
+    },
+  ],
+};
+
 const state = {
   archive: loadArchive(),
   activeCategory: "All",
@@ -680,6 +727,19 @@ const state = {
   openAiChatBusy: false,
   activeMemorySnapshotId: "",
   teamChatPollTimer: null,
+  fileExplorer: {
+    mode: "virtual",
+    nativeSupported: typeof window.showDirectoryPicker === "function",
+    rootHandle: null,
+    currentHandle: null,
+    pathParts: [],
+    tree: loadFileExplorerTree(),
+    currentVirtualId: "virtual-root",
+    selectedKey: "",
+    selectedEntry: null,
+    entries: [],
+    nativeHandleMap: new Map(),
+  },
 };
 
 const els = {};
@@ -776,6 +836,22 @@ function cacheElements() {
   els.collabDocToSourceButton = document.getElementById("collabDocToSourceButton");
   els.fileIntegrationStatus = document.getElementById("fileIntegrationStatus");
   els.fileIntegrationGrid = document.getElementById("fileIntegrationGrid");
+  els.fileExplorerModeBadge = document.getElementById("fileExplorerModeBadge");
+  els.fileExplorerSelectFolderButton = document.getElementById("fileExplorerSelectFolderButton");
+  els.fileExplorerUpButton = document.getElementById("fileExplorerUpButton");
+  els.fileExplorerPathInput = document.getElementById("fileExplorerPathInput");
+  els.fileExplorerRefreshButton = document.getElementById("fileExplorerRefreshButton");
+  els.fileExplorerNewFolderButton = document.getElementById("fileExplorerNewFolderButton");
+  els.fileExplorerNewTxtButton = document.getElementById("fileExplorerNewTxtButton");
+  els.fileExplorerRenameButton = document.getElementById("fileExplorerRenameButton");
+  els.fileExplorerCopyPathButton = document.getElementById("fileExplorerCopyPathButton");
+  els.fileExplorerDeleteButton = document.getElementById("fileExplorerDeleteButton");
+  els.fileExplorerStatus = document.getElementById("fileExplorerStatus");
+  els.fileExplorerTree = document.getElementById("fileExplorerTree");
+  els.fileExplorerList = document.getElementById("fileExplorerList");
+  els.fileExplorerPreviewMeta = document.getElementById("fileExplorerPreviewMeta");
+  els.fileExplorerPreview = document.getElementById("fileExplorerPreview");
+  els.fileExplorerContextMenu = document.getElementById("fileExplorerContextMenu");
   els.createMemorySnapshotButton = document.getElementById("createMemorySnapshotButton");
   els.exportMemoryBankButton = document.getElementById("exportMemoryBankButton");
   els.memoryBankSummary = document.getElementById("memoryBankSummary");
@@ -884,6 +960,29 @@ function wireEvents() {
   });
   document.querySelectorAll("[data-file-route-panel]").forEach((button) => {
     button.addEventListener("click", () => setActivePanel(button.dataset.fileRoutePanel, { save: true }));
+  });
+  els.fileExplorerSelectFolderButton?.addEventListener("click", selectNativeFileExplorerRoot);
+  els.fileExplorerUpButton?.addEventListener("click", goFileExplorerUp);
+  els.fileExplorerRefreshButton?.addEventListener("click", () => renderFileExplorer("Refreshed file explorer."));
+  els.fileExplorerNewFolderButton?.addEventListener("click", createFileExplorerFolder);
+  els.fileExplorerNewTxtButton?.addEventListener("click", createFileExplorerTxt);
+  els.fileExplorerRenameButton?.addEventListener("click", renameSelectedFileExplorerEntry);
+  els.fileExplorerCopyPathButton?.addEventListener("click", copySelectedFileExplorerPath);
+  els.fileExplorerDeleteButton?.addEventListener("click", deleteSelectedFileExplorerEntry);
+  els.fileExplorerPathInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") goToFileExplorerPath(event.currentTarget.value);
+  });
+  els.fileExplorerTree?.addEventListener("click", handleFileExplorerTreeClick);
+  els.fileExplorerList?.addEventListener("click", handleFileExplorerListClick);
+  els.fileExplorerList?.addEventListener("dblclick", handleFileExplorerListDoubleClick);
+  els.fileExplorerList?.addEventListener("contextmenu", showFileExplorerContextMenu);
+  els.fileExplorerList?.addEventListener("dragover", handleFileExplorerDragOver);
+  els.fileExplorerList?.addEventListener("drop", handleFileExplorerDrop);
+  els.fileExplorerContextMenu?.addEventListener("click", handleFileExplorerContextAction);
+  document.addEventListener("click", (event) => {
+    if (!els.fileExplorerContextMenu || els.fileExplorerContextMenu.hidden) return;
+    if (els.fileExplorerContextMenu.contains(event.target)) return;
+    els.fileExplorerContextMenu.hidden = true;
   });
   els.createMemorySnapshotButton.addEventListener("click", () => createManualMemorySnapshot("Manual user snapshot"));
   els.exportMemoryBankButton.addEventListener("click", exportMemoryBank);
@@ -1119,6 +1218,11 @@ function renderPermissionState() {
     "exportCollabJsonButton",
     "printCollabDocButton",
     "collabDocToSourceButton",
+    "fileExplorerSelectFolderButton",
+    "fileExplorerNewFolderButton",
+    "fileExplorerNewTxtButton",
+    "fileExplorerRenameButton",
+    "fileExplorerDeleteButton",
     "createMemorySnapshotButton",
     "exportMemoryBankButton",
   ].forEach((id) => {
@@ -1168,6 +1272,7 @@ function render() {
   renderTeamChat();
   renderCollabDocs();
   renderFileIntegrations();
+  renderFileExplorer();
   renderMemoryBank();
   renderProfiles();
   renderReferenceLibrary();
@@ -4814,6 +4919,764 @@ function renderFileIntegrations() {
         })
         .join("")
     : '<div class="empty-state">No cloud file integrations are configured yet.</div>';
+}
+
+function loadFileExplorerTree() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(FILE_EXPLORER_STORAGE_KEY) || "null");
+    if (saved?.kind === "directory" && saved?.id) return normalizeFileExplorerNode(saved);
+  } catch {
+    // Use the starter workspace if browser storage is unavailable or corrupted.
+  }
+  return normalizeFileExplorerNode(clone(DEFAULT_FILE_EXPLORER_TREE));
+}
+
+function normalizeFileExplorerNode(node) {
+  const normalized = {
+    id: node.id || `virtual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: node.name || "Untitled",
+    kind: node.kind === "file" ? "file" : "directory",
+    type: node.type || (node.kind === "file" ? "text/plain" : "Folder"),
+    createdAt: node.createdAt || new Date().toISOString(),
+    modifiedAt: node.modifiedAt || node.createdAt || new Date().toISOString(),
+  };
+  if (normalized.kind === "directory") {
+    normalized.children = Array.isArray(node.children) ? node.children.map(normalizeFileExplorerNode) : [];
+    normalized.size = 0;
+  } else {
+    normalized.content = String(node.content || "");
+    normalized.size = Number(node.size || normalized.content.length || 0);
+  }
+  return normalized;
+}
+
+function persistFileExplorerTree(reason = "File workspace updated") {
+  if (isGuestUser()) return;
+  try {
+    window.localStorage.setItem(FILE_EXPLORER_STORAGE_KEY, JSON.stringify(state.fileExplorer.tree));
+    rememberArchive(reason);
+  } catch (error) {
+    console.warn("File explorer persistence failed", error);
+  }
+}
+
+function renderFileExplorer(message = "") {
+  if (!els.fileExplorerTree || !els.fileExplorerList) return;
+  if (state.fileExplorer.mode === "native" && state.fileExplorer.currentHandle) {
+    renderNativeFileExplorer(message);
+    return;
+  }
+  renderVirtualFileExplorer(message);
+}
+
+function renderVirtualFileExplorer(message = "") {
+  state.fileExplorer.mode = "virtual";
+  state.fileExplorer.pathParts = getVirtualFileExplorerPathParts(state.fileExplorer.currentVirtualId);
+  const current = getCurrentVirtualDirectory();
+  const entries = (current?.children || []).map((node) => virtualNodeToFileEntry(node));
+  state.fileExplorer.entries = entries;
+  if (!entries.some((entry) => entry.key === state.fileExplorer.selectedKey)) {
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+  }
+  els.fileExplorerModeBadge.textContent = state.fileExplorer.nativeSupported ? "Virtual Workspace / Native Ready" : "Virtual Workspace";
+  els.fileExplorerPathInput.value = getFileExplorerCurrentPath();
+  setFileExplorerStatus(
+    message ||
+      (state.fileExplorer.nativeSupported
+        ? "Virtual workspace active. Select Folder to connect a real local folder."
+        : "Virtual workspace active. This browser does not expose local folder access.")
+  );
+  els.fileExplorerTree.innerHTML = renderVirtualFileExplorerTreeNode(state.fileExplorer.tree, 0);
+  renderFileExplorerList(entries);
+  renderFileExplorerPreview(state.fileExplorer.selectedEntry);
+}
+
+async function renderNativeFileExplorer(message = "") {
+  const explorer = state.fileExplorer;
+  if (!explorer.currentHandle) {
+    renderVirtualFileExplorer("No native folder is connected. Using the virtual workspace.");
+    return;
+  }
+  els.fileExplorerModeBadge.textContent = "Native Folder";
+  els.fileExplorerPathInput.value = getFileExplorerCurrentPath();
+  setFileExplorerStatus(message || "Native folder connected. Operations apply inside the selected folder permission boundary.");
+  try {
+    explorer.nativeHandleMap = new Map();
+    els.fileExplorerTree.innerHTML = await renderNativeFileExplorerTreeNode(explorer.rootHandle, [explorer.rootHandle.name || "Selected Folder"], 0);
+    const entries = await listNativeFileExplorerEntries(explorer.currentHandle, explorer.pathParts);
+    explorer.entries = entries;
+    if (!entries.some((entry) => entry.key === explorer.selectedKey)) {
+      explorer.selectedKey = "";
+      explorer.selectedEntry = null;
+    }
+    renderFileExplorerList(entries);
+    renderFileExplorerPreview(explorer.selectedEntry);
+  } catch (error) {
+    console.error(error);
+    setFileExplorerStatus(`Native folder read failed: ${error.message || error}`);
+  }
+}
+
+function renderFileExplorerList(entries) {
+  const selectedKey = state.fileExplorer.selectedKey;
+  if (!entries.length) {
+    els.fileExplorerList.innerHTML = '<div class="empty-state">This folder is empty. Create a folder, create a TXT note, or drop files here.</div>';
+    return;
+  }
+  els.fileExplorerList.innerHTML = entries
+    .map(
+      (entry) => `
+        <button class="file-explorer-row${entry.key === selectedKey ? " is-active" : ""}" type="button" data-file-key="${escapeHtml(entry.key)}">
+          <span class="file-explorer-name"><span class="file-explorer-icon">${entry.kind === "directory" ? "DIR" : "FILE"}</span><strong>${escapeHtml(entry.name)}</strong></span>
+          <span>${escapeHtml(fileExplorerTypeLabel(entry))}</span>
+          <span>${entry.kind === "directory" ? escapeHtml(String(entry.childCount || 0)) : escapeHtml(formatBytes(entry.size || 0))}</span>
+        </button>
+      `
+    )
+    .join("");
+}
+
+function renderVirtualFileExplorerTreeNode(node, depth) {
+  const selected = state.fileExplorer.currentVirtualId === node.id;
+  const children = (node.children || [])
+    .filter((child) => child.kind === "directory")
+    .map((child) => renderVirtualFileExplorerTreeNode(child, depth + 1))
+    .join("");
+  return `
+    <div class="explorer-tree-node" style="--depth:${depth}">
+      <button class="${selected ? "is-active" : ""}" type="button" data-virtual-dir="${escapeHtml(node.id)}">
+        <span>DIR</span><strong>${escapeHtml(node.name)}</strong>
+      </button>
+      ${children}
+    </div>
+  `;
+}
+
+async function renderNativeFileExplorerTreeNode(handle, pathParts, depth) {
+  const path = pathParts.join("/");
+  const selected = path === state.fileExplorer.pathParts.join("/");
+  state.fileExplorer.nativeHandleMap.set(path, handle);
+  let children = "";
+  if (depth < 2) {
+    const dirs = [];
+    try {
+      for await (const [name, childHandle] of handle.entries()) {
+        if (childHandle.kind === "directory") dirs.push([name, childHandle]);
+      }
+    } catch {
+      // Some system folders deny listing; keep the node visible.
+    }
+    dirs.sort(([a], [b]) => a.localeCompare(b));
+    children = (
+      await Promise.all(dirs.slice(0, 80).map(([name, childHandle]) => renderNativeFileExplorerTreeNode(childHandle, [...pathParts, name], depth + 1)))
+    ).join("");
+  }
+  return `
+    <div class="explorer-tree-node" style="--depth:${depth}">
+      <button class="${selected ? "is-active" : ""}" type="button" data-native-dir="${escapeHtml(path)}">
+        <span>DIR</span><strong>${escapeHtml(handle.name || pathParts[pathParts.length - 1])}</strong>
+      </button>
+      ${children}
+    </div>
+  `;
+}
+
+async function listNativeFileExplorerEntries(directoryHandle, pathParts) {
+  const entries = [];
+  for await (const [name, handle] of directoryHandle.entries()) {
+    const entry = {
+      key: `native:${[...pathParts, name].join("/")}`,
+      name,
+      kind: handle.kind,
+      handle,
+      parentHandle: directoryHandle,
+      pathParts: [...pathParts, name],
+      type: handle.kind === "directory" ? "Folder" : "File",
+      size: 0,
+      modifiedAt: "",
+    };
+    if (handle.kind === "file") {
+      try {
+        const file = await handle.getFile();
+        entry.type = file.type || extensionFromFileName(file.name) || "File";
+        entry.size = file.size;
+        entry.modifiedAt = new Date(file.lastModified || Date.now()).toISOString();
+      } catch {
+        entry.type = "File";
+      }
+    }
+    entries.push(entry);
+  }
+  return entries.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "directory" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function virtualNodeToFileEntry(node) {
+  return {
+    key: `virtual:${node.id}`,
+    id: node.id,
+    name: node.name,
+    kind: node.kind,
+    node,
+    type: node.kind === "directory" ? "Folder" : node.type || "text/plain",
+    size: node.kind === "directory" ? 0 : node.size || String(node.content || "").length,
+    childCount: node.kind === "directory" ? (node.children || []).length : 0,
+    modifiedAt: node.modifiedAt || node.createdAt || "",
+  };
+}
+
+function fileExplorerTypeLabel(entry = {}) {
+  if (entry.kind === "directory") return "Folder";
+  return entry.type || extensionFromFileName(entry.name) || "File";
+}
+
+function setFileExplorerStatus(message) {
+  if (els.fileExplorerStatus) els.fileExplorerStatus.textContent = message;
+}
+
+function getFileExplorerCurrentPath() {
+  const parts = state.fileExplorer.mode === "native" ? state.fileExplorer.pathParts : getVirtualFileExplorerPathParts(state.fileExplorer.currentVirtualId);
+  return `/${parts.join("/")}`;
+}
+
+function getVirtualFileExplorerPathParts(id) {
+  const found = findVirtualFileExplorerNode(id);
+  return found?.path?.map((node) => node.name) || [state.fileExplorer.tree.name];
+}
+
+function getCurrentVirtualDirectory() {
+  return findVirtualFileExplorerNode(state.fileExplorer.currentVirtualId)?.node || state.fileExplorer.tree;
+}
+
+function findVirtualFileExplorerNode(id, node = state.fileExplorer.tree, parent = null, path = []) {
+  const nextPath = [...path, node];
+  if (node.id === id) return { node, parent, path: nextPath };
+  for (const child of node.children || []) {
+    const found = findVirtualFileExplorerNode(id, child, node, nextPath);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findVirtualFileExplorerPath(pathValue) {
+  const parts = String(pathValue || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!parts.length) return state.fileExplorer.tree;
+  if (parts[0].toLowerCase() === state.fileExplorer.tree.name.toLowerCase()) parts.shift();
+  let current = state.fileExplorer.tree;
+  for (const part of parts) {
+    const next = (current.children || []).find((child) => child.kind === "directory" && child.name.toLowerCase() === part.toLowerCase());
+    if (!next) return null;
+    current = next;
+  }
+  return current;
+}
+
+async function selectNativeFileExplorerRoot() {
+  if (!ensureCanWrite("select a local file workspace")) return;
+  if (!state.fileExplorer.nativeSupported) {
+    setFileExplorerStatus("This browser does not support local directory access. Use the virtual workspace instead.");
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+    state.fileExplorer.mode = "native";
+    state.fileExplorer.rootHandle = handle;
+    state.fileExplorer.currentHandle = handle;
+    state.fileExplorer.pathParts = [handle.name || "Selected Folder"];
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+    await renderNativeFileExplorer("Native folder selected.");
+  } catch (error) {
+    if (error?.name !== "AbortError") setFileExplorerStatus(`Folder selection failed: ${error.message || error}`);
+  }
+}
+
+async function goFileExplorerUp() {
+  if (state.fileExplorer.mode === "native") {
+    if (state.fileExplorer.pathParts.length <= 1) return;
+    const nextParts = state.fileExplorer.pathParts.slice(0, -1);
+    await navigateNativeFileExplorerPath(nextParts);
+    return;
+  }
+  const found = findVirtualFileExplorerNode(state.fileExplorer.currentVirtualId);
+  if (found?.parent) {
+    state.fileExplorer.currentVirtualId = found.parent.id;
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+    renderVirtualFileExplorer("Moved up one folder.");
+  }
+}
+
+async function goToFileExplorerPath(pathValue) {
+  if (state.fileExplorer.mode === "native") {
+    const rootName = state.fileExplorer.rootHandle?.name || state.fileExplorer.pathParts[0];
+    const parts = String(pathValue || "")
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts[0]?.toLowerCase() !== rootName.toLowerCase()) parts.unshift(rootName);
+    await navigateNativeFileExplorerPath(parts);
+    return;
+  }
+  const node = findVirtualFileExplorerPath(pathValue);
+  if (node) {
+    state.fileExplorer.currentVirtualId = node.id;
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+    renderVirtualFileExplorer("Path opened.");
+  } else {
+    setFileExplorerStatus("Virtual path was not found.");
+  }
+}
+
+async function navigateNativeFileExplorerPath(pathParts) {
+  if (!state.fileExplorer.rootHandle) return;
+  try {
+    let handle = state.fileExplorer.rootHandle;
+    for (const part of pathParts.slice(1)) {
+      handle = await handle.getDirectoryHandle(part);
+    }
+    state.fileExplorer.currentHandle = handle;
+    state.fileExplorer.pathParts = pathParts;
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+    await renderNativeFileExplorer("Folder opened.");
+  } catch (error) {
+    setFileExplorerStatus(`Folder could not be opened: ${error.message || error}`);
+  }
+}
+
+function handleFileExplorerTreeClick(event) {
+  const virtualButton = event.target.closest("[data-virtual-dir]");
+  const nativeButton = event.target.closest("[data-native-dir]");
+  if (virtualButton) {
+    state.fileExplorer.mode = "virtual";
+    state.fileExplorer.currentVirtualId = virtualButton.dataset.virtualDir;
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+    renderVirtualFileExplorer("Folder opened.");
+  } else if (nativeButton) {
+    const handle = state.fileExplorer.nativeHandleMap.get(nativeButton.dataset.nativeDir);
+    if (!handle) return;
+    state.fileExplorer.currentHandle = handle;
+    state.fileExplorer.pathParts = nativeButton.dataset.nativeDir.split("/");
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+    renderNativeFileExplorer("Folder opened.");
+  }
+}
+
+function handleFileExplorerListClick(event) {
+  const row = event.target.closest("[data-file-key]");
+  if (!row) return;
+  selectFileExplorerEntry(row.dataset.fileKey);
+}
+
+function handleFileExplorerListDoubleClick(event) {
+  const row = event.target.closest("[data-file-key]");
+  if (!row) return;
+  const entry = selectFileExplorerEntry(row.dataset.fileKey, { renderList: false });
+  openFileExplorerEntry(entry);
+}
+
+function selectFileExplorerEntry(key, options = {}) {
+  const entry = state.fileExplorer.entries.find((candidate) => candidate.key === key);
+  if (!entry) return null;
+  state.fileExplorer.selectedKey = key;
+  state.fileExplorer.selectedEntry = entry;
+  if (options.renderList !== false) renderFileExplorerList(state.fileExplorer.entries);
+  renderFileExplorerPreview(entry);
+  return entry;
+}
+
+async function renderFileExplorerPreview(entry) {
+  if (!els.fileExplorerPreview) return;
+  if (!entry) {
+    els.fileExplorerPreviewMeta.innerHTML = "";
+    els.fileExplorerPreview.textContent = "Select a file to preview its contents.";
+    return;
+  }
+  els.fileExplorerPreviewMeta.innerHTML = `
+    <span><strong>Name:</strong> ${escapeHtml(entry.name)}</span>
+    <span><strong>Type:</strong> ${escapeHtml(fileExplorerTypeLabel(entry))}</span>
+    <span><strong>Size:</strong> ${escapeHtml(entry.kind === "directory" ? `${entry.childCount || 0} items` : formatBytes(entry.size || 0))}</span>
+  `;
+  if (entry.kind === "directory") {
+    els.fileExplorerPreview.textContent = "[Folder Selected]\nDouble-click or use Open / Launch to enter this folder.";
+    return;
+  }
+  if (state.fileExplorer.mode === "native") {
+    await renderNativeFileExplorerPreview(entry);
+    return;
+  }
+  const content = String(entry.node?.content || "");
+  if (content.length > FILE_EXPLORER_PREVIEW_BYTES) {
+    els.fileExplorerPreview.textContent = `[Preview Disabled]\nFile size (${formatBytes(content.length)}) is too large to preview safely.`;
+    return;
+  }
+  els.fileExplorerPreview.textContent = clampFileExplorerPreview(content);
+}
+
+async function renderNativeFileExplorerPreview(entry) {
+  try {
+    const file = await entry.handle.getFile();
+    if (file.size > FILE_EXPLORER_PREVIEW_BYTES) {
+      els.fileExplorerPreview.textContent = `[Preview Disabled]\nFile size (${formatBytes(file.size)}) is too large to preview safely.`;
+      return;
+    }
+    if (!isFileExplorerTextEntry({ name: file.name, type: file.type })) {
+      els.fileExplorerPreview.textContent = `[Binary or document file]\nName: ${file.name}\nType: ${file.type || "unknown"}\nSize: ${formatBytes(file.size)}\nUse Open / Launch to view it in a browser tab.`;
+      return;
+    }
+    els.fileExplorerPreview.textContent = clampFileExplorerPreview(await file.text());
+  } catch (error) {
+    els.fileExplorerPreview.textContent = `Error rendering preview window content details:\n${error.message || error}`;
+  }
+}
+
+function clampFileExplorerPreview(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const head = lines.slice(0, FILE_EXPLORER_PREVIEW_LINES).join("\n");
+  return lines.length > FILE_EXPLORER_PREVIEW_LINES ? `${head}\n\n... [Content Truncated for Previewing] ...` : head;
+}
+
+function isFileExplorerTextEntry(entry = {}) {
+  const type = String(entry.type || "").toLowerCase();
+  const extension = extensionFromFileName(entry.name);
+  return type.startsWith("text/") || type.includes("json") || type.includes("xml") || FILE_EXPLORER_TEXT_EXTENSIONS.has(extension);
+}
+
+async function openFileExplorerEntry(entry = state.fileExplorer.selectedEntry) {
+  if (!entry) return;
+  if (entry.kind === "directory") {
+    if (state.fileExplorer.mode === "native") {
+      state.fileExplorer.currentHandle = entry.handle;
+      state.fileExplorer.pathParts = entry.pathParts;
+      state.fileExplorer.selectedKey = "";
+      state.fileExplorer.selectedEntry = null;
+      await renderNativeFileExplorer("Folder opened.");
+    } else {
+      state.fileExplorer.currentVirtualId = entry.id;
+      state.fileExplorer.selectedKey = "";
+      state.fileExplorer.selectedEntry = null;
+      renderVirtualFileExplorer("Folder opened.");
+    }
+    return;
+  }
+  if (state.fileExplorer.mode === "native") {
+    const file = await entry.handle.getFile();
+    const url = URL.createObjectURL(file);
+    window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+  const blob = new Blob([entry.node?.content || ""], { type: entry.type || "text/plain" });
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+async function createFileExplorerFolder() {
+  if (!ensureCanWrite("create file workspace folders")) return;
+  const name = cleanFileExplorerName(window.prompt("New folder name", "New Folder"));
+  if (!name) return;
+  if (state.fileExplorer.mode === "native" && state.fileExplorer.currentHandle) {
+    try {
+      const uniqueName = await uniqueNativeFileExplorerName(state.fileExplorer.currentHandle, name);
+      await state.fileExplorer.currentHandle.getDirectoryHandle(uniqueName, { create: true });
+      await renderNativeFileExplorer(`Created folder "${uniqueName}".`);
+    } catch (error) {
+      setFileExplorerStatus(`Folder could not be created: ${error.message || error}`);
+    }
+    return;
+  }
+  const current = getCurrentVirtualDirectory();
+  const uniqueName = uniqueFileExplorerName(current.children || [], name);
+  current.children = current.children || [];
+  current.children.push({
+    id: `virtual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: uniqueName,
+    kind: "directory",
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+    children: [],
+  });
+  current.modifiedAt = new Date().toISOString();
+  persistFileExplorerTree("Created virtual folder");
+  renderVirtualFileExplorer(`Created folder "${uniqueName}".`);
+}
+
+async function createFileExplorerTxt() {
+  if (!ensureCanWrite("create TXT notes in the file workspace")) return;
+  const rawName = cleanFileExplorerName(window.prompt("New TXT file name", "New Note.txt"));
+  if (!rawName) return;
+  const name = rawName.toLowerCase().endsWith(".txt") ? rawName : `${rawName}.txt`;
+  if (state.fileExplorer.mode === "native" && state.fileExplorer.currentHandle) {
+    try {
+      const uniqueName = await uniqueNativeFileExplorerName(state.fileExplorer.currentHandle, name);
+      const handle = await state.fileExplorer.currentHandle.getFileHandle(uniqueName, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write("");
+      await writable.close();
+      await renderNativeFileExplorer(`Created TXT file "${uniqueName}".`);
+    } catch (error) {
+      setFileExplorerStatus(`TXT file could not be created: ${error.message || error}`);
+    }
+    return;
+  }
+  const current = getCurrentVirtualDirectory();
+  const uniqueName = uniqueFileExplorerName(current.children || [], name);
+  current.children = current.children || [];
+  current.children.push({
+    id: `virtual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: uniqueName,
+    kind: "file",
+    type: "text/plain",
+    content: "",
+    size: 0,
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+  });
+  current.modifiedAt = new Date().toISOString();
+  persistFileExplorerTree("Created virtual TXT file");
+  renderVirtualFileExplorer(`Created TXT file "${uniqueName}".`);
+}
+
+async function renameSelectedFileExplorerEntry() {
+  if (!ensureCanWrite("rename file workspace items")) return;
+  const entry = state.fileExplorer.selectedEntry;
+  if (!entry) {
+    setFileExplorerStatus("Select an item to rename.");
+    return;
+  }
+  const nextName = cleanFileExplorerName(window.prompt("Rename item", entry.name));
+  if (!nextName || nextName === entry.name) return;
+  if (state.fileExplorer.mode === "native") {
+    await renameNativeFileExplorerEntry(entry, nextName);
+    return;
+  }
+  entry.node.name = nextName;
+  entry.node.modifiedAt = new Date().toISOString();
+  persistFileExplorerTree("Renamed virtual file workspace item");
+  state.fileExplorer.selectedKey = `virtual:${entry.node.id}`;
+  renderVirtualFileExplorer(`Renamed item to "${nextName}".`);
+}
+
+async function renameNativeFileExplorerEntry(entry, nextName) {
+  try {
+    if (await nativeFileExplorerEntryExists(entry.parentHandle, nextName)) {
+      setFileExplorerStatus(`Rename failed: "${nextName}" already exists in this folder.`);
+      return;
+    }
+    if (entry.kind === "file") {
+      const file = await entry.handle.getFile();
+      const nextHandle = await entry.parentHandle.getFileHandle(nextName, { create: true });
+      const writable = await nextHandle.createWritable();
+      await writable.write(await file.arrayBuffer());
+      await writable.close();
+      await entry.parentHandle.removeEntry(entry.name);
+    } else {
+      const nextDir = await entry.parentHandle.getDirectoryHandle(nextName, { create: true });
+      await copyNativeFileExplorerDirectory(entry.handle, nextDir);
+      await entry.parentHandle.removeEntry(entry.name, { recursive: true });
+    }
+    state.fileExplorer.selectedKey = "";
+    state.fileExplorer.selectedEntry = null;
+    await renderNativeFileExplorer(`Renamed item to "${nextName}".`);
+  } catch (error) {
+    setFileExplorerStatus(`Rename failed: ${error.message || error}`);
+  }
+}
+
+async function copyNativeFileExplorerDirectory(sourceDir, targetDir) {
+  for await (const [name, handle] of sourceDir.entries()) {
+    if (handle.kind === "directory") {
+      const nextDir = await targetDir.getDirectoryHandle(name, { create: true });
+      await copyNativeFileExplorerDirectory(handle, nextDir);
+    } else {
+      const file = await handle.getFile();
+      const nextFile = await targetDir.getFileHandle(name, { create: true });
+      const writable = await nextFile.createWritable();
+      await writable.write(await file.arrayBuffer());
+      await writable.close();
+    }
+  }
+}
+
+async function copySelectedFileExplorerPath() {
+  const entry = state.fileExplorer.selectedEntry;
+  if (!entry) {
+    setFileExplorerStatus("Select an item to copy its path.");
+    return;
+  }
+  const path = getFileExplorerEntryPath(entry);
+  try {
+    await navigator.clipboard.writeText(path);
+    setFileExplorerStatus(`Copied path: ${path}`);
+  } catch {
+    window.prompt("Copy path", path);
+  }
+}
+
+async function deleteSelectedFileExplorerEntry() {
+  if (!ensureCanWrite("delete file workspace items")) return;
+  const entry = state.fileExplorer.selectedEntry;
+  if (!entry) {
+    setFileExplorerStatus("Select an item to delete.");
+    return;
+  }
+  const confirmed = window.confirm(`Permanently delete "${entry.name}"?`);
+  if (!confirmed) return;
+  if (state.fileExplorer.mode === "native") {
+    try {
+      await entry.parentHandle.removeEntry(entry.name, { recursive: entry.kind === "directory" });
+      state.fileExplorer.selectedKey = "";
+      state.fileExplorer.selectedEntry = null;
+      await renderNativeFileExplorer(`Deleted "${entry.name}".`);
+    } catch (error) {
+      setFileExplorerStatus(`Delete failed: ${error.message || error}`);
+    }
+    return;
+  }
+  const found = findVirtualFileExplorerNode(entry.id);
+  if (!found?.parent) return;
+  found.parent.children = (found.parent.children || []).filter((child) => child.id !== entry.id);
+  found.parent.modifiedAt = new Date().toISOString();
+  state.fileExplorer.selectedKey = "";
+  state.fileExplorer.selectedEntry = null;
+  persistFileExplorerTree("Deleted virtual file workspace item");
+  renderVirtualFileExplorer(`Deleted "${entry.name}".`);
+}
+
+function showFileExplorerContextMenu(event) {
+  const row = event.target.closest("[data-file-key]");
+  if (!row || !els.fileExplorerContextMenu) return;
+  event.preventDefault();
+  selectFileExplorerEntry(row.dataset.fileKey);
+  els.fileExplorerContextMenu.style.left = `${event.clientX}px`;
+  els.fileExplorerContextMenu.style.top = `${event.clientY}px`;
+  els.fileExplorerContextMenu.hidden = false;
+}
+
+function handleFileExplorerContextAction(event) {
+  const button = event.target.closest("[data-file-context-action]");
+  if (!button) return;
+  els.fileExplorerContextMenu.hidden = true;
+  const action = button.dataset.fileContextAction;
+  if (action === "open") openFileExplorerEntry();
+  if (action === "copy-path") copySelectedFileExplorerPath();
+  if (action === "rename") renameSelectedFileExplorerEntry();
+  if (action === "delete") deleteSelectedFileExplorerEntry();
+}
+
+function handleFileExplorerDragOver(event) {
+  if (event.dataTransfer?.types?.includes("Files")) {
+    event.preventDefault();
+  }
+}
+
+async function handleFileExplorerDrop(event) {
+  if (!event.dataTransfer?.files?.length) return;
+  event.preventDefault();
+  if (!ensureCanWrite("drop files into the file workspace")) return;
+  const files = [...event.dataTransfer.files];
+  if (state.fileExplorer.mode === "native" && state.fileExplorer.currentHandle) {
+    try {
+      for (const file of files) {
+        const handle = await state.fileExplorer.currentHandle.getFileHandle(file.name, { create: true });
+        const writable = await handle.createWritable();
+        await writable.write(file);
+        await writable.close();
+      }
+      await renderNativeFileExplorer(`Imported ${files.length} dropped file(s).`);
+    } catch (error) {
+      setFileExplorerStatus(`Dropped files could not be imported: ${error.message || error}`);
+    }
+    return;
+  }
+  const current = getCurrentVirtualDirectory();
+  current.children = current.children || [];
+  for (const file of files) {
+    const textLike = isFileExplorerTextEntry({ name: file.name, type: file.type });
+    const content = textLike && file.size <= FILE_EXPLORER_PREVIEW_BYTES ? await file.text() : `[Stored metadata only]\n${file.name}\n${file.type || "unknown"}\n${formatBytes(file.size)}`;
+    current.children.push({
+      id: `virtual-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: uniqueFileExplorerName(current.children, file.name),
+      kind: "file",
+      type: file.type || extensionFromFileName(file.name) || "File",
+      content,
+      size: file.size,
+      createdAt: new Date().toISOString(),
+      modifiedAt: new Date(file.lastModified || Date.now()).toISOString(),
+    });
+  }
+  persistFileExplorerTree("Dropped files into virtual file workspace");
+  renderVirtualFileExplorer(`Imported ${files.length} dropped file(s).`);
+}
+
+function getFileExplorerEntryPath(entry) {
+  if (!entry) return getFileExplorerCurrentPath();
+  if (state.fileExplorer.mode === "native") return `/${(entry.pathParts || state.fileExplorer.pathParts).join("/")}`;
+  const found = findVirtualFileExplorerNode(entry.id);
+  return found ? `/${found.path.map((node) => node.name).join("/")}` : `/${entry.name}`;
+}
+
+function cleanFileExplorerName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+}
+
+function uniqueFileExplorerName(siblings, desiredName) {
+  const existing = new Set((siblings || []).map((item) => item.name.toLowerCase()));
+  if (!existing.has(desiredName.toLowerCase())) return desiredName;
+  const extension = extensionFromFileName(desiredName);
+  const base = extension ? desiredName.slice(0, -extension.length) : desiredName;
+  let index = 2;
+  let candidate = `${base} ${index}${extension}`;
+  while (existing.has(candidate.toLowerCase())) {
+    index += 1;
+    candidate = `${base} ${index}${extension}`;
+  }
+  return candidate;
+}
+
+async function nativeFileExplorerEntryExists(directoryHandle, name) {
+  try {
+    await directoryHandle.getFileHandle(name);
+    return true;
+  } catch {
+    // Not a file with that name.
+  }
+  try {
+    await directoryHandle.getDirectoryHandle(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function uniqueNativeFileExplorerName(directoryHandle, desiredName) {
+  if (!(await nativeFileExplorerEntryExists(directoryHandle, desiredName))) return desiredName;
+  const extension = extensionFromFileName(desiredName);
+  const base = extension ? desiredName.slice(0, -extension.length) : desiredName;
+  let index = 2;
+  let candidate = `${base} ${index}${extension}`;
+  while (await nativeFileExplorerEntryExists(directoryHandle, candidate)) {
+    index += 1;
+    candidate = `${base} ${index}${extension}`;
+  }
+  return candidate;
 }
 
 function createCollabDoc() {

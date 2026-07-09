@@ -746,6 +746,62 @@
                     <button class="ghost-button" type="button" data-file-route-panel="sourcePanel">Go to Sources</button>
                   </section>
                 </div>
+
+                <section class="api-panel file-explorer-studio" aria-labelledby="advancedFileExplorerTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="advancedFileExplorerTitle">Codex Workspace Studio</h2>
+                      <p>Three-pane in-app file explorer with directory tree, file list, context menu, and safe live preview.</p>
+                    </div>
+                    <span class="detail-chip" id="fileExplorerModeBadge">Virtual Workspace</span>
+                  </div>
+
+                  <div class="file-explorer-toolbar" aria-label="File explorer navigation">
+                    <button class="ghost-button iconless" id="fileExplorerSelectFolderButton" type="button">Select Folder</button>
+                    <button class="ghost-button iconless" id="fileExplorerUpButton" type="button">Up</button>
+                    <input id="fileExplorerPathInput" aria-label="Current file explorer path" value="/CORE ATLAS">
+                    <button class="ghost-button iconless" id="fileExplorerRefreshButton" type="button">Refresh</button>
+                  </div>
+
+                  <div class="file-explorer-actions" aria-label="File explorer actions">
+                    <button class="primary-button iconless" id="fileExplorerNewFolderButton" type="button">New Folder</button>
+                    <button class="primary-button iconless" id="fileExplorerNewTxtButton" type="button">New TXT</button>
+                    <button class="ghost-button iconless" id="fileExplorerRenameButton" type="button">Rename</button>
+                    <button class="ghost-button iconless" id="fileExplorerCopyPathButton" type="button">Copy Path</button>
+                    <button class="ghost-button iconless danger-action" id="fileExplorerDeleteButton" type="button">Delete</button>
+                  </div>
+
+                  <p id="fileExplorerStatus" class="browser-status">Use Select Folder for real local files in Chrome/Edge, or use the virtual workspace on mobile.</p>
+
+                  <div class="file-explorer-shell">
+                    <aside class="file-explorer-pane file-explorer-tree-pane" aria-label="Directory tree">
+                      <h3>Folders</h3>
+                      <div id="fileExplorerTree" class="file-explorer-tree" role="tree"></div>
+                    </aside>
+
+                    <section class="file-explorer-pane file-explorer-list-pane" aria-label="Files and folders">
+                      <div class="file-list-header" aria-hidden="true">
+                        <span>Name</span>
+                        <span>Type</span>
+                        <span>Size</span>
+                      </div>
+                      <div id="fileExplorerList" class="file-explorer-list" role="listbox" tabindex="0"></div>
+                    </section>
+
+                    <aside class="file-explorer-pane file-explorer-preview-pane" aria-label="File preview">
+                      <h3>File Preview</h3>
+                      <div id="fileExplorerPreviewMeta" class="file-explorer-preview-meta"></div>
+                      <pre id="fileExplorerPreview" class="file-explorer-preview">Select a file to preview its contents.</pre>
+                    </aside>
+                  </div>
+
+                  <div id="fileExplorerContextMenu" class="file-explorer-context-menu" hidden>
+                    <button type="button" data-file-context-action="open">Open / Launch</button>
+                    <button type="button" data-file-context-action="copy-path">Copy Path to Clipboard</button>
+                    <button type="button" data-file-context-action="rename">Rename</button>
+                    <button type="button" data-file-context-action="delete">Delete Permanently</button>
+                  </div>
+                </section>
               </div>
             </section>
 

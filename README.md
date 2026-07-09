@@ -72,6 +72,8 @@ Imports can create Source records and file logs. ChatGPT export structures are d
 
 The Files panel is a clean cloud handoff section for Google Drive, MEGA Cloud, Google Docs, Google Forms, and Google Sheets. It opens those services externally while keeping atlas-managed uploads, source logs, and document drafts inside Import, Sources, and Docs.
 
+The Files panel also includes Codex Workspace Studio, a three-pane in-app file explorer modeled after a desktop file manager. Chrome and Edge desktop can use `Select Folder` to grant access to a real local folder through the browser File System Access API. Browsers without that API use a persistent virtual workspace stored in browser storage, with folder creation, TXT creation, rename, delete, path copy, drag/drop import, and safe text previews.
+
 ## Collaboration
 
 The Team panel supports posts, updates, links, and recommendations. Recommendations can be rejected or added to Sources by signed-in users.
