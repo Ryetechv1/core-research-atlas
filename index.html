@@ -156,6 +156,7 @@
                 <button class="segment" type="button" data-panel="openAiPanel">OpenAI</button>
                 <button class="segment" type="button" data-panel="teamPanel">Team</button>
                 <button class="segment" type="button" data-panel="collabPanel">Docs</button>
+                <button class="segment" type="button" data-panel="filesPanel">Files</button>
                 <button class="segment" type="button" data-panel="memoryPanel">Memory</button>
                 <button class="segment" type="button" data-panel="profilesPanel">Profiles</button>
                 <button class="segment" type="button" data-panel="codexPanel">Codex</button>
@@ -704,6 +705,47 @@
                     <button class="ghost-button" id="collabDocToSourceButton" type="button">Add to Sources</button>
                   </div>
                 </section>
+              </div>
+            </section>
+
+            <section id="filesPanel" class="panel-view">
+              <div class="source-panel file-handoff-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Cloud File Manager</h2>
+                    <p>Clean handoff workspace for cloud storage, team documents, forms, and research tables.</p>
+                  </div>
+                  <span class="detail-chip">External services</span>
+                </div>
+
+                <section class="api-panel file-clean-slate-panel" aria-labelledby="fileWorkspaceTitle">
+                  <div class="panel-heading compact">
+                    <div>
+                      <h2 id="fileWorkspaceTitle">File Workspace Integrations</h2>
+                      <p id="fileIntegrationStatus">External launch integrations for import/export handoff from the Files tab.</p>
+                    </div>
+                    <span class="detail-chip">Google + MEGA</span>
+                  </div>
+                  <div id="fileIntegrationGrid" class="file-integration-grid" aria-live="polite"></div>
+                </section>
+
+                <div class="file-routing-grid">
+                  <section class="api-panel">
+                    <h3>Atlas Import Flow</h3>
+                    <p>Use Import to analyze uploaded files, create source records, and preserve file logs inside the atlas.</p>
+                    <button class="ghost-button" type="button" data-file-route-panel="importPanel">Go to Import</button>
+                  </section>
+                  <section class="api-panel">
+                    <h3>Document Drafting</h3>
+                    <p>Use Docs for drafting, HTML/TXT/JSON export, print-to-PDF handoff, and source-ready research notes.</p>
+                    <button class="ghost-button" type="button" data-file-route-panel="collabPanel">Go to Docs</button>
+                  </section>
+                  <section class="api-panel">
+                    <h3>Source Records</h3>
+                    <p>Use Sources to view added file logs, URLs, previews, source metadata, and verified research entries.</p>
+                    <button class="ghost-button" type="button" data-file-route-panel="sourcePanel">Go to Sources</button>
+                  </section>
+                </div>
               </div>
             </section>
 

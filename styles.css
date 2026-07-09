@@ -1770,6 +1770,83 @@ input[type="range"] {
   overflow-wrap: anywhere;
 }
 
+.file-handoff-panel {
+  gap: 16px;
+}
+
+.file-clean-slate-panel {
+  gap: 14px;
+}
+
+.file-integration-grid,
+.file-routing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.file-integration-card {
+  display: grid;
+  gap: 12px;
+  align-content: space-between;
+  min-height: 230px;
+  padding: 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, #f7f7f7 0%, #c5c5c5 48%, #3b3b3b 100%) padding-box,
+    var(--border-gradient) border-box;
+  color: #080808;
+}
+
+.file-integration-card h3 {
+  margin: 10px 0 6px;
+  color: #080808;
+  font-size: 21px;
+  line-height: 1.15;
+}
+
+.file-integration-card p {
+  margin: 0;
+  color: #151515;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.file-integration-card code {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.28);
+  border-radius: 8px;
+  color: #080808;
+  background: rgba(255, 255, 255, 0.72);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.file-integration-card .detail-chip {
+  color: #fff;
+  background: #050505;
+}
+
+.file-routing-grid .api-panel {
+  align-content: start;
+}
+
+.file-routing-grid h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.file-routing-grid p {
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .integration-panel h2 {
   margin: 0 0 12px;
   font-size: 16px;

@@ -774,6 +774,8 @@ function cacheElements() {
   els.exportCollabJsonButton = document.getElementById("exportCollabJsonButton");
   els.printCollabDocButton = document.getElementById("printCollabDocButton");
   els.collabDocToSourceButton = document.getElementById("collabDocToSourceButton");
+  els.fileIntegrationStatus = document.getElementById("fileIntegrationStatus");
+  els.fileIntegrationGrid = document.getElementById("fileIntegrationGrid");
   els.createMemorySnapshotButton = document.getElementById("createMemorySnapshotButton");
   els.exportMemoryBankButton = document.getElementById("exportMemoryBankButton");
   els.memoryBankSummary = document.getElementById("memoryBankSummary");
@@ -875,6 +877,14 @@ function wireEvents() {
   els.exportCollabJsonButton.addEventListener("click", () => exportActiveCollabDoc("json"));
   els.printCollabDocButton.addEventListener("click", printActiveCollabDoc);
   els.collabDocToSourceButton.addEventListener("click", addActiveCollabDocToSources);
+  els.fileIntegrationGrid?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-file-integration-open]");
+    if (!button) return;
+    openExternalUrl(button.dataset.fileIntegrationOpen);
+  });
+  document.querySelectorAll("[data-file-route-panel]").forEach((button) => {
+    button.addEventListener("click", () => setActivePanel(button.dataset.fileRoutePanel, { save: true }));
+  });
   els.createMemorySnapshotButton.addEventListener("click", () => createManualMemorySnapshot("Manual user snapshot"));
   els.exportMemoryBankButton.addEventListener("click", exportMemoryBank);
   els.profileForm.addEventListener("submit", handleSaveProfile);
@@ -1157,6 +1167,7 @@ function render() {
   renderTeamSyncSettings();
   renderTeamChat();
   renderCollabDocs();
+  renderFileIntegrations();
   renderMemoryBank();
   renderProfiles();
   renderReferenceLibrary();
@@ -4768,6 +4779,41 @@ function renderCollabDocs() {
   els.collabDocOwnerInput.value = active.owner || state.currentUser?.username || "";
   els.collabDocStatusChip.textContent = `${active.type || "Document"} / ${active.status || "Draft"}`;
   els.collabDocEditor.innerHTML = sanitizeDocHtml(active.contentHtml || "<p>Start drafting here.</p>");
+}
+
+function renderFileIntegrations() {
+  if (!els.fileIntegrationGrid) return;
+  const workspace =
+    state.archive.externalApis?.cloudStorageWorkspace || SEED_DATA.externalApis.cloudStorageWorkspace;
+  const services = Array.isArray(workspace?.services) ? workspace.services : [];
+  if (els.fileIntegrationStatus) {
+    els.fileIntegrationStatus.textContent =
+      workspace?.status || "External launch integrations for import/export handoff from the Files tab.";
+  }
+
+  els.fileIntegrationGrid.innerHTML = services.length
+    ? services
+        .map((service) => {
+          const name = service.name || "External workspace";
+          const url = service.url || "";
+          const purpose = service.purpose || "Cloud file handoff";
+          const host = domainFromUrl(url);
+          return `
+            <article class="file-integration-card">
+              <div>
+                <span class="detail-chip">${escapeHtml(host || "external")}</span>
+                <h3>${escapeHtml(name)}</h3>
+                <p>${escapeHtml(purpose)}</p>
+              </div>
+              <code>${escapeHtml(url || "No URL configured")}</code>
+              <button class="ghost-button" type="button" data-file-integration-open="${escapeHtml(url)}" ${url ? "" : "disabled"}>
+                Open ${escapeHtml(name)}
+              </button>
+            </article>
+          `;
+        })
+        .join("")
+    : '<div class="empty-state">No cloud file integrations are configured yet.</div>';
 }
 
 function createCollabDoc() {

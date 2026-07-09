@@ -68,6 +68,10 @@ The Import panel supports common research formats:
 
 Imports can create Source records and file logs. ChatGPT export structures are detected so useful conversation data can be reviewed inside the atlas.
 
+## File Manager Integrations
+
+The Files panel is a clean cloud handoff section for Google Drive, MEGA Cloud, Google Docs, Google Forms, and Google Sheets. It opens those services externally while keeping atlas-managed uploads, source logs, and document drafts inside Import, Sources, and Docs.
+
 ## Collaboration
 
 The Team panel supports posts, updates, links, and recommendations. Recommendations can be rejected or added to Sources by signed-in users.
